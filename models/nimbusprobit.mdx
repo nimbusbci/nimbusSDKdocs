@@ -1,6 +1,6 @@
 ---
 title: "NimbusProbit (Julia only)"
-description: "Bayesian Multinomial Probit Regression for BCI classification in NimbusSDK.jl. Flexible non-Gaussian decision boundaries with uncertainty quantification."
+description: "NimbusProbit for Julia: Bayesian multinomial probit classification with uncertainty quantification and flexible non-Gaussian boundaries for BCI tasks."
 keywords: ["NimbusProbit", "Bayesian Probit", "Multinomial Probit Regression", "BCI", "RxInfer", "Julia SDK", "uncertainty quantification", "classification"]
 icon: "brain"
 ---
@@ -49,7 +49,7 @@ println("Accuracy: $(sum(results.predictions .== labels) / length(labels))")
 - If latency must be minimized: start with `NimbusLDA`, then `NimbusQDA`
 - If the task is non-stationary / drifting: use `NimbusSTS` (Python-only)
 
-## Next Steps
+## Next Read
 
 - Julia SDK reference: `/julia-sdk/api-reference`
 - Static Gaussian models: `/models/rxlda`, `/models/rxgmm`

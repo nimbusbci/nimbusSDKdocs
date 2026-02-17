@@ -1,6 +1,6 @@
 ---
 title: "Bayesian QDA"
-description: "NimbusQDA is a Bayesian QDA-style classifier with class-specific covariances. Flexible 15-25ms inference for P300 and overlapping class distributions."
+description: "Bayesian QDA classifier with class-specific covariances for overlapping BCI classes, delivering uncertainty-aware inference in 15-25ms."
 keywords: ["NimbusQDA", "Bayesian QDA", "Quadratic Discriminant Analysis", "P300", "BCI classification", "heteroscedastic", "class-specific covariance", "RxInfer"]
 icon: "brain"
 ---
@@ -20,9 +20,23 @@ NimbusQDA is a Bayesian classification model with **class-specific covariance ma
 Both implementations provide class-specific covariances for flexible modeling.
 </Note>
 
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Start with SDK setup and first inference workflow.
+  </Card>
+  <Card title="Model Selection" icon="box" href="/model-specification">
+    Compare Nimbus models by data characteristics and use case.
+  </Card>
+  <Card title="Examples" icon="braces" href="/examples/basic-examples">
+    See practical BCI examples for training and inference.
+  </Card>
+</CardGroup>
+
 ## Overview
 
-Bayesian QDA extends beyond traditional Gaussian classifiers by allowing each class to have its own covariance structure:<br/>
+Bayesian QDA extends beyond traditional Gaussian classifiers by allowing each class to have its own covariance structure:
 ✅ **Class-specific covariances** (unlike Bayesian LDA's shared covariance)<br/>
 ✅ **More flexible modeling** of heterogeneous distributions<br/>
 ✅ **Posterior probability distributions** with uncertainty quantification<br/>
@@ -921,7 +935,7 @@ if rxlda_acc < 0.75
 end
 ```
 
-## Next Steps
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="Bayesian LDA (NimbusLDA)" icon="brain" href="/models/rxlda">

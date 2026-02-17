@@ -1,6 +1,6 @@
 ---
 title: "Model Specification"
-description: "Overview of probabilistic models in Nimbus. Learn about NimbusLDA/NimbusQDA plus non-Gaussian models (NimbusSoftmax, NimbusProbit) and adaptive NimbusSTS with factor graphs and reactive message passing."
+description: "Technical overview of Nimbus probabilistic models, including NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusProbit, and adaptive NimbusSTS."
 keywords: ["model specification", "probabilistic models", "Bayesian models", "factor graphs", "message passing", "RxInfer", "BCI models", "Bayesian inference", "Nimbus models"]
 icon: "box"
 ---
@@ -21,6 +21,20 @@ For detailed implementation, see the individual model pages above.
 </Info>
 
 ---
+
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Bayesian LDA" icon="brain" href="/models/rxlda">
+    Start with fast shared-covariance classification.
+  </Card>
+  <Card title="Bayesian QDA" icon="brain" href="/models/rxgmm">
+    Use class-specific covariance for overlapping classes.
+  </Card>
+  <Card title="Bayesian STS" icon="brain" href="/models/rxsts">
+    Choose adaptive stateful modeling for non-stationarity.
+  </Card>
+</CardGroup>
 
 ## Model Architecture
 
@@ -322,7 +336,7 @@ print(f"ECE: {calib_metrics.ece:.3f}")
 
 ---
 
-## Next Steps
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="NimbusLDA" icon="brain" href="/models/rxlda">

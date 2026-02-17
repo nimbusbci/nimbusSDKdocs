@@ -1,6 +1,6 @@
 ---
 title: "Julia SDK Quickstart"
-description: "Get started with Nimbus BCI in minutes - from API key to your first BCI application. Learn installation, authentication, and basic inference with NimbusSDK.jl."
+description: "Get started with NimbusSDK.jl from API key setup to first BCI inference, including installation, authentication, and production-ready basics."
 keywords: ["Julia SDK", "quickstart", "NimbusSDK.jl", "Julia BCI", "getting started", "tutorial", "BCI", "Bayesian inference", "RxInfer", "Julia tutorial"]
 icon: "rocket"
 ---
@@ -291,7 +291,7 @@ NimbusSDK includes Bayesian inference models for different BCI scenarios:
 All models use **RxInfer.jl** for efficient variational Bayesian inference with reactive message passing.
 </Note>
 
-## Next Steps
+## Next Read
 
 Now that you have NimbusSDK running, explore these advanced features:
 
@@ -341,6 +341,20 @@ Now that you have NimbusSDK running, explore these advanced features:
     Real-time brain state monitoring and training
   </Card>
 </CardGroup>
+
+## Quickstart FAQ
+
+<AccordionGroup>
+  <Accordion title="Do I need an API key for NimbusSDK.jl?" icon="key">
+    Yes. Install the wrapper with `Pkg.add("NimbusSDK")`, then run `NimbusSDK.install_core("your-api-key")` once per machine.
+  </Accordion>
+  <Accordion title="Can I run inference on raw EEG?" icon="waveform">
+    NimbusSDK.jl expects preprocessed features rather than raw EEG. See [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) and [Feature Normalization](/inference-configuration/feature-normalization).
+  </Accordion>
+  <Accordion title="What should I read after quickstart?" icon="arrow-right">
+    Continue with the [Julia SDK API Reference](/julia-sdk/api-reference), [Batch Processing](/inference-configuration/batch-processing), and [Streaming Inference](/inference-configuration/streaming-inference).
+  </Accordion>
+</AccordionGroup>
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
 ---
-title: "Authentication"
-description: "API key authentication and license management for Nimbus. Learn how to get API keys, authenticate requests, and manage licenses."
+title: "Cloud API Authentication"
+description: "Authenticate Nimbus Cloud API requests with API keys, license validation, and secure usage patterns for Julia SDK integrations."
 keywords: ["authentication", "API key", "license management", "Nimbus API", "Julia SDK", "API authentication", "license tiers", "API credentials", "BCI"]
 icon: "key"
 ---
@@ -444,6 +444,37 @@ To upgrade your license tier, contact **hello@nimbusbci.com** with:
 - Use case details
 - Expected monthly volume
 
+## Authentication FAQ
+
+<AccordionGroup>
+  <Accordion title="Do Python SDK users need Cloud API authentication?" icon="help-circle">
+    No. The Python SDK runs locally and does not require API authentication. Cloud API authentication is primarily for Julia SDK installation, licensing, and model registry workflows.
+  </Accordion>
+  <Accordion title="How often do I need to run install_core?" icon="clock">
+    `NimbusSDK.install_core()` is typically a one-time setup per machine. After the core is installed and credentials are cached, normal SDK usage does not require repeated setup.
+  </Accordion>
+  <Accordion title="What causes authentication failures most often?" icon="alert-triangle">
+    Common causes are invalid key format, expired or revoked keys, quota/rate limits, and missing environment-variable configuration in deployment environments.
+  </Accordion>
+</AccordionGroup>
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="Cloud API Reference" icon="server" href="/cloud-api/introduction">
+    Endpoint overview, base URL, and service scope.
+  </Card>
+  <Card title="Cloud API Endpoints" icon="list" href="/cloud-api/inference-endpoints">
+    Model registry and analytics endpoint details.
+  </Card>
+  <Card title="Julia SDK Quickstart" icon="code" href="/julia-sdk/quickstart">
+    End-to-end install and first-inference setup path.
+  </Card>
+  <Card title="Python SDK Quickstart" icon="python" href="/python-sdk/quickstart">
+    Local-only Python workflow without API authentication.
+  </Card>
+</CardGroup>
+
 ## Troubleshooting
 
 ### "Invalid API key" Error
@@ -489,7 +520,7 @@ end
 session = authenticate_with_retry(api_key)
 ```
 
-## Next Steps
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="Julia SDK" icon="code" href="/julia-sdk/api-reference">

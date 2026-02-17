@@ -1,6 +1,6 @@
 ---
 title: "Python SDK"
-description: "Overview of nimbus-bci Python library for Bayesian BCI classification. sklearn-compatible Bayesian classifiers with MNE-Python integration for motor imagery, P300, and SSVEP."
+description: "Overview of the nimbus-bci Python SDK: sklearn-compatible Bayesian classifiers with MNE integration for motor imagery, P300, and SSVEP."
 keywords: ["Python SDK", "nimbus-bci", "Python BCI", "Bayesian BCI", "sklearn", "MNE-Python", "motor imagery", "P300", "SSVEP", "Python library", "BCI classification"]
 icon: "python"
 ---
@@ -8,6 +8,20 @@ icon: "python"
 # Python SDK
 
 The **nimbus-bci** Python library provides sklearn-compatible Bayesian classifiers for Brain-Computer Interface applications. Built on JAX and NumPyro, it delivers fast probabilistic inference with full uncertainty quantification, streaming support, and rich diagnostics.
+
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Install nimbus-bci" icon="download" href="/python-sdk/installation">
+    Install and verify your Python SDK environment.
+  </Card>
+  <Card title="Run Quickstart" icon="rocket" href="/python-sdk/quickstart">
+    Build your first Bayesian BCI classifier in minutes.
+  </Card>
+  <Card title="Pick a Model" icon="brain" href="/model-specification">
+    Compare NimbusLDA, NimbusQDA, NimbusSoftmax, and NimbusSTS.
+  </Card>
+</CardGroup>
 
 ## Overview
 
@@ -180,7 +194,7 @@ The `nimbus-bci` package provides:
 - `extract_csp_features()` - CSP feature extraction
 - `extract_bandpower_features()` - Bandpower features
 
-## Next Steps
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="Installation" icon="download" href="/python-sdk/installation">
@@ -209,4 +223,30 @@ Need help? We're here for you:
 ---
 
 Ready to get started? Head to the [Installation Guide](/python-sdk/installation) to install nimbus-bci.
+
+<script
+  type="application/ld+json"
+  dangerouslySetInnerHTML={{
+    __html: JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'TechArticle',
+      headline: 'Python SDK',
+      description:
+        'Overview of the nimbus-bci Python SDK: sklearn-compatible Bayesian classifiers with MNE integration for motor imagery, P300, and SSVEP.',
+      author: {
+        '@type': 'Organization',
+        name: 'Nimbus BCI',
+        url: 'https://nimbusbci.com',
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Nimbus BCI',
+        url: 'https://nimbusbci.com',
+      },
+      inLanguage: 'en-US',
+      isAccessibleForFree: true,
+      url: 'https://docs.nimbusbci.com/python-sdk/introduction',
+    }),
+  }}
+/>
 

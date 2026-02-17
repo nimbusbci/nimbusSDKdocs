@@ -1,6 +1,6 @@
 ---
 title: "Bayesian Multinomial"
-description: "Bayesian Multinomial Logistic Regression with uncertainty quantification using RxInfer.jl. Flexible 15-25ms inference for complex multinomial BCI classification tasks."
+description: "Bayesian multinomial classifier for non-Gaussian BCI decision boundaries, with uncertainty quantification and 15-25ms inference for complex tasks."
 keywords: ["Bayesian Softmax", "NimbusSoftmax", "Multinomial Logistic Regression", "multinomial classification", "BCI", "logistic regression", "RxInfer", "NimbusSoftmax", "probabilistic classification"]
 icon: "brain"
 ---
@@ -18,9 +18,23 @@ Bayesian Softmax is a Bayesian multinomial classification model with uncertainty
 - **Julia SDK**: ✅ `NimbusProbit`
 </Note>
 
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Start with SDK setup and first inference workflow.
+  </Card>
+  <Card title="Model Selection" icon="box" href="/model-specification">
+    Compare Nimbus models by data characteristics and use case.
+  </Card>
+  <Card title="Examples" icon="braces" href="/examples/basic-examples">
+    See practical BCI examples for training and inference.
+  </Card>
+</CardGroup>
+
 ## Overview
 
-Bayesian Softmax provides a powerful alternative to traditional Gaussian classifiers:<br/>
+Bayesian Softmax provides a powerful alternative to traditional Gaussian classifiers:
 ✅ **Full Bayesian inference** with posterior probability distributions<br/>
 ✅ **Uncertainty quantification** for each prediction<br/>
 ✅ **Continuous transition mapping** from features to latent space<br/>
@@ -1161,7 +1175,7 @@ end
   </Tab>
 </Tabs>
 
-## Next Steps
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="Bayesian LDA (NimbusLDA)" icon="brain" href="/models/rxlda">

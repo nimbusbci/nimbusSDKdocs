@@ -1,6 +1,6 @@
 ---
 title: "Python SDK Quickstart"
-description: "Build your first BCI classifier with nimbus-bci in 5 minutes. Learn installation, basic usage, sklearn integration, and real-time streaming inference for Bayesian BCI models."
+description: "Build your first nimbus-bci classifier in minutes with installation, sklearn integration, and real-time streaming inference."
 keywords: ["Python SDK", "nimbus-bci", "BCI quickstart", "Bayesian BCI", "Python tutorial", "sklearn integration", "streaming inference", "motor imagery", "P300"]
 icon: "rocket"
 ---
@@ -472,7 +472,7 @@ from nimbus_bci.models.nimbus_lda import nimbus_lda_predict
 predictions = nimbus_lda_predict(loaded_model, X_test)
 ```
 
-## Next Steps
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
@@ -544,6 +544,20 @@ for trial in online_session:
     # Update model
     clf.partial_fit(trial.features.reshape(1, -1), [true_label])
 ```
+
+## Quickstart FAQ
+
+<AccordionGroup>
+  <Accordion title="Can I use nimbus-bci with raw EEG?" icon="help-circle">
+    Not directly. `nimbus-bci` expects preprocessed features (for example CSP, bandpower, or ERP features). See [Preprocessing Requirements](/inference-configuration/preprocessing-requirements).
+  </Accordion>
+  <Accordion title="Which classifier should I start with?" icon="brain">
+    Start with `NimbusLDA` for fast baselines, especially motor imagery. Try `NimbusQDA` for overlapping distributions (such as P300), and `NimbusSTS` for non-stationary sessions.
+  </Accordion>
+  <Accordion title="What should I do after this quickstart?" icon="arrow-right">
+    Continue with [sklearn Integration](/python-sdk/sklearn-integration), [MNE-Python Integration](/python-sdk/mne-integration), and [Streaming Inference](/python-sdk/streaming-inference).
+  </Accordion>
+</AccordionGroup>
 
 ## Troubleshooting
 

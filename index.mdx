@@ -1,6 +1,6 @@
 ---
 title: "Nimbus BCI Engine"
-description: "Production-ready Bayesian inference for Brain-Computer Interfaces in Python and Julia. Fast sub-30ms inference latency with NimbusLDA and NimbusQDA, plus NimbusSoftmax/NimbusSTS (Python) and NimbusProbit (Julia). Full uncertainty quantification for motor imagery, P300, and SSVEP paradigms."
+description: "Production-ready Bayesian BCI inference in Python and Julia with sub-30ms latency, uncertainty quantification, and models for motor imagery, P300, and SSVEP."
 keywords: ["BCI", "brain-computer interface", "Bayesian inference", "EEG", "motor imagery", "P300", "SSVEP", "probabilistic AI", "RxInfer", "Nimbus BCI", "Python SDK", "Julia SDK", "Bayesian LDA", "Bayesian QDA", "uncertainty quantification", "real-time BCI"]
 icon: "brain"
 ---
@@ -23,6 +23,20 @@ Nimbus provides fast, probabilistic inference for Brain-Computer Interface appli
   </Card>
   <Card title="Julia SDK (NimbusSDK.jl)" icon="code" href="/julia-sdk/quickstart">
     Built on RxInfer.jl for maximum performance
+  </Card>
+</CardGroup>
+
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Python Quickstart" icon="python" href="/python-sdk/quickstart">
+    Start with local sklearn-compatible workflows in nimbus-bci.
+  </Card>
+  <Card title="Julia Quickstart" icon="code" href="/julia-sdk/quickstart">
+    Start with NimbusSDK.jl and RxInfer-powered inference.
+  </Card>
+  <Card title="Model Selection" icon="brain" href="/model-specification">
+    Choose the right Bayesian model for your BCI task.
   </Card>
 </CardGroup>
 
@@ -358,6 +372,38 @@ EEG Hardware → Preprocessing → Nimbus SDK → Application
     Authentication and model registry
   </Card>
 </CardGroup>
+
+## Next Read
+
+<CardGroup cols={3}>
+  <Card title="Python SDK" icon="python" href="/python-sdk/introduction">
+    Understand local Python workflows and integration patterns.
+  </Card>
+  <Card title="Julia SDK" icon="code" href="/julia-sdk/api-reference">
+    Explore Julia API workflows and model operations.
+  </Card>
+  <Card title="Cloud API" icon="server" href="/cloud-api/introduction">
+    Review authentication, licensing, and endpoint architecture.
+  </Card>
+</CardGroup>
+
+## Common Questions
+
+<AccordionGroup>
+  <Accordion title="Which SDK should I choose: Python or Julia?" icon="help-circle">
+    Use the [Python SDK Quickstart](/python-sdk/quickstart) if you want sklearn-compatible workflows, MNE integration, and fully local development with `pip`.
+
+    Use the [Julia SDK Quickstart](/julia-sdk/quickstart) if you want RxInfer.jl-native performance, model registry access, and Julia-first pipelines.
+  </Accordion>
+  <Accordion title="Which Nimbus model should I start with?" icon="brain">
+    Start with [Bayesian LDA](/models/rxlda) for most motor-imagery pipelines and fast baseline performance.
+
+    Move to [Bayesian QDA](/models/rxgmm) for overlapping class distributions (for example, P300), and use [Bayesian STS](/models/rxsts) for non-stationary sessions that drift over time.
+  </Accordion>
+  <Accordion title="Can Nimbus process raw EEG directly?" icon="waveform">
+    Nimbus expects preprocessed features rather than raw EEG. See [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) and [Feature Normalization](/inference-configuration/feature-normalization) for the recommended pipeline.
+  </Accordion>
+</AccordionGroup>
 
 ## Performance
 

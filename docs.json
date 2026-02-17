@@ -125,6 +125,28 @@
       }
     ]
   },
+  "redirects": [
+    {
+      "source": "/api-reference/introduction",
+      "destination": "/cloud-api/introduction"
+    },
+    {
+      "source": "/api-reference/authentication",
+      "destination": "/cloud-api/authentication"
+    },
+    {
+      "source": "/api-reference/inference-endpoints",
+      "destination": "/cloud-api/inference-endpoints"
+    },
+    {
+      "source": "/api-reference/streaming-api",
+      "destination": "/cloud-api/streaming-api"
+    },
+    {
+      "source": "/api-reference/julia-sdk",
+      "destination": "/julia-sdk/api-reference"
+    }
+  ],
   "anchors": [
     {
       "name": "Website",
@@ -202,7 +224,7 @@
   },
   "seo": {
     "title": "Nimbus BCI Engine - Bayesian Inference for Brain-Computer Interfaces",
-    "description": "Production-ready Bayesian BCI inference with NimbusLDA and NimbusQDA in Python & Julia, plus NimbusSoftmax and NimbusSTS (Python) and NimbusProbit (Julia). Fast sub-30ms inference latency with uncertainty quantification.",
+    "description": "Documentation for Nimbus BCI: Bayesian inference in Python and Julia with sub-30ms latency, uncertainty quantification, and production-ready SDK workflows.",
     "og": {
       "image": "/images/hero.png",
       "type": "website",

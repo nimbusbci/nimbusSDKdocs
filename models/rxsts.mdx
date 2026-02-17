@@ -1,6 +1,6 @@
 ---
 title: "Bayesian STS"
-description: "Bayesian Structural Time Series classifier with Extended Kalman Filter for non-stationary BCI data. Adaptive temporal modeling for EEG signals with drift adaptation and state management."
+description: "Stateful Bayesian STS for non-stationary BCI data, combining drift adaptation, temporal dynamics, and uncertainty-aware inference in 20-30ms."
 keywords: ["Bayesian STS", "NimbusSTS", "Structural Time Series", "Kalman Filter", "non-stationary BCI", "adaptive classification", "temporal drift", "state-space model", "BCI", "EEG"]
 icon: "brain"
 ---
@@ -20,9 +20,23 @@ Bayesian STS is a **stateful** Bayesian classification model designed for **non-
 This is the **only model in the SDK** that explicitly handles temporal dynamics and non-stationary distributions.
 </Note>
 
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Start with SDK setup and first inference workflow.
+  </Card>
+  <Card title="Model Selection" icon="box" href="/model-specification">
+    Compare Nimbus models by data characteristics and use case.
+  </Card>
+  <Card title="Examples" icon="braces" href="/examples/basic-examples">
+    See practical BCI examples for training and inference.
+  </Card>
+</CardGroup>
+
 ## Overview
 
-Bayesian STS extends beyond traditional static classifiers by modeling **latent state evolution** over time:<br/>
+Bayesian STS extends beyond traditional static classifiers by modeling **latent state evolution** over time:
 ✅ **Temporal state dynamics** with Extended Kalman Filter<br/>
 ✅ **Drift adaptation** for non-stationary data<br/>
 ✅ **State management API** for explicit time propagation<br/>
@@ -908,7 +922,7 @@ for i, (features, true_label) in enumerate(online_trials):
           f"latency={latency_ms:.1f}ms")
 ```
 
-## Next Steps
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="Bayesian LDA (NimbusLDA)" icon="brain" href="/models/rxlda">

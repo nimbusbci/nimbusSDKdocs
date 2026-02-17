@@ -1,6 +1,6 @@
 ---
-title: 'API Reference'
-description: 'Nimbus API for authentication, licensing, and model registry. REST API documentation for Julia SDK backend services.'
+title: "Cloud API Reference"
+description: "Cloud API reference for Nimbus authentication, licensing, model registry, and backend endpoints used by the Julia SDK."
 keywords: ["API reference", "Nimbus API", "REST API", "authentication", "model registry", "licensing", "Julia SDK", "API documentation", "BCI API"]
 icon: 'book-open'
 ---
@@ -17,6 +17,20 @@ The Nimbus API provides backend services for the Julia SDK (NimbusSDK.jl), inclu
 <Note>
 **Python SDK Users**: The Python SDK (`nimbus-bci`) does **not** require API keys or API access. All processing is local. See the [Python SDK documentation](/python-sdk/introduction) for details.
 </Note>
+
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Authentication" icon="key" href="/cloud-api/authentication">
+    Validate API keys, quotas, and license behavior.
+  </Card>
+  <Card title="Endpoints" icon="list" href="/cloud-api/inference-endpoints">
+    Review model registry and analytics API routes.
+  </Card>
+  <Card title="Julia Setup" icon="code" href="/julia-sdk/quickstart">
+    Install NimbusSDK.jl and enable authenticated workflows.
+  </Card>
+</CardGroup>
 
 ## API Base URL
 
@@ -84,7 +98,7 @@ The Nimbus API provides the following endpoints:
 
 Detailed documentation for each endpoint is available in the following pages.
 
-## Next Steps
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="Python SDK" icon="python" href="/python-sdk/introduction">
@@ -100,3 +114,29 @@ Detailed documentation for each endpoint is available in the following pages.
     Pre-trained models (Julia SDK)
   </Card>
 </CardGroup>
+
+<script
+  type="application/ld+json"
+  dangerouslySetInnerHTML={{
+    __html: JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'TechArticle',
+      headline: 'Cloud API Reference',
+      description:
+        'Cloud API reference for Nimbus authentication, licensing, model registry, and backend endpoints used by the Julia SDK.',
+      author: {
+        '@type': 'Organization',
+        name: 'Nimbus BCI',
+        url: 'https://nimbusbci.com',
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Nimbus BCI',
+        url: 'https://nimbusbci.com',
+      },
+      inLanguage: 'en-US',
+      isAccessibleForFree: true,
+      url: 'https://docs.nimbusbci.com/cloud-api/introduction',
+    }),
+  }}
+/>

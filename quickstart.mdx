@@ -1,6 +1,6 @@
 ---
-title: "Quickstart"
-description: "Choose your SDK and get started with Nimbus BCI quickly."
+title: "Nimbus Quickstart"
+description: "Start quickly with Nimbus by choosing the Python or Julia SDK and following setup paths for your first BCI workflow."
 keywords: ["quickstart", "Nimbus", "Python SDK", "Julia SDK", "getting started", "tutorial", "BCI"]
 icon: "rocket"
 ---
@@ -22,15 +22,32 @@ Choose your SDK:
 If you landed here from an older link: the Julia quickstart moved from `/quickstart` to `/julia-sdk/quickstart`.
 </Note>
 
+## Start Here
+
+<CardGroup cols={2}>
+  <Card title="Python Setup Path" icon="python" href="/python-sdk/quickstart">
+    Install `nimbus-bci`, run your first classifier, and add streaming.
+  </Card>
+  <Card title="Julia Setup Path" icon="code" href="/julia-sdk/quickstart">
+    Install NimbusSDK.jl, authenticate, and run your first inference.
+  </Card>
+  <Card title="Preprocessing Requirements" icon="list-filter" href="/inference-configuration/preprocessing-requirements">
+    Required feature pipeline for motor imagery, P300, and SSVEP.
+  </Card>
+  <Card title="Model Selection Guide" icon="brain" href="/model-specification">
+    Choose the right Bayesian model for your BCI task.
+  </Card>
+</CardGroup>
+
 ## Prerequisites
 
 Before you begin, make sure you have:
-- **Julia 1.9+** installed on your system
+- **Python 3.10+** (for Python SDK) or **Julia 1.9+** (for Julia SDK)
 - **Basic understanding** of EEG data and BCI concepts
 - **Preprocessed features** (CSP, bandpower, etc.) - see [preprocessing requirements](/inference-configuration/preprocessing-requirements)
 
 <Tip>
-**Important**: NimbusSDK.jl expects **preprocessed features**, not raw EEG data. You must apply bandpass filtering, artifact removal, and feature extraction (e.g., CSP) before using the SDK.
+**Important**: Nimbus SDKs expect **preprocessed features**, not raw EEG data. Apply filtering, artifact removal, and feature extraction (for example, CSP) before inference.
 </Tip>
 
 ## Step 1: Get Your API Key
@@ -295,7 +312,7 @@ NimbusSDK includes Bayesian inference models for different BCI scenarios:
 All models use **RxInfer.jl** for efficient variational Bayesian inference with reactive message passing.
 </Note>
 
-## Next Steps
+## Next Read
 
 Now that you have NimbusSDK running, explore these advanced features:
 
@@ -345,6 +362,20 @@ Now that you have NimbusSDK running, explore these advanced features:
     Real-time brain state monitoring and training
   </Card>
 </CardGroup>
+
+## Quickstart FAQ
+
+<AccordionGroup>
+  <Accordion title="Do I need an API key for both SDKs?" icon="key">
+    No. The Python SDK (`nimbus-bci`) runs locally and does not require an API key. The Julia SDK (`NimbusSDK.jl`) requires an API key for installation and model access.
+  </Accordion>
+  <Accordion title="What data format does Nimbus expect?" icon="database">
+    Use extracted features, not raw EEG. Typical shape is `(n_features x n_samples x n_trials)` for batch workflows. See [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) for full guidance.
+  </Accordion>
+  <Accordion title="What should I read next after setup?" icon="arrow-right">
+    Continue with [Streaming Inference](/inference-configuration/streaming-inference), [Feature Normalization](/inference-configuration/feature-normalization), and [Basic Examples](/examples/basic-examples).
+  </Accordion>
+</AccordionGroup>
 
 ## Troubleshooting
 

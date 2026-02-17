@@ -1,6 +1,6 @@
 ---
-title: "API Endpoints"
-description: "Nimbus API endpoints for model registry and analytics. REST API reference for model management, inference, and usage tracking."
+title: "Cloud API Endpoints"
+description: "Reference for Nimbus Cloud API endpoints covering model registry access, inference operations, analytics, and usage workflows."
 keywords: ["API endpoints", "REST API", "model registry", "analytics", "Nimbus API", "endpoints", "API documentation", "model management", "BCI API"]
 icon: "database"
 ---
@@ -8,6 +8,20 @@ icon: "database"
 # API Endpoints
 
 The Nimbus API provides backend services for model management and analytics. **Note**: Inference is performed locally by NimbusSDK.jl, not via API calls.
+
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Cloud API Authentication" icon="key" href="/cloud-api/authentication">
+    Set up API keys, license checks, and secure access patterns.
+  </Card>
+  <Card title="Cloud API Reference" icon="book-open" href="/cloud-api/introduction">
+    Review API scope, base URL, and service architecture.
+  </Card>
+  <Card title="Julia SDK Quickstart" icon="code" href="/julia-sdk/quickstart">
+    Run authenticated setup and load your first pre-trained model.
+  </Card>
+</CardGroup>
 
 ## Base URL
 
@@ -367,7 +381,21 @@ model = load_model(NimbusLDA, "motor_imagery_4class_v1")  # &lt;100ms
 
 Cache location: `~/.nimbus/models/`
 
-## Next Steps
+## Endpoints FAQ
+
+<AccordionGroup>
+  <Accordion title="Does this API run BCI inference directly?" icon="help-circle">
+    No. Inference runs locally in NimbusSDK.jl. The API is used for authentication, model registry access, installation flows, and optional analytics logging.
+  </Accordion>
+  <Accordion title="Which endpoint is required first?" icon="arrow-right">
+    Start with authentication (`/v1/auth/validate` via SDK setup), then use `/v1/models/list` to discover available models for your license tier.
+  </Accordion>
+  <Accordion title="Why can model loading be fast after first use?" icon="clock">
+    Models are cached locally after the first download, so subsequent `load_model(...)` calls typically avoid network fetches and complete much faster.
+  </Accordion>
+</AccordionGroup>
+
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="Authentication" icon="key" href="/cloud-api/authentication">

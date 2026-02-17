@@ -1,6 +1,6 @@
 ---
-title: "API Reference"
-description: "Complete API documentation for nimbus-bci Python SDK. Reference for NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusSTS classes and methods."
+title: "Python SDK API Reference"
+description: "Full nimbus-bci Python API reference for NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusSTS, and core inference utilities."
 keywords: ["API reference", "Python SDK", "nimbus-bci", "NimbusLDA", "NimbusQDA", "NimbusSoftmax", "NimbusSTS", "BCI API", "Python documentation"]
 icon: "book"
 ---
@@ -8,6 +8,20 @@ icon: "book"
 # Python SDK API Reference
 
 Complete reference for the nimbus-bci Python library.
+
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Python SDK Quickstart" icon="rocket" href="/python-sdk/quickstart">
+    Build and run your first classifier before diving into full API details.
+  </Card>
+  <Card title="Model Selection" icon="brain" href="/model-specification">
+    Compare NimbusLDA, NimbusQDA, NimbusSoftmax, and NimbusSTS use cases.
+  </Card>
+  <Card title="Streaming Inference" icon="activity" href="/python-sdk/streaming-inference">
+    Move from batch workflows to real-time BCI inference patterns.
+  </Card>
+</CardGroup>
 
 ## Classifiers
 
@@ -867,7 +881,21 @@ def train_classifier(
     return clf
 ```
 
-## Next Steps
+## API FAQ
+
+<AccordionGroup>
+  <Accordion title="Which classifier should I start with?" icon="help-circle">
+    Start with `NimbusLDA` for fast baselines, especially motor imagery. Use `NimbusQDA` for overlapping distributions and `NimbusSTS` for non-stationary sessions.
+  </Accordion>
+  <Accordion title="When should I use StreamingSession instead of predict_batch?" icon="arrow-right">
+    Use `predict_batch` for offline trials and evaluation. Use `StreamingSession` for chunk-by-chunk real-time inference where latency and incremental decisions matter.
+  </Accordion>
+  <Accordion title="Do I need MNE-Python to use nimbus-bci?" icon="brain">
+    No. MNE integration is optional. You can use `nimbus-bci` with any preprocessing pipeline as long as you provide correctly shaped feature arrays.
+  </Accordion>
+</AccordionGroup>
+
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="sklearn Integration" icon="code" href="/python-sdk/sklearn-integration">
