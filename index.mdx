@@ -103,7 +103,7 @@ Brain-Computer Interfaces face unique challenges: noisy neural signals, inherent
   <Card
     title="Uncertainty Quantification"
     icon="shield"
-    href="/core-concepts/uncertainty-handling"
+    href="/core-concepts/probabilistic-ai"
   >
     Full posterior distributions with confidence scores for quality assessment and rejection
   </Card>
@@ -129,11 +129,18 @@ Nimbus provides production-ready Bayesian models. Some are available in both SDK
     **Bayesian Quadratic Discriminant Analysis** with class-specific covariances. More flexible (15-25ms), better for overlapping distributions like P300. Python: `NimbusQDA`, Julia: `NimbusQDA`.
   </Card>
   <Card
-    title="Bayesian Multinomial (NimbusSoftmax / NimbusProbit)"
+    title="NimbusSoftmax (Python)"
     icon="brain"
     href="/models/rxpolya"
   >
-    **Non-Gaussian multinomial classifier family**. Python: `NimbusSoftmax`. Julia: `NimbusProbit`.
+    **Bayesian softmax classifier** for non-Gaussian Python workflows with posterior uncertainty and active-learning support.
+  </Card>
+  <Card
+    title="NimbusProbit (Julia)"
+    icon="brain"
+    href="/models/nimbusprobit"
+  >
+    **Bayesian multinomial probit classifier** for non-Gaussian Julia workflows built on RxInfer.
   </Card>
   <Card
     title="Bayesian STS (NimbusSTS)"

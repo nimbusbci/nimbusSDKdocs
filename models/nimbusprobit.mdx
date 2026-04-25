@@ -1,24 +1,24 @@
 ---
-title: "NimbusProbit (Julia only)"
-description: "NimbusProbit for Julia: Bayesian multinomial probit classification with uncertainty quantification and flexible non-Gaussian boundaries for BCI tasks."
-keywords: ["NimbusProbit", "Bayesian Probit", "Multinomial Probit Regression", "BCI", "RxInfer", "Julia SDK", "uncertainty quantification", "classification"]
+title: "NimbusProbit (Julia)"
+description: "NimbusProbit for Julia: Bayesian multinomial probit classification with RxInfer, uncertainty quantification, and flexible non-Gaussian boundaries for BCI tasks."
+keywords: ["NimbusProbit", "Bayesian Probit", "Multinomial Probit Regression", "Julia SDK", "NimbusSDK", "RxInfer", "BCI", "uncertainty quantification"]
 icon: "brain"
 ---
 
 # NimbusProbit — Bayesian Multinomial Probit Regression
 
-**Julia**: `NimbusProbit` | **Python**: Not currently available  
-**Mathematical Model**: Bayesian Multinomial Probit Regression
+**Julia**: `NimbusProbit` | **Python equivalent**: [`NimbusSoftmax`](/models/rxpolya)<br/>
+**Mathematical model**: Bayesian multinomial probit regression
 
-NimbusProbit is NimbusSDK.jl’s most flexible **static** classifier. Compared to Gaussian models (`NimbusLDA`, `NimbusQDA`), it can represent **non-Gaussian decision boundaries** while still producing calibrated posterior probabilities.
+`NimbusProbit` is the Julia SDK's flexible non-Gaussian static classifier. Compared with Gaussian models (`NimbusLDA`, `NimbusQDA`), it can represent more complex decision boundaries while still returning posterior probabilities and uncertainty metrics.
 
 <Note>
 **Availability**
 - **Julia SDK**: ✅ `NimbusProbit`
-- **Python SDK**: ❌ Not currently available (use `NimbusSoftmax` for a non-Gaussian static model in Python)
+- **Python SDK**: ❌ Use [`NimbusSoftmax`](/models/rxpolya) for Python's non-Gaussian static classifier
 </Note>
 
-## Quick Start (Julia)
+## Quick Start
 
 ```julia
 using NimbusSDK
@@ -35,23 +35,240 @@ model = train_model(
 
 # Batch inference
 results = predict_batch(model, test_data)
-println("Accuracy: $(sum(results.predictions .== labels) / length(labels))")
+accuracy = sum(results.predictions .== labels) / length(labels)
+println("Accuracy: $(round(accuracy * 100, digits=1))%")
 ```
 
 ## When to Use NimbusProbit
 
-- Complex multi-class tasks where `NimbusLDA` / `NimbusQDA` plateau
-- Non-Gaussian boundaries (e.g., overlapping clusters not well modeled by class-conditional Gaussians)
-- You still need **uncertainty quantification** and stable probabilities
+- You are using the **Julia SDK** and need a flexible static classifier.
+- `NimbusLDA` / `NimbusQDA` plateau on complex multi-class data.
+- Class boundaries are non-Gaussian or not well modeled by class-conditional Gaussians.
+- You need calibrated posterior probabilities from a probabilistic model.
 
 ## When Not to Use It
 
-- If latency must be minimized: start with `NimbusLDA`, then `NimbusQDA`
-- If the task is non-stationary / drifting: use `NimbusSTS` (Python-only)
+- If latency must be minimized: start with `NimbusLDA`, then `NimbusQDA`.
+- If class centers and Mahalanobis distance are important: use `NimbusLDA` or `NimbusQDA`.
+- If the task is non-stationary or drifting: use `NimbusSTS` in the Python SDK.
+- If you are using Python: use [`NimbusSoftmax`](/models/rxpolya).
+
+## Model Architecture
+
+`NimbusProbit` is implemented with RxInfer and models a latent multinomial probit representation.
+
+```julia
+struct NimbusProbit <: BCIModel
+    B_posterior                        # Learned regression coefficient posterior
+    W_posterior                        # Learned precision matrix posterior
+    metadata::ModelMetadata            # Model info
+    N::Int                             # Trials per observation
+    ξβ::Vector{Float64}                # Prior mean for B
+    Wβ::Matrix{Float64}                # Prior precision for B
+    W_df::Float64                      # Wishart degrees of freedom
+    W_scale::Matrix{Float64}           # Wishart scale matrix
+end
+```
+
+### RxInfer Learning Model
+
+```julia
+@model function NimbusProbit_learning_model(obs, N, X, n_classes, n_features,
+                                            ξβ, Wβ, W_df, W_scale)
+    B ~ MvNormalWeightedMeanPrecision(ξβ, Wβ)
+    W ~ Wishart(W_df, W_scale)
+
+    for i in eachindex(obs)
+        Ψ[i] ~ ContinuousTransition(X[i], B, W)
+        obs[i] ~ MultinomialPolya(N, Ψ[i])
+    end
+end
+```
+
+The public API hides the factor-graph details behind `train_model()` and `predict_batch()`.
+
+## Hyperparameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `iterations` | `50` | Variational inference iterations |
+| `showprogress` | `false` | Display training progress |
+| `N` | `1` | Number of trials per observation |
+| `ξβ` | auto-configured | Prior mean for regression coefficients |
+| `Wβ` | auto-configured | Prior precision for regression coefficients |
+| `W_df` | auto-configured | Wishart degrees of freedom |
+| `W_scale` | auto-configured | Wishart scale matrix |
+
+## Train a Custom Model
+
+```julia
+using NimbusSDK
+
+metadata = BCIMetadata(
+    sampling_rate = 250.0,
+    paradigm = :motor_imagery,
+    feature_type = :csp,
+    n_features = 16,
+    n_classes = 4,
+    chunk_size = nothing
+)
+
+train_data = BCIData(train_features, metadata, train_labels)
+
+model = train_model(
+    NimbusProbit,
+    train_data;
+    iterations = 50,
+    showprogress = true,
+    name = "motor_imagery_probit",
+    description = "4-class MI classifier with NimbusProbit"
+)
+```
+
+## Tune Hyperparameters
+
+Use stronger priors for noisy or limited data, and weaker priors for clean datasets with many trials.
+
+```julia
+B_dim = (n_classes - 1) * n_features
+
+model = train_model(
+    NimbusProbit,
+    train_data;
+    iterations = 50,
+    N = 1,
+    Wβ = 1e-5 * diageye(B_dim),
+    W_df = Float64(n_classes + 5),
+    showprogress = true
+)
+```
+
+| Scenario | `Wβ` scale | `W_df` offset | Notes |
+| --- | --- | --- | --- |
+| Excellent data quality | `1e-6` | `2` | Minimal regularization |
+| Good data quality | `1e-5` | `5` | Balanced default |
+| Moderate data quality | `1e-5` to `1e-4` | `5-8` | Slight regularization |
+| Poor data quality | `1e-4` | `10` | Stronger regularization |
+| Very limited trials | `1e-4` | `15` | Maximum regularization |
+
+## Batch Inference
+
+```julia
+test_data = BCIData(test_features, metadata, test_labels)
+results = predict_batch(model, test_data; iterations = 10)
+
+println("Predictions: ", results.predictions)
+println("Mean confidence: ", mean(results.confidences))
+
+accuracy = sum(results.predictions .== test_labels) / length(test_labels)
+itr = calculate_ITR(accuracy, 4, 4.0)
+
+println("Accuracy: $(round(accuracy * 100, digits=1))%")
+println("ITR: $(round(itr, digits=1)) bits/minute")
+```
+
+## Streaming Inference
+
+```julia
+session = init_streaming(model, metadata_with_chunk_size)
+
+for chunk in eeg_feature_stream
+    result = process_chunk(session, chunk; iterations = 10)
+    println("Chunk: pred=$(result.prediction), conf=$(round(result.confidence, digits=3))")
+end
+
+final_result = finalize_trial(session; method = :weighted_vote)
+println("Final: pred=$(final_result.prediction), conf=$(round(final_result.confidence, digits=3))")
+```
+
+## Training Requirements
+
+- Use preprocessed features, not raw EEG.
+- Normalize features before training for cross-session stability.
+- Use enough trials for a flexible multinomial model; start with `NimbusLDA` / `NimbusQDA` for small datasets.
+- Keep labels aligned with the Julia SDK's class convention for the dataset you are using.
+
+## Model Inspection
+
+```julia
+println("B posterior:")
+println("  Type: ", typeof(model.B_posterior))
+println("  Mean: ", mean(model.B_posterior))
+
+println("\nW posterior:")
+println("  Type: ", typeof(model.W_posterior))
+println("  Mean: ", mean(model.W_posterior))
+
+println("\nHyperparameters:")
+println("  N: ", model.N)
+println("  ξβ dimensions: ", size(model.ξβ))
+println("  Wβ dimensions: ", size(model.Wβ))
+println("  W_df: ", model.W_df)
+println("  W_scale dimensions: ", size(model.W_scale))
+```
+
+## Model Selection Context
+
+Use `NimbusProbit` when you are in Julia and need a flexible non-Gaussian static classifier. If you need faster inference or explicit class-center diagnostics, start with `NimbusLDA` or `NimbusQDA`. If you are using Python, the analogous non-Gaussian static model is `NimbusSoftmax`.
+
+For the canonical side-by-side comparison, see [Model Specification](/model-specification).
 
 ## Next Read
 
-- Julia SDK reference: `/julia-sdk/api-reference`
-- Static Gaussian models: `/models/rxlda`, `/models/rxgmm`
-- Python non-Gaussian static model: `/models/rxpolya`
+<CardGroup cols={2}>
+  <Card title="NimbusSoftmax (Python)" icon="brain" href="/models/rxpolya">
+    Python's non-Gaussian static classifier.
+  </Card>
+  <Card title="Julia SDK API Reference" icon="book" href="/julia-sdk/api-reference">
+    Full Julia model and inference API.
+  </Card>
+  <Card title="Bayesian LDA" icon="brain" href="/models/rxlda">
+    Faster static model with shared covariance.
+  </Card>
+  <Card title="Bayesian QDA" icon="brain" href="/models/rxgmm">
+    Static model with class-specific covariance.
+  </Card>
+</CardGroup>
 
+## References
+
+**Implementation:**
+- RxInfer.jl: https://rxinfer.com/
+- Julia source code: `src/models/nimbus_probit/` in NimbusSDKCore
+
+**Theory:**
+- Bayesian multinomial probit regression
+- Variational inference with reactive message passing
+- Continuous-transition latent variable models for multinomial classification
+
+<script
+  type="application/ld+json"
+  dangerouslySetInnerHTML={{
+    __html: JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'TechArticle',
+      headline: 'NimbusProbit (Julia)',
+      description:
+        'Julia Bayesian multinomial probit regression with RxInfer for non-Gaussian BCI classification.',
+      author: {
+        '@type': 'Organization',
+        name: 'Nimbus BCI',
+        url: 'https://nimbusbci.com',
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Nimbus BCI',
+        url: 'https://nimbusbci.com',
+      },
+      about: {
+        '@type': 'Thing',
+        name: 'Brain-Computer Interface',
+        description: 'Bayesian multinomial probit classification for BCI tasks',
+      },
+      keywords:
+        'NimbusProbit, Bayesian Probit, Julia SDK, RxInfer, multinomial probit regression, BCI',
+      inLanguage: 'en-US',
+      isAccessibleForFree: true,
+    }),
+  }}
+/>

@@ -1,0 +1,125 @@
+---
+title: "Julia Streaming Inference"
+description: "Configure local real-time BCI streaming with NimbusSDK.jl using chunk processing, trial finalization, and confidence-aware aggregation."
+keywords: ["Julia streaming inference", "NimbusSDK", "real-time BCI", "streaming", "process_chunk", "finalize_trial"]
+icon: "rss"
+---
+
+# Julia Streaming Inference
+
+Streaming inference processes preprocessed feature chunks as they arrive from your BCI pipeline. It runs locally in `NimbusSDK.jl`; no network call is made during chunk inference.
+
+<Note>
+For Python streaming, see [Python SDK Streaming Inference](/python-sdk/streaming-inference). For cross-SDK configuration guidance, see [Streaming Inference Configuration](/inference-configuration/streaming-inference).
+</Note>
+
+## When To Use It
+
+Use Julia streaming when your application needs low-latency feedback before a full trial is complete:
+
+- Real-time motor imagery control
+- Neurofeedback and training applications
+- Assistive interfaces with confidence-based rejection
+- Long-running monitoring sessions
+
+The Julia SDK streaming API supports `NimbusLDA`, `NimbusQDA`, and `NimbusProbit`.
+
+## Streaming Flow
+
+```text
+EEG hardware -> preprocessing -> feature chunks -> NimbusSDK.jl -> predictions
+```
+
+Nimbus expects feature chunks, not raw EEG. Filtering, artifact handling, and feature extraction should happen before calling `process_chunk()`.
+
+## Basic Setup
+
+```julia
+using NimbusSDK
+
+# One-time setup. The core can be cached for later use.
+NimbusSDK.install_core("your-api-key")
+
+model = load_model(NimbusLDA, "motor_imagery_4class_v1")
+
+metadata = BCIMetadata(
+    sampling_rate = 250.0,
+    paradigm = :motor_imagery,
+    feature_type = :csp,
+    n_features = 16,
+    n_classes = 4,
+    chunk_size = 250
+)
+
+session = init_streaming(model, metadata)
+```
+
+## Process Chunks
+
+Each chunk should be shaped `(n_features, chunk_size)`.
+
+```julia
+for chunk in eeg_feature_stream
+    result = process_chunk(session, chunk; iterations=10)
+
+    println("Prediction: $(result.prediction)")
+    println("Confidence: $(round(result.confidence, digits=3))")
+    println("Posterior: $(result.posterior)")
+end
+```
+
+## Finalize A Trial
+
+After enough chunks have been processed for a trial, aggregate them into a final prediction:
+
+```julia
+final = finalize_trial(session; method=:weighted_vote)
+
+if should_reject_trial(final.confidence, 0.7)
+    @warn "Trial rejected" confidence=final.confidence
+else
+    @info "Trial accepted" prediction=final.prediction confidence=final.confidence
+end
+```
+
+Supported aggregation methods:
+
+- `:weighted_vote`: weight chunk predictions by confidence.
+- `:max_confidence`: use the prediction from the most confident chunk.
+- `:posterior_mean`: average chunk-level posterior distributions.
+- `:unanimous`: require all chunks to agree, with fallback behavior when they do not.
+
+## Chunk Size Guidance
+
+| Paradigm | Typical Chunk Size | Notes |
+| --- | --- | --- |
+| Motor imagery | 250-500 samples | Balances latency and accuracy at 250 Hz. |
+| P300 | 100-200 samples | Short windows for event-related responses. |
+| SSVEP | 500-1000 samples | Longer windows help frequency estimates. |
+
+Smaller chunks reduce latency but can lower per-chunk confidence. Larger chunks improve evidence quality but delay feedback.
+
+## Production Checklist
+
+- Validate each chunk shape before calling `process_chunk()`.
+- Warm up the model with a dummy chunk before the user session.
+- Use a confidence threshold for high-stakes actions.
+- Keep preprocessing and feature extraction deterministic between calibration and deployment.
+- Reset or recreate sessions between independent trials when you do not want chunk history to carry over.
+
+## Next Read
+
+<CardGroup cols={2}>
+  <Card title="Real-time Setup" icon="gauge" href="/inference-configuration/real-time-setup">
+    Acquisition and hardware setup guidance.
+  </Card>
+  <Card title="Julia SDK API Reference" icon="code" href="/julia-sdk/api-reference">
+    Complete Julia SDK function reference.
+  </Card>
+  <Card title="Batch Processing" icon="list" href="/inference-configuration/batch-processing">
+    Offline trial-level inference patterns.
+  </Card>
+  <Card title="Preprocessing Requirements" icon="list-filter" href="/inference-configuration/preprocessing-requirements">
+    Feature preparation requirements before inference.
+  </Card>
+</CardGroup>

@@ -117,7 +117,7 @@ Benefits:
 - Medium Dynamics (100ms): Motor planning  
 - Fast Dynamics (10ms): Neural oscillations
 
-NimbusLDA and NimbusQDA (both SDKs), plus the Bayesian Multinomial models (NimbusSoftmax in Python / NimbusProbit in Julia), handle temporal structure through proper feature aggregation and trial-level inference.
+NimbusLDA and NimbusQDA (both SDKs), plus the non-Gaussian static models (`NimbusSoftmax` in Python / `NimbusProbit` in Julia), handle temporal structure through proper feature aggregation and trial-level inference.
 
 ### Multi-modal Integration
 
@@ -183,7 +183,7 @@ BCI signals can have extreme values. RxInfer handles this robustly:
 
 ### Model Structure
 
-NimbusLDA and NimbusQDA (both SDKs), Bayesian Multinomial (NimbusSoftmax in Python / NimbusProbit in Julia), and NimbusSTS (Python) all use factor graph representations:
+NimbusLDA and NimbusQDA (both SDKs), the non-Gaussian static models (`NimbusSoftmax` in Python / `NimbusProbit` in Julia), and NimbusSTS (Python) all use factor graph representations:
 
 **NimbusLDA**: Linear Discriminant Analysis
 - Gaussian observations with shared precision matrix
@@ -195,9 +195,9 @@ NimbusLDA and NimbusQDA (both SDKs), Bayesian Multinomial (NimbusSoftmax in Pyth
 - More flexible for overlapping distributions
 - Handles complex class structures
 
-**Non-Gaussian Multinomial (NimbusSoftmax / NimbusProbit)**: Multinomial classifier with uncertainty quantification
-- Continuous transitions to latent space
-- MultinomialPolya likelihood for classification
+**Non-Gaussian static models**: Multinomial classifiers with uncertainty quantification
+- `NimbusSoftmax` (Python): Bayesian multinomial logistic regression with Polya-Gamma variational inference
+- `NimbusProbit` (Julia): Bayesian multinomial probit regression with RxInfer
 - Most flexible for complex multinomial tasks
 
 **Bayesian STS (`NimbusSTS`)**: State-space model with temporal dynamics (Python SDK only)

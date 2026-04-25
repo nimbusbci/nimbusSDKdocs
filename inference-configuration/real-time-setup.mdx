@@ -1,591 +1,122 @@
 ---
 title: "Real-Time BCI Setup"
-description: "Set up Nimbus for low-latency BCI streaming with LSL, BrainFlow, and real-time EEG acquisition pipelines."
-keywords: ["real-time setup", "low latency", "LSL", "Lab Streaming Layer", "BrainFlow", "EEG acquisition", "real-time BCI", "BCI setup", "hardware integration"]
+description: "Set up low-latency BCI acquisition pipelines with LSL, BrainFlow, preprocessing, and streaming handoff to Nimbus SDKs."
+keywords: ["real-time setup", "low latency", "LSL", "Lab Streaming Layer", "BrainFlow", "EEG acquisition", "real-time BCI", "hardware integration"]
 icon: "settings"
 ---
 
-# Real-time Inference Setup
+# Real-Time BCI Setup
 
-Setting up for real-time BCI applications requires proper configuration to achieve 10-25ms latency while maintaining accuracy. This guide covers essential setup steps and best practices for both Python and Julia SDKs.
+This page owns hardware and acquisition setup: how EEG gets from an amplifier into feature chunks that Nimbus can classify. For SDK streaming APIs, see [Streaming Inference Configuration](/inference-configuration/streaming-inference), [Python Streaming Inference](/python-sdk/streaming-inference), and [Julia Streaming Inference](/julia-sdk/streaming-inference).
 
-<Note>
-Both SDKs support Bayesian models: **Bayesian LDA**, **Bayesian QDA**, **Bayesian Softmax**, and **Bayesian STS** (Python SDK only). Choose based on your accuracy, latency, and adaptivity requirements.
-</Note>
+## Real-Time Pipeline
 
-## Quick Start
-
-Minimal setup for real-time streaming:
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA, StreamingSession
-from nimbus_bci.data import BCIMetadata
-
-# 1. Train classifier
-clf = NimbusLDA()
-clf.fit(X_train, y_train)
-
-# 2. Configure streaming metadata
-metadata = BCIMetadata(
-    sampling_rate=250.0,
-    paradigm="motor_imagery",
-    feature_type="csp",
-    n_features=16,
-    n_classes=4,
-    chunk_size=125,  # 500ms chunks at 250 Hz
-    temporal_aggregation="logvar"
-)
-
-# 3. Initialize streaming session
-session = StreamingSession(clf.model_, metadata)
-
-# 4. Process chunks in real-time
-for chunk in eeg_stream:
-    result = session.process_chunk(chunk)
-    execute_command(result.prediction, result.confidence)
+```text
+EEG amplifier -> acquisition transport -> preprocessing -> feature chunks -> Nimbus streaming session -> application command
 ```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
 
-# 1. Authenticate
-NimbusSDK.install_core("your-api-key")
+Nimbus expects **feature chunks**, not raw EEG. Your acquisition loop should filter, clean, epoch/window, and extract features before calling the SDK.
 
-# 2. Load model
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
+## Acquisition Options
 
-# 3. Configure streaming metadata
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    paradigm = :motor_imagery,
-    feature_type = :csp,
-    n_features = 16,
-    n_classes = 4,
-    chunk_size = 250  # 1 second chunks at 250 Hz
-)
+| Option | Best for | Notes |
+| --- | --- | --- |
+| Lab Streaming Layer (LSL) | Research labs and multi-device synchronization | Common for EEG streams and markers |
+| BrainFlow | Consumer and research EEG hardware | Unified API for many boards |
+| Vendor SDK | Production devices | Lowest integration overhead when the vendor API is stable |
+| File replay | Testing and demos | Useful for deterministic latency tests |
 
-# 4. Initialize streaming session
-session = init_streaming(model, metadata)
+## Setup Checklist
 
-# 5. Process chunks in real-time
-for chunk in eeg_stream
-    result = process_chunk(session, chunk)
-    execute_command(result.prediction, result.confidence)
-end
-```
-  </Tab>
-</Tabs>
+1. Confirm amplifier sampling rate and channel order.
+2. Synchronize event markers with EEG samples.
+3. Apply artifact handling and feature extraction in the same way as calibration.
+4. Emit chunks with stable shape: `(n_features, chunk_size)`.
+5. Use the same normalization parameters from training.
+6. Measure latency around preprocessing and SDK inference separately.
+7. Add rejection thresholds for low-confidence or high-entropy decisions.
 
-## Chunk Size Selection
+## LSL Pattern
 
-The `chunk_size` parameter determines latency and accuracy tradeoff:
-
-### Fast Response (0.5 second chunks)
-```julia
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    chunk_size = 125,  # 0.5s at 250 Hz
-    # ... other params
-)
-```
-- **Latency**: ~10-15ms per chunk
-- **Update rate**: Every 0.5 seconds
-- **Use case**: Fast paced games, quick reactions
-- **Trade-off**: Less data per prediction, potentially lower confidence
-
-### Standard (1 second chunks) - **Recommended**
-```julia
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    chunk_size = 250,  # 1s at 250 Hz
-    # ... other params
-)
-```
-- **Latency**: ~15-20ms per chunk
-- **Update rate**: Every second
-- **Use case**: Most BCI applications
-- **Trade-off**: Good balance of speed and accuracy
-
-### Accurate (2 second chunks)
-```julia
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    chunk_size = 500,  # 2s at 250 Hz
-    # ... other params
-)
-```
-- **Latency**: ~20-25ms per chunk
-- **Update rate**: Every 2 seconds
-- **Use case**: High-stakes decisions, medical applications
-- **Trade-off**: Higher confidence but slower updates
-
-## Model Selection for Real-Time
-
-### Bayesian LDA vs Bayesian QDA vs Bayesian STS
-
-<Tabs>
-  <Tab title="Python">
+Use LSL when you need synchronized EEG and marker streams.
 
 ```python
-from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSTS
+from pylsl import StreamInlet, resolve_stream
 
-# Bayesian LDA: Fastest, recommended for stationary real-time
-clf_lda = NimbusLDA()
-# Typical latency: 10-20ms
-# Use when: Speed is priority, classes are well-separated, data is stationary
+eeg_stream = resolve_stream("type", "EEG")[0]
+marker_stream = resolve_stream("type", "Markers")[0]
 
-# Bayesian QDA: More flexible, slightly slower
-clf_qda = NimbusQDA()
-# Typical latency: 15-25ms
-# Use when: Need flexibility for overlapping classes, data is stationary
+eeg_inlet = StreamInlet(eeg_stream)
+marker_inlet = StreamInlet(marker_stream)
 
-# Bayesian STS: Adaptive, for non-stationary data
-clf_sts = NimbusSTS()
-# Typical latency: 20-30ms
-# Use when: Long sessions (>30min), data drifts over time, need temporal adaptation
+while True:
+    samples, timestamps = eeg_inlet.pull_chunk(timeout=0.0)
+    markers, marker_times = marker_inlet.pull_chunk(timeout=0.0)
+
+    if samples:
+        feature_chunk = preprocess_to_features(samples, markers)
+        result = session.process_chunk(feature_chunk)
+        handle_prediction(result.prediction, result.confidence)
 ```
-</Tab>
-  <Tab title="Julia">
 
-```julia
-using NimbusSDK
+## BrainFlow Pattern
 
-# NimbusLDA: Faster, recommended for real-time
-lda_model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-# Typical latency: 10-20ms
-# Use when: Speed is priority, classes are well-separated
+Use BrainFlow when you want one API across supported EEG boards.
 
-# NimbusQDA: More flexible, slightly slower
-qda_model = load_model(NimbusQDA, "motor_imagery_4class_qda_v1")
-# Typical latency: 15-25ms
-# Use when: Need flexibility for overlapping classes
+```python
+from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 
-# Note: NimbusSTS (Bayesian STS) is currently available in Python SDK only
+params = BrainFlowInputParams()
+board = BoardShim(BoardIds.CYTON_BOARD.value, params)
+
+board.prepare_session()
+board.start_stream()
+
+try:
+    while True:
+        data = board.get_current_board_data(250)
+        feature_chunk = preprocess_to_features(data)
+        result = session.process_chunk(feature_chunk)
+        handle_prediction(result.prediction, result.confidence)
+finally:
+    board.stop_stream()
+    board.release_session()
 ```
-  </Tab>
-</Tabs>
+
+## Latency Budget
+
+| Stage | Target |
+| --- | --- |
+| Acquisition buffer | 1-10ms |
+| Preprocessing and feature extraction | 5-50ms, depending on feature type |
+| Nimbus inference | 10-25ms typical |
+| Application command | 1-10ms |
 
 <Tip>
-For most real-time applications with **stationary data**, **Bayesian LDA (NimbusLDA)** is recommended due to its faster inference while maintaining good accuracy. For **long sessions with non-stationary data**, consider **NimbusSTS** (Python SDK).
+Profile each stage separately. If latency is high, the bottleneck is often acquisition buffering or feature extraction rather than model inference.
 </Tip>
 
-## Aggregation Strategies
-
-Choose how to combine multiple chunks for final decisions:
-
-### Weighted Vote (Recommended)
-```julia
-# High-confidence chunks contribute more
-final_result = finalize_trial(session; method=:weighted_vote)
-```
-- Best for: Most applications
-- Advantage: Balances all chunks by confidence
-- Typical accuracy: Best overall performance
-
-### Posterior Mean
-```julia
-# Average chunk posteriors
-final_result = finalize_trial(session; method=:posterior_mean)
-```
-- Best for: Preserving probabilistic evidence across chunks
-- Advantage: Uses the full posterior distribution from each chunk
-- Typical accuracy: Good when posteriors are well-calibrated
-
-### Max Confidence
-```julia
-# Use the most confident chunk
-final_result = finalize_trial(session; method=:max_confidence)
-```
-- Best for: When one chunk is clearly more reliable
-- Advantage: Fastest response to state changes
-- Typical accuracy: Lower, but most reactive
-
-## Performance Optimization
-
-### JIT Compilation Warmup
-
-Julia's JIT compiler makes the first inference slower. Warm up before real use:
-
-```julia
-using NimbusSDK
-
-# Load model
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-session = init_streaming(model, metadata)
-
-# Warmup: Run a few dummy inferences
-println("Warming up...")
-dummy_chunk = randn(16, 250)  # Same shape as real data
-for i in 1:10
-    process_chunk(session, dummy_chunk)
-end
-println("✓ Ready for real-time processing")
-
-# Now process real data (much faster)
-for chunk in eeg_stream
-    result = process_chunk(session, chunk)  # Fast after warmup
-end
-```
-
-### Memory Pre-allocation
-
-Avoid allocations in the real-time loop:
-
-```julia
-using NimbusSDK
-
-# Pre-allocate buffers
-chunk_buffer = zeros(Float64, 16, 250)
-results_buffer = Vector{StreamingResult}(undef, 100)
-
-# Real-time loop with minimal allocation
-for (i, raw_chunk) in enumerate(eeg_stream)
-    # Reuse pre-allocated buffer
-    chunk_buffer .= raw_chunk
-    
-    # Process (minimal allocation)
-    result = process_chunk(session, chunk_buffer)
-    results_buffer[i] = result
-    
-    # Handle result
-    handle_bci_command(result)
-end
-```
-
-### Confidence Thresholding
-
-Only act on high-confidence predictions:
-
-```julia
-# Configure threshold based on application
-confidence_threshold = 0.75  # Adjust based on needs
-
-for chunk in eeg_stream
-    result = process_chunk(session, chunk)
-    
-    # Only execute if confidence exceeds threshold
-    if result.confidence > confidence_threshold
-        execute_command(result.prediction)
-    else
-        # Optional: provide feedback about low confidence
-        display_uncertain_state()
-    end
-end
-```
-
-## Real-Time Monitoring
-
-### Performance Tracking
-
-Monitor system performance during operation:
-
-```julia
-using NimbusSDK
-using Statistics
-
-# Initialize tracker
-latencies = Float64[]
-confidences = Float64[]
-
-for (i, chunk) in enumerate(eeg_stream)
-    # Time the inference
-    t_start = time()
-    result = process_chunk(session, chunk)
-    t_end = time()
-    
-    latency_ms = (t_end - t_start) * 1000
-    push!(latencies, latency_ms)
-    push!(confidences, result.confidence)
-    
-    # Report every 50 chunks
-    if i % 50 == 0
-        println("\n=== Performance Report ===")
-        println("Mean latency: $(round(mean(latencies[end-49:end]), digits=1)) ms")
-        println("Max latency: $(round(maximum(latencies[end-49:end]), digits=1)) ms")
-        println("Mean confidence: $(round(mean(confidences[end-49:end]), digits=3))")
-    end
-end
-```
-
-### Quality Monitoring
-
-Track signal quality in real-time:
-
-```julia
-using NimbusSDK
-
-# Track confidence trends
-confidence_window = CircularBuffer{Float64}(20)
-
-for chunk in eeg_stream
-    result = process_chunk(session, chunk)
-    
-    # Add to rolling window
-    push!(confidence_window, result.confidence)
-    
-    # Check for degrading quality
-    if length(confidence_window) >= 20
-        recent_conf = mean(confidence_window)
-        
-        if recent_conf < 0.6
-            @warn "Signal quality degrading"
-            println("Recent mean confidence: $(round(recent_conf, digits=2))")
-            println("Recommendation: Check electrode contact")
-        end
-    end
-end
-```
-
-## Application-Specific Setups
-
-### Motor Imagery Game Control
-
-```julia
-using NimbusSDK
-
-# Setup for gaming
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-
-# Fast chunks for responsive gameplay
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    chunk_size = 125,  # 0.5s for quick response
-    paradigm = :motor_imagery,
-    feature_type = :csp,
-    n_features = 16,
-    n_classes = 4
-)
-
-session = init_streaming(model, metadata)
-
-# Game control loop
-for chunk in game_eeg_stream
-    result = process_chunk(session, chunk)
-    
-    # Lower threshold for responsive gameplay
-    if result.confidence > 0.65
-        update_game_state(result.prediction)
-    end
-end
-```
-
-### P300 Speller
-
-```julia
-using NimbusSDK
-
-# P300 detection setup
-model = load_model(NimbusLDA, "p300_binary_v1")
-
-# Post-stimulus window
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    chunk_size = 200,  # 0.8s post-stimulus
-    paradigm = :p300,
-    feature_type = :erp,
-    n_features = 12,
-    n_classes = 2  # target vs non-target
-)
-
-session = init_streaming(model, metadata)
-
-# Process stimulus presentations
-for (stimulus, chunk) in p300_stream
-    result = process_chunk(session, chunk)
-    
-    # Higher threshold for spelling accuracy
-    if result.prediction == 1 && result.confidence > 0.85
-        selected_character = stimulus
-        println("Selected: $selected_character")
-    end
-end
-```
-
-### Wheelchair Control (Safety-Critical)
-
-```julia
-using NimbusSDK
-
-# Safety-critical setup
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-
-# Longer chunks for higher confidence
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    chunk_size = 500,  # 2s for safety
-    paradigm = :motor_imagery,
-    feature_type = :csp,
-    n_features = 16,
-    n_classes = 4
-)
-
-session = init_streaming(model, metadata)
-
-# Safety-critical control loop
-for chunk in wheelchair_stream
-    result = process_chunk(session, chunk)
-    
-    # Very high threshold for safety
-    if result.confidence > 0.90
-        execute_wheelchair_command(result.prediction)
-    else
-        # Require confirmation for low confidence
-        request_manual_confirmation(result.prediction, result.confidence)
-    end
-end
-```
-
-## Error Handling
-
-### Robust Real-Time Loop
-
-```julia
-using NimbusSDK
-
-session = init_streaming(model, metadata)
-error_count = 0
-max_errors = 10
-
-while is_bci_active()
-    try
-        chunk = get_next_chunk()
-        
-        # Process with timeout protection
-        result = process_chunk(session, chunk)
-        
-        # Reset error counter on success
-        error_count = 0
-        
-        # Handle result
-        handle_bci_result(result)
-        
-    catch e
-        error_count += 1
-        @error "Chunk processing failed" exception=e error_count
-        
-        if error_count >= max_errors
-            @error "Too many consecutive errors - stopping"
-            break
-        end
-        
-        # Brief pause before retry
-        sleep(0.1)
-    end
-end
-```
-
-## System Requirements
-
-### Minimum Requirements
-- **CPU**: Modern multi-core processor (Intel i5 or equivalent)
-- **RAM**: 4GB available
-- **Julia**: Version 1.9 or later
-- **OS**: Windows, macOS, or Linux
-
-### Recommended for Real-Time
-- **CPU**: Intel i7 or equivalent (or better)
-- **RAM**: 8GB available
-- **Julia**: Version 1.10+
-- **Storage**: SSD for faster model loading
-- **OS**: Linux for best real-time performance
-
-### Latency Expectations
-
-| Hardware | NimbusLDA Latency | NimbusQDA Latency |
-|----------|---------------|---------------|
-| i5, 8GB RAM | 15-25ms | 20-30ms |
-| i7, 16GB RAM | 10-20ms | 15-25ms |
-| High-end workstation | 10-15ms | 12-20ms |
-
-<Note>
-These are per-chunk latencies. Total system latency includes signal acquisition and any application-specific processing.
-</Note>
-
-## Troubleshooting
-
-### High Latency Issues
-
-```julia
-# Profile to find bottlenecks
-latencies = []
-
-for chunk in test_stream[1:100]
-    t_start = time()
-    result = process_chunk(session, chunk)
-    latency = (time() - t_start) * 1000
-    
-    push!(latencies, latency)
-end
-
-println("Statistics:")
-println("  Mean: $(round(mean(latencies), digits=1)) ms")
-println("  Median: $(round(median(latencies), digits=1)) ms")
-println("  95th percentile: $(round(quantile(latencies, 0.95), digits=1)) ms")
-println("  Max: $(round(maximum(latencies), digits=1)) ms")
-
-# First chunk is usually slower (JIT compilation)
-println("\nExcluding first chunk:")
-println("  Mean: $(round(mean(latencies[2:end]), digits=1)) ms")
-```
-
-**Common Solutions:**
-1. Run warmup inferences before real use
-2. Use NimbusLDA instead of NimbusQDA for speed
-3. Reduce chunk_size if acceptable
-4. Check system resource usage
-5. Close other applications
-
-### Low Confidence Issues
-
-```julia
-# Diagnose signal quality
-using NimbusSDK
-
-# Collect diagnostic trial
-diagnostic_data = collect_diagnostic_trial()
-
-# Check preprocessing quality
-report = diagnose_preprocessing(diagnostic_data)
-
-println("Preprocessing quality: $(round(report.quality_score * 100, digits=1))%")
-
-if !isempty(report.warnings)
-    println("\nWarnings:")
-    for warning in report.warnings
-        println("  • $warning")
-    end
-end
-
-if !isempty(report.recommendations)
-    println("\nRecommendations:")
-    for rec in report.recommendations
-        println("  • $rec")
-    end
-end
-```
+## Production Guardrails
+
+- Warm up model and preprocessing code before the session starts.
+- Use fixed-size buffers to avoid unbounded memory growth.
+- Reset streaming sessions between trials.
+- Log per-stage latency, confidence, entropy, and rejection decisions.
+- Keep calibration preprocessing and online preprocessing identical.
 
 ## Next Read
 
 <CardGroup cols={2}>
-  <Card title="Streaming Inference" icon="signal" href="/inference-configuration/streaming-inference">
-    Complete streaming inference guide
+  <Card title="Streaming Inference Configuration" icon="play" href="/inference-configuration/streaming-inference">
+    Choose chunk sizes and aggregation methods.
   </Card>
-  <Card title="Batch Processing" icon="layers" href="/inference-configuration/batch-processing">
-    Offline analysis workflows
+  <Card title="Python Streaming Inference" icon="activity" href="/python-sdk/streaming-inference">
+    Use `StreamingSession` in Python.
   </Card>
-  <Card title="Error Handling" icon="shield" href="/inference-configuration/error-handling">
-    Robust error recovery patterns
+  <Card title="Julia Streaming Inference" icon="rss" href="/julia-sdk/streaming-inference">
+    Use `init_streaming`, `process_chunk`, and `finalize_trial` in Julia.
   </Card>
-  <Card title="Code Examples" icon="code" href="/examples/basic-examples">
-    Working real-time examples
+  <Card title="Preprocessing Requirements" icon="list-filter" href="/inference-configuration/preprocessing-requirements">
+    Prepare feature-space inputs correctly.
   </Card>
 </CardGroup>
-
----
-
-<Note>
-**Tip**: Start with standard 1-second chunks and adjust based on your application's speed/accuracy requirements.
-</Note>

@@ -1,657 +1,92 @@
 ---
 title: "Streaming Inference Configuration"
-description: "Configure low-latency chunk-by-chunk BCI streaming in Nimbus with temporal aggregation, session setup, and real-time inference patterns."
-keywords: ["streaming inference", "chunk processing", "temporal aggregation", "streaming mode", "real-time BCI", "NimbusSDK", "streaming sessions", "chunk-by-chunk", "BCI streaming"]
+description: "Configure cross-SDK chunk size, temporal aggregation, and streaming decision patterns for low-latency BCI inference."
+keywords: ["streaming inference", "chunk processing", "temporal aggregation", "streaming mode", "real-time BCI", "streaming sessions", "BCI streaming"]
 icon: "play"
 ---
 
-# Streaming Inference for BCI
+# Streaming Inference Configuration
 
-Streaming inference is essential for real-time BCI applications. Both Python and Julia SDKs support chunk-by-chunk processing for responsive brain-computer interfaces with sub-25ms latency per chunk.
+This page is the cross-SDK configuration overview for streaming inference. It explains the shared concepts: when to stream, how to choose chunk sizes, and how to aggregate chunk predictions.
 
 <Note>
-Both SDKs support Bayesian models: **Bayesian LDA**, **Bayesian QDA**, **Bayesian Softmax**, and **Bayesian STS** (Python SDK only). All support streaming inference with similar latencies.
-
-**Python SDK users**: See [Python Streaming Inference](/python-sdk/streaming-inference) for Python-specific detailed examples and patterns.
+For implementation-specific APIs, use the SDK pages:
+- **Python**: [Python Streaming Inference](/python-sdk/streaming-inference) documents `StreamingSession` and `StreamingSessionSTS`.
+- **Julia**: [Julia Streaming Inference](/julia-sdk/streaming-inference) documents `init_streaming`, `process_chunk`, and `finalize_trial`.
 </Note>
 
-## Streaming vs Batch Processing
+## Streaming vs Batch
 
-### Batch Processing
+Use **batch inference** when full trials are already available and you are doing offline evaluation, model validation, or analytics.
 
-Process complete trials offline:
+Use **streaming inference** when feature chunks arrive over time and the application needs low-latency updates before a complete trial has finished.
 
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA
-
-# Batch: Process all trials at once
-clf = NimbusLDA()
-clf.fit(X_train, y_train)
-predictions = clf.predict(X_test)
+```text
+EEG stream -> preprocessing -> feature chunks -> streaming session -> chunk posteriors -> final decision
 ```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Batch: Process all trials at once
-results = predict_batch(model, all_trials_data)
-```
-  </Tab>
-</Tabs>
 
-**Best for:**
-- Offline analysis
-- Model training/validation
-- Research studies
-- Multiple trials available upfront
+## Core Configuration
 
-### Streaming Processing
+Every streaming setup needs:
 
-Process chunks as they arrive in real-time:
+- `sampling_rate`: acquisition rate in Hz.
+- `chunk_size`: number of samples per chunk.
+- `paradigm`: task type such as motor imagery, P300, or SSVEP.
+- `feature_type`: feature representation such as CSP, bandpower, or ERP amplitude.
+- `n_features`: feature count per chunk.
+- `n_classes`: number of output classes.
+- `temporal_aggregation`: how to reduce feature time structure when required.
 
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import StreamingSession
+## Chunk Size Guidelines
 
-# Streaming: Process chunks incrementally
-session = StreamingSession(clf.model_, metadata)
-for chunk in eeg_stream:
-    chunk_result = session.process_chunk(chunk)
-    # Immediate response to user
+| Chunk duration | Typical use | Trade-off |
+| --- | --- | --- |
+| 0.25-0.5s | Fast feedback, games, exploratory interfaces | Lower latency, less evidence per chunk |
+| 0.5-1.0s | Most real-time BCI systems | Balanced responsiveness and confidence |
+| 1.0-2.0s | Medical or high-stakes decisions | Higher confidence, slower feedback |
 
-final_result = session.finalize_trial(method="weighted_vote")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Streaming: Process chunks incrementally
-session = init_streaming(model, metadata)
-for chunk in eeg_stream
-    chunk_result = process_chunk(session, chunk)
-    # Immediate response to user
-end
-final_result = finalize_trial(session)
-```
-  </Tab>
-</Tabs>
-
-**Best for:**
-- Real-time BCI control
-- Online feedback
-- Interactive applications
-- Gaming and communication
-
-## Setting Up Streaming Inference
-
-### Basic Streaming Setup
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA, StreamingSession
-from nimbus_bci.data import BCIMetadata
-import numpy as np
-
-# 1. Train classifier
-clf = NimbusLDA()
-clf.fit(X_train, y_train)
-
-# 2. Configure streaming metadata
-metadata = BCIMetadata(
-    sampling_rate=250.0,
-    paradigm="motor_imagery",
-    feature_type="csp",
-    n_features=16,
-    n_classes=4,
-    chunk_size=125,  # 500ms chunks at 250 Hz
-    temporal_aggregation="logvar"
-)
-
-# 3. Initialize streaming session
-session = StreamingSession(clf.model_, metadata)
-print("✓ Streaming session initialized")
-
-# 4. Process chunks as they arrive
-for chunk in your_eeg_stream():
-    # chunk shape: (n_features, chunk_size)
-    chunk_result = session.process_chunk(chunk)
-    
-    print(f"Chunk prediction: {chunk_result.prediction}")
-    print(f"Confidence: {chunk_result.confidence:.3f}")
-    
-    # Provide immediate feedback
-    if chunk_result.confidence > 0.75:
-        provide_feedback(chunk_result.prediction)
-
-# 5. Finalize trial with aggregated result
-final_result = session.finalize_trial(method="weighted_vote")
-print(f"\n✓ Final prediction: {final_result.prediction}")
-print(f"Final confidence: {final_result.confidence:.3f}")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-
-# 1. Authenticate and load model
-NimbusSDK.install_core("your-api-key")
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-
-# 2. Configure streaming metadata
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    paradigm = :motor_imagery,
-    feature_type = :csp,
-    n_features = 16,
-    n_classes = 4,
-    chunk_size = 250  # 1 second chunks at 250 Hz
-)
-
-# 3. Initialize streaming session
-session = init_streaming(model, metadata)
-println("✓ Streaming session initialized")
-
-# 4. Process chunks as they arrive
-for chunk in your_eeg_stream()
-    # chunk shape: (n_features × chunk_size)
-    chunk_result = process_chunk(session, chunk)
-    
-    println("Chunk prediction: $(chunk_result.prediction)")
-    println("Confidence: $(round(chunk_result.confidence, digits=3))")
-    
-    # Provide immediate feedback
-    if chunk_result.confidence > 0.75
-        provide_feedback(chunk_result.prediction)
-    end
-end
-
-# 5. Finalize trial with aggregated result
-final_result = finalize_trial(session; method=:weighted_vote)
-println("\n✓ Final prediction: $(final_result.prediction)")
-println("Final confidence: $(round(final_result.confidence, digits=3))")
-```
-  </Tab>
-</Tabs>
-
-### Chunk Size Selection
-
-Choose chunk size based on your application:
-
-<Tabs>
-  <Tab title="Python">
-```python
-# Fast updates (0.5 second chunks)
-chunk_size = 125  # At 250 Hz sampling rate
-# Pro: More responsive, frequent updates
-# Con: Less data per prediction, potentially lower confidence
-
-# Standard (0.5-1 second chunks) - Recommended for Python
-chunk_size = 125  # 500ms at 250 Hz
-# Pro: Good balance of responsiveness and accuracy
-# Con: None - recommended default
-
-# Longer chunks (1 second chunks)
-chunk_size = 250
-# Pro: More data, higher confidence
-# Con: Less responsive, slower feedback
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Fast updates (0.5 second chunks)
-chunk_size = 125  # At 250 Hz sampling rate
-# Pro: More responsive, frequent updates
-# Con: Less data per prediction, potentially lower confidence
-
-# Standard (1 second chunks)
-chunk_size = 250  
-# Pro: Good balance of responsiveness and accuracy
-# Con: None - recommended default
-
-# Longer chunks (2 second chunks)
-chunk_size = 500
-# Pro: More data, higher confidence
-# Con: Less responsive, slower feedback
-```
-  </Tab>
-</Tabs>
-
-<Tip>
-**Python SDK**: Start with 500ms chunks (125 samples at 250 Hz). See [Python Streaming Inference](/python-sdk/streaming-inference) for detailed examples.
-
-**Julia SDK**: Start with 1-second chunks (chunk_size = sampling_rate). Adjust based on your accuracy/latency requirements.
-</Tip>
+Start with 0.5-1.0s chunks for motor imagery and adjust based on confidence, latency, and user experience.
 
 ## Aggregation Methods
 
-### Weighted Vote
+Streaming produces one posterior per chunk. Trial-level decisions combine those chunk posteriors.
 
-Weight chunks by confidence (recommended):
+| Method | Use when |
+| --- | --- |
+| `weighted_vote` | You want confidence-weighted decisions across chunks |
+| `posterior_mean` | You want smooth posterior averaging across chunks |
+| `max_confidence` | You trust the single most confident chunk |
+| `unanimous` | You need conservative decisions only when chunks agree |
 
-<Tabs>
-  <Tab title="Python">
-```python
-# Aggregate with weighted voting
-final_result = session.finalize_trial(method="weighted_vote")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Aggregate with weighted voting
-final_result = finalize_trial(session; method=:weighted_vote)
-```
-  </Tab>
-</Tabs>
+<Tip>
+Use `weighted_vote` as the default. Switch to `posterior_mean` when you want smoother probabilities, or `max_confidence` when the task has short high-signal windows.
+</Tip>
 
-High-confidence chunks contribute more to the final decision. Best for most applications.
+## Quality Gates
 
-### Posterior Mean
+Streaming systems should monitor:
 
-Average posterior distributions across chunks:
+- confidence (`max posterior probability`)
+- entropy (`prediction uncertainty`)
+- class balance over recent trials
+- rejection rate
+- per-chunk and per-trial latency
 
-<Tabs>
-  <Tab title="Python">
-```python
-# Aggregate with posterior averaging
-final_result = session.finalize_trial(method="posterior_mean")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Aggregate with posterior averaging
-final_result = finalize_trial(session; method=:posterior_mean)
-```
-  </Tab>
-</Tabs>
-
-Use when you want to preserve full posterior evidence across chunks.
-
-### Max Confidence
-
-Use the chunk with highest confidence:
-
-<Tabs>
-  <Tab title="Python">
-```python
-# Use most confident chunk
-final_result = session.finalize_trial(method="max_confidence")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Use most confident chunk
-final_result = finalize_trial(session; method=:max_confidence)
-```
-</Tab>
-</Tabs>
-
-Use when one chunk is clearly more reliable than the rest.
-
-## Real-time BCI Example
-
-### Motor Imagery Control
-
-```julia
-using NimbusSDK
-
-# Setup
-NimbusSDK.install_core("your-api-key")
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    paradigm = :motor_imagery,
-    feature_type = :csp,
-    n_features = 16,
-    n_classes = 4,
-    chunk_size = 250
-)
-
-session = init_streaming(model, metadata)
-
-# Real-time processing loop
-trial_count = 0
-while is_bci_active()
-    trial_count += 1
-    println("\n=== Trial $trial_count ===")
-    
-    # Collect trial chunks
-    chunk_count = 0
-    for chunk in collect_trial_chunks()  # Your acquisition function
-        chunk_count += 1
-        
-        # Process chunk
-        chunk_result = process_chunk(session, chunk)
-        
-        # Real-time feedback
-        println("Chunk $chunk_count: $(chunk_result.prediction) (conf: $(round(chunk_result.confidence, digits=2)))")
-        
-        # Early stopping if very confident
-        if chunk_result.confidence > 0.95 && chunk_count >= 2
-            println("✓ High confidence - early stop")
-            break
-        end
-    end
-    
-    # Finalize trial
-    final_result = finalize_trial(session; method=:weighted_vote)
-    
-    println("\n✓ Trial complete")
-    println("  Prediction: $(final_result.prediction)")
-    println("  Confidence: $(round(final_result.confidence, digits=3))")
-    
-    # Execute command
-    execute_motor_command(final_result.prediction)
-    
-    # Quality check
-    if should_reject_trial(final_result.confidence, 0.7)
-        println("⚠️  Low confidence - suggest recalibration")
-    end
-end
-```
-
-### P300 Speller
-
-```julia
-using NimbusSDK
-
-# P300 detection with streaming
-model = load_model(NimbusLDA, "p300_detection_v1")
-
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    paradigm = :p300,
-    feature_type = :erp,
-    n_features = 12,
-    n_classes = 2,  # Target vs non-target
-    chunk_size = 200  # 0.8 seconds post-stimulus
-)
-
-# Process stimulus presentations
-for letter_row in spelling_matrix
-    session = init_streaming(model, metadata)
-    
-    for stimulus in letter_row
-        # Present stimulus
-        flash_stimulus(stimulus)
-        
-        # Collect and process EEG response
-        chunk = collect_post_stimulus_chunk()  # 0.8s after stimulus
-        result = process_chunk(session, chunk)
-        
-        if result.prediction == 2 && result.confidence > 0.8
-            # P300 detected - this is the target
-            println("✓ Target detected: $stimulus")
-            break
-        end
-    end
-end
-```
-
-## Performance Monitoring
-
-### Real-time Metrics
-
-Track streaming performance:
-
-```julia
-using NimbusSDK
-
-# Initialize performance tracker
-tracker = OnlinePerformanceTracker(window_size=20)
-
-# Process stream with tracking
-for chunk in eeg_stream
-    start_time = time()
-    
-    result = process_chunk(session, chunk)
-    
-    latency_ms = (time() - start_time) * 1000
-    
-    # Update tracker (if ground truth available)
-    if !isnothing(ground_truth)
-        final = finalize_trial(session)
-        metrics = update_and_report!(tracker, final.prediction, ground_truth, final.confidence)
-        
-        println("Running accuracy: $(round(metrics.accuracy * 100, digits=1))%")
-        println("Chunk latency: $(round(latency_ms, digits=1)) ms")
-    end
-end
-```
-
-### Quality Monitoring
-
-Monitor signal quality during streaming:
-
-```julia
-# Track confidence trends
-confidence_history = Float64[]
-
-for chunk in eeg_stream
-    result = process_chunk(session, chunk)
-    push!(confidence_history, result.confidence)
-    
-    # Check for degrading quality
-    if length(confidence_history) >= 5
-        recent_conf = mean(confidence_history[end-4:end])
-        if recent_conf < 0.6
-            @warn "Signal quality degrading"
-            println("Recent confidence: $(round(recent_conf, digits=2))")
-            println("Recommendation: Check electrode contact or reduce movement")
-        end
-    end
-end
-```
-
-## Advanced Streaming Features
-
-### Adaptive Confidence Thresholds
-
-```julia
-# Adjust thresholds based on performance
-base_threshold = 0.7
-current_metrics = get_metrics(tracker, n_classes=4, trial_duration=4.0)
-current_accuracy = current_metrics.accuracy
-
-if current_accuracy > 0.85
-    # User performing well - can lower threshold for faster response
-    threshold = base_threshold * 0.9
-elseif current_accuracy < 0.65
-    # User struggling - raise threshold for more reliable decisions
-    threshold = base_threshold * 1.2
-else
-    threshold = base_threshold
-end
-
-# Apply threshold
-if final_result.confidence > threshold
-    execute_command(final_result.prediction)
-else
-    request_retry()
-end
-```
-
-### Multi-trial Context
-
-```julia
-# Track recent trial history for context
-struct TrialHistory
-    predictions::Vector{Int}
-    confidences::Vector{Float64}
-    max_history::Int
-end
-
-function add_trial!(history::TrialHistory, pred::Int, conf::Float64)
-    push!(history.predictions, pred)
-    push!(history.confidences, conf)
-    
-    # Keep only recent trials
-    if length(history.predictions) > history.max_history
-        popfirst!(history.predictions)
-        popfirst!(history.confidences)
-    end
-end
-
-# Use history to detect anomalies
-function is_anomaly(history::TrialHistory, new_pred::Int)
-    if length(history.predictions) < 3
-        return false
-    end
-    
-    # Check if prediction differs from recent trend
-    recent_mode = mode(history.predictions[end-2:end])
-    return new_pred != recent_mode
-end
-
-# Example usage
-history = TrialHistory(Int[], Float64[], 10)
-
-for trial in trials
-    final_result = finalize_trial(session)
-    
-    if is_anomaly(history, final_result.prediction)
-        println("⚠️  Anomalous prediction - requesting confirmation")
-        show_confirmation_dialog(final_result.prediction)
-    end
-    
-    add_trial!(history, final_result.prediction, final_result.confidence)
-end
-```
-
-## Best Practices
-
-### Session Management
-
-```julia
-# Always initialize new session for each trial
-for trial_idx in 1:n_trials
-    # New session = fresh state
-    session = init_streaming(model, metadata)
-    
-    # Process trial
-    for chunk in collect_trial()
-        process_chunk(session, chunk)
-    end
-    
-    # Finalize
-    result = finalize_trial(session)
-    
-    # Session automatically cleaned up
-end
-```
-
-### Error Handling
-
-```julia
-using NimbusSDK
-
-try
-    session = init_streaming(model, metadata)
-    
-    for chunk in eeg_stream
-        try
-            result = process_chunk(session, chunk)
-            handle_result(result)
-        catch e
-            @error "Chunk processing failed" exception=e
-            # Continue to next chunk
-            continue
-        end
-    end
-    
-    final_result = finalize_trial(session)
-    
-catch e
-    @error "Streaming session failed" exception=e
-    # Reinitialize and retry
-end
-```
-
-### Memory Management
-
-```julia
-# Streaming uses bounded memory - no accumulation
-# Each session has fixed memory footprint
-
-# Good: Process long sessions safely
-for hour in 1:8
-    for trial in collect_hour_trials(hour)
-        session = init_streaming(model, metadata)
-        # ... process trial
-        # Memory freed after finalize_trial
-    end
-end
-
-# Memory usage stays constant regardless of session length
-```
-
-## Troubleshooting
-
-### Low Confidence Issues
-
-```julia
-# Diagnose low confidence
-if mean(confidence_history) < 0.65
-    println("Troubleshooting low confidence:")
-    println("1. Check preprocessing quality")
-    println("2. Verify chunk_size is appropriate")
-    println("3. Ensure user is focused and relaxed")
-    println("4. Check for electrode issues")
-    println("5. Consider recalibration")
-    
-    # Run diagnostics
-    diagnostic_data = collect_diagnostic_trial()
-    report = diagnose_preprocessing(diagnostic_data)
-    println("\nPreprocessing quality: $(round(report.quality_score * 100, digits=1))%")
-end
-```
-
-### Latency Issues
-
-```julia
-# Profile streaming latency
-latencies = Float64[]
-
-for chunk in eeg_stream[1:100]  # Test 100 chunks
-    t_start = time()
-    result = process_chunk(session, chunk)
-    t_end = time()
-    
-    push!(latencies, (t_end - t_start) * 1000)  # Convert to ms
-end
-
-println("Latency statistics:")
-println("  Mean: $(round(mean(latencies), digits=1)) ms")
-println("  Median: $(round(median(latencies), digits=1)) ms")
-println("  95th percentile: $(round(quantile(latencies, 0.95), digits=1)) ms")
-println("  Max: $(round(maximum(latencies), digits=1)) ms")
-
-# First chunk is slower due to JIT compilation
-println("\nExcluding first chunk (JIT warmup):")
-println("  Mean: $(round(mean(latencies[2:end]), digits=1)) ms")
-```
+For Python rejection and quality APIs, see [Python SDK API Reference](/python-sdk/api-reference). For end-to-end real-time setup, see [Real-Time BCI Setup](/inference-configuration/real-time-setup).
 
 ## Next Read
 
 <CardGroup cols={2}>
+  <Card title="Python Streaming Inference" icon="activity" href="/python-sdk/streaming-inference">
+    Python `StreamingSession` examples and STS state handling.
+  </Card>
+  <Card title="Julia Streaming Inference" icon="rss" href="/julia-sdk/streaming-inference">
+    Julia streaming API for local chunk processing.
+  </Card>
+  <Card title="Real-Time BCI Setup" icon="settings" href="/inference-configuration/real-time-setup">
+    Hardware, LSL, BrainFlow, and acquisition-loop guidance.
+  </Card>
   <Card title="Batch Processing" icon="list" href="/inference-configuration/batch-processing">
-    Learn about offline batch inference
-  </Card>
-  <Card title="Real-time Setup" icon="settings" href="/inference-configuration/real-time-setup">
-    Configure your real-time BCI system
-  </Card>
-  <Card title="Julia SDK" icon="code" href="/julia-sdk/api-reference">
-    Complete SDK reference
-  </Card>
-  <Card title="Examples" icon="play" href="/examples/basic-examples">
-    Working streaming examples
+    Offline trial processing and diagnostics.
   </Card>
 </CardGroup>
-
----
-
-<Note>
-**Next**: Configure your [real-time BCI setup](/inference-configuration/real-time-setup) for optimal streaming performance.
-</Note>

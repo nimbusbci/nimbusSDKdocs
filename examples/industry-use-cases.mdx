@@ -864,7 +864,7 @@ p300_results = run_bci_experiment(:p300, 10)
 
 <Card title="Research Applications" icon="flask-conical">
   **Use Cases**: Cognitive neuroscience, BCI algorithms, clinical trials  
-  **Models**: NimbusLDA, NimbusQDA, and Bayesian Multinomial (NimbusSoftmax in Python / NimbusProbit in Julia) with custom training  
+  **Models**: NimbusLDA, NimbusQDA, `NimbusSoftmax` (Python), and `NimbusProbit` (Julia) with custom training<br/>
   **Flexibility**: Subject-specific calibration and adaptation  
   **Metrics**: Accuracy, ITR, confidence, confusion matrices  
   **Publication**: Transparent probabilistic models for peer review  
@@ -949,4 +949,4 @@ For medical BCI applications, NimbusSDK provides:
 
 ---
 
-These industry applications demonstrate the real-world potential of Nimbus BCI's probabilistic models across healthcare, assistive technology, and research domains. Both Python and Julia SDKs provide production-ready Bayesian classifiers (Bayesian LDA, Bayesian QDA, Bayesian Softmax, and Bayesian STS for Python) for motor imagery, P300, and SSVEP paradigms.
+These industry applications demonstrate the real-world potential of Nimbus BCI's probabilistic models across healthcare, assistive technology, and research domains. Both Python and Julia SDKs provide production-ready Bayesian classifiers for motor imagery, P300, and SSVEP paradigms: Bayesian LDA and QDA in both SDKs, `NimbusSoftmax` and `NimbusSTS` in Python, and `NimbusProbit` in Julia.

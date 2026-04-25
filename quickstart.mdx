@@ -1,427 +1,60 @@
 ---
 title: "Nimbus Quickstart"
-description: "Start quickly with Nimbus by choosing the Python or Julia SDK and following setup paths for your first BCI workflow."
+description: "Choose the Python or Julia SDK quickstart path and find the setup guide for your first BCI workflow."
 keywords: ["quickstart", "Nimbus", "Python SDK", "Julia SDK", "getting started", "tutorial", "BCI"]
 icon: "rocket"
 ---
 
 # Quickstart
 
-Choose your SDK:
+Choose the SDK that matches your workflow. The Python SDK runs fully locally with an sklearn-style API, while the Julia SDK uses NimbusSDK.jl and requires an API key for the commercial core.
 
 <CardGroup cols={2}>
   <Card title="Python SDK Quickstart" icon="python" href="/python-sdk/quickstart">
-    Get started with `nimbus-bci` (fully local)
+    Install `nimbus-bci`, fit your first classifier, and try batch, streaming, and active-learning workflows.
   </Card>
   <Card title="Julia SDK Quickstart" icon="code" href="/julia-sdk/quickstart">
-    Get started with NimbusSDK.jl (requires API key)
+    Install NimbusSDK.jl, authenticate with an API key, and run your first Julia inference workflow.
   </Card>
 </CardGroup>
 
-<Note>
-If you landed here from an older link: the Julia quickstart moved from `/quickstart` to `/julia-sdk/quickstart`.
-</Note>
+## Before You Start
 
-## Start Here
+- Use **Python 3.11+** for the Python SDK or **Julia 1.9+** for the Julia SDK.
+- Provide **preprocessed EEG features**, not raw EEG.
+- Start with the [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) guide if you are not sure how to prepare CSP, bandpower, or ERP features.
+
+<Tip>
+Nimbus focuses on Bayesian inference and BCI workflow tooling. Filtering, artifact removal, epoching, and feature extraction happen before data reaches the SDK.
+</Tip>
+
+## Common Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Python Setup Path" icon="python" href="/python-sdk/quickstart">
-    Install `nimbus-bci`, run your first classifier, and add streaming.
-  </Card>
-  <Card title="Julia Setup Path" icon="code" href="/julia-sdk/quickstart">
-    Install NimbusSDK.jl, authenticate, and run your first inference.
-  </Card>
-  <Card title="Preprocessing Requirements" icon="list-filter" href="/inference-configuration/preprocessing-requirements">
-    Required feature pipeline for motor imagery, P300, and SSVEP.
-  </Card>
-  <Card title="Model Selection Guide" icon="brain" href="/model-specification">
-    Choose the right Bayesian model for your BCI task.
-  </Card>
-</CardGroup>
-
-## Prerequisites
-
-Before you begin, make sure you have:
-- **Python 3.11+** (for Python SDK) or **Julia 1.9+** (for Julia SDK)
-- **Basic understanding** of EEG data and BCI concepts
-- **Preprocessed features** (CSP, bandpower, etc.) - see [preprocessing requirements](/inference-configuration/preprocessing-requirements)
-
-<Tip>
-**Important**: Nimbus SDKs expect **preprocessed features**, not raw EEG data. Apply filtering, artifact removal, and feature extraction (for example, CSP) before inference.
-</Tip>
-
-## Step 1: Get Your API Key
-
-<Card title="Request API Access" icon="envelope" href="mailto:hello@nimbusbci.com">
-  Contact us at **hello@nimbusbci.com** to request your API key. Include your use case and expected volume.
-</Card>
-
-<Note>
-API keys are typically issued within 24 hours. Include details about your BCI application, expected data volume, and timeline in your request.
-</Note>
-
-## Step 2: Install NimbusSDK.jl
-
-NimbusSDK.jl is now available in the public Julia General Registry:
-
-```julia
-using Pkg
-
-# Install the public wrapper (no private registry needed!)
-Pkg.add("NimbusSDK")
-```
-
-After installing the wrapper, install the proprietary core with your API key:
-
-```julia
-using NimbusSDK
-
-# One-time setup: Install the commercial core
-NimbusSDK.install_core("your-api-key-here")
-```
-
-<Note>
-**What changed?** NimbusSDK.jl is now a public wrapper package. No more private registry setup! Just `Pkg.add("NimbusSDK")` and then install the core with your API key.
-</Note>
-
-<Tip>
-The core installation is persistent. You only need to run `install_core()` once per machine. After that, simply `using NimbusSDK` will work in any Julia project.
-</Tip>
-
-## Step 3: Your First BCI Inference
-
-Create a new Julia script and run your first BCI inference:
-
-```julia
-using NimbusSDK
-using Statistics
-
-# Step 1: One-time setup with your API key
-NimbusSDK.install_core("your-api-key-here")
-
-# Step 2: Load a pre-trained NimbusLDA model
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-println("✓ Model loaded: $(get_n_features(model)) features, $(get_n_classes(model)) classes")
-
-# Step 3: Prepare your preprocessed CSP features
-# Shape: (n_features × n_samples × n_trials)
-# Example: 16 CSP features × 250 samples × 20 trials
-n_features = 16
-n_samples = 250  # 1 second at 250 Hz
-n_trials = 20
-
-# Generate sample CSP features (in practice, load from your preprocessing)
-features = randn(n_features, n_samples, n_trials)
-labels = rand(1:4, n_trials)  # Random labels for demo
-
-# Create BCIData with metadata
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    paradigm = :motor_imagery,
-    feature_type = :csp,
-    n_features = n_features,
-    n_classes = 4,
-    chunk_size = nothing  # Batch mode
-)
-
-data = BCIData(features, metadata, labels)
-
-# Step 4: Run batch inference
-println("Running batch inference...")
-results = predict_batch(model, data; iterations=10)
-
-# Step 5: Analyze results
-println("\n✓ Results:")
-println("  Mean confidence: $(round(mean(results.confidences), digits=3))")
-println("  Accuracy: $(round(100 * sum(results.predictions .== labels) / length(labels), digits=1))%")
-println("  ITR: $(round(calculate_ITR(
-    sum(results.predictions .== labels) / length(labels),
-    4,
-    4.0
-), digits=1)) bits/minute")
-```
-
-### Required Format for Features
-
-NimbusSDK expects features in a specific format:
-- **Dimensions**: `(n_features × n_samples × n_trials)`
-- **Feature types**: CSP (recommended), bandpower, ERP amplitudes
-- **Preprocessing**: Must be applied before using SDK
-
-<Note>
-**Critical**: You must preprocess your EEG data before using NimbusSDK. The SDK does NOT process raw EEG - it requires extracted features. See [Preprocessing Guide](/inference-configuration/preprocessing-requirements) for details.
-</Note>
-
-## Step 4: Training Your Own Model
-
-Train a custom NimbusLDA model on your labeled data:
-
-```julia
-using NimbusSDK
-using Statistics
-
-# One-time setup: Install core with your API key
-NimbusSDK.install_core("your-api-key")
-
-# Prepare training data (features already preprocessed!)
-train_features = load_your_csp_features()  # (n_features × n_samples × n_trials)
-train_labels = load_your_labels()         # Vector of integers: 1, 2, 3, 4, ...
-
-# IMPORTANT: Normalize features for cross-session performance
-# This is critical if you plan to use the model on new sessions
-norm_params = estimate_normalization_params(train_features; method=:zscore)
-train_features_norm = apply_normalization(train_features, norm_params)
-
-train_data = BCIData(
-    train_features_norm,  # Use normalized features
-    BCIMetadata(
-        sampling_rate = 250.0,
-        paradigm = :motor_imagery,
-        feature_type = :csp,
-        n_features = 16,
-        n_classes = 4,
-        chunk_size = nothing,  # Batch mode
-        temporal_aggregation = :logvar  # For CSP features in MI
-    ),
-    train_labels  # Required for training!
-)
-
-# Train the model
-println("Training NimbusLDA model...")
-model = train_model(
-    NimbusLDA,
-    train_data;
-    iterations = 50,        # Number of inference iterations
-    showprogress = true,    # Show training progress
-    name = "my_custom_model",
-    description = "4-class motor imagery with CSP"
-)
-
-# Save the trained model WITH normalization parameters
-using JLD2
-@save "my_custom_model.jld2" model norm_params
-
-# Later: Load and use with same normalization
-@load "my_custom_model.jld2" model norm_params
-
-# Load your test features and apply the same normalization
-test_features = load_your_test_features()  # (n_features × n_samples × n_trials)
-test_features_norm = apply_normalization(test_features, norm_params)
-
-# Reuse the same metadata structure as training
-test_data = BCIData(test_features_norm, train_data.metadata)
-results = predict_batch(model, test_data)
-```
-
-<Warning>
-**Feature Normalization is Critical!**
-
-EEG amplitude varies 50-200% across sessions. Without normalization, accuracy drops 15-30% for cross-session BCI.
-
-Always:
-1. Estimate normalization params from training data
-2. Apply same params to test/deployment data
-3. Save params with your model
-
-See [Feature Normalization](/inference-configuration/feature-normalization) for details.
-</Warning>
-
-<Tip>
-**New in v0.2.0**: You can now fine-tune model hyperparameters (`dof_offset`, `mean_prior_precision`) to optimize performance for your specific dataset. See the [model documentation](/models/rxlda#hyperparameter-tuning-v020) for detailed tuning guidance.
-</Tip>
-
-## Step 5: Streaming Inference
-
-For real-time applications, use streaming inference:
-
-```julia
-using NimbusSDK
-
-# One-time setup: Install core with your API key
-NimbusSDK.install_core("your-api-key")
-
-# Load model (core is already installed)
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-
-# Initialize streaming session (1 second chunks at 250 Hz)
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    paradigm = :motor_imagery,
-    feature_type = :csp,
-    n_features = 16,
-    n_classes = 4,
-    chunk_size = 250,  # 1 second chunks
-    temporal_aggregation = :logvar  # For CSP features in MI
-)
-
-session = init_streaming(model, metadata)
-
-# Process chunks as they arrive
-for trial in your_eeg_stream()
-    # Process one chunk
-    chunk_result = process_chunk(session, trial)
-    
-    println("Chunk prediction: $(chunk_result.prediction) " *
-            "(confidence: $(round(chunk_result.confidence, digits=3)))")
-    
-    # Finalize trial with weighted voting across all chunks
-    if is_trial_complete(trial)
-        final_result = finalize_trial(session; method=:weighted_vote)
-        println("✓ Final prediction: $(final_result.prediction)")
-        
-        # Check quality
-        if should_reject_trial(final_result.confidence, 0.7)
-            println("⚠️ Low confidence - trial rejected")
-        end
-    end
-end
-```
-
-## Available Models
-
-NimbusSDK includes Bayesian inference models for different BCI scenarios:
-
-### Bayesian LDA (NimbusLDA)
-**API Name**: `NimbusLDA`  
-**Mathematical Model**: Pooled Gaussian Classifier (PGC)
-
-- **Shared covariance** across classes
-- Fast inference and training
-- Best for well-separated classes
-- Typical training time: 10-30 seconds (50 iterations, 100 trials)
-
-### Bayesian QDA (NimbusQDA)
-**API Name**: `NimbusQDA`  
-**Mathematical Model**: Heteroscedastic Gaussian Classifier (HGC)
-
-- **Class-specific covariances**
-- More flexible, handles overlapping distributions
-- Better for complex class structures
-- Slightly slower than Bayesian LDA
-
-### NimbusProbit (Julia only)
-**API Name**: `NimbusProbit`  
-**Mathematical Model**: Bayesian Multinomial Probit Regression
-
-- **Continuous transition mapping** to latent space
-- Most flexible for complex multinomial tasks
-- Works in (K-1) dimensional space
-- Ideal for advanced BCI applications
-
-<Note>
-All models use **RxInfer.jl** for efficient variational Bayesian inference with reactive message passing.
-</Note>
-
-## Next Read
-
-Now that you have NimbusSDK running, explore these advanced features:
-
-<CardGroup cols={2}>
-  <Card title="Julia SDK Reference" icon="code" href="/julia-sdk/api-reference">
-    Complete SDK documentation with all functions and types
+  <Card title="Model Selection" icon="brain" href="/model-specification">
+    Compare NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusProbit, and NimbusSTS.
   </Card>
   <Card title="Feature Normalization" icon="arrows-up-down" href="/inference-configuration/feature-normalization">
-    Critical guide for cross-session BCI performance (+15-30% accuracy)
-  </Card>
-  <Card title="Bayesian LDA (NimbusLDA)" icon="brain" href="/models/rxlda">
-    Learn about the Bayesian LDA model in detail
-  </Card>
-  <Card title="Bayesian QDA (NimbusQDA)" icon="brain" href="/models/rxgmm">
-    Learn about the Bayesian QDA model in detail
-  </Card>
-  <Card title="NimbusProbit" icon="brain" href="/models/nimbusprobit">
-    Learn about NimbusProbit in detail
-  </Card>
-  <Card title="Bayesian STS (NimbusSTS)" icon="brain" href="/models/rxsts">
-    Adaptive model for non-stationary data (Python SDK only)
-  </Card>
-  <Card title="Preprocessing Guide" icon="settings" href="/inference-configuration/preprocessing-requirements">
-    Critical guide on preparing your EEG data
+    Normalize features consistently across sessions.
   </Card>
   <Card title="Batch Processing" icon="list" href="/inference-configuration/batch-processing">
-    Process multiple trials efficiently
+    Evaluate complete trials offline and compute diagnostics.
   </Card>
   <Card title="Streaming Inference" icon="activity" href="/inference-configuration/streaming-inference">
-    Real-time chunk-by-chunk processing
+    Configure chunk-by-chunk low-latency inference.
   </Card>
 </CardGroup>
 
-## Common Use Cases
-
-<CardGroup cols={2}>
-  <Card title="Motor Imagery BCI" icon="gamepad" href="/examples/basic-examples">
-    Control devices with imagined movements using CSP features
-  </Card>
-  <Card title="P300 Speller" icon="keyboard" href="/examples/advanced-applications">
-    Communication interfaces using event-related potentials
-  </Card>
-  <Card title="SSVEP Control" icon="eye" href="/examples/advanced-applications">
-    High-speed visual BCI with steady-state responses
-  </Card>
-  <Card title="Neurofeedback" icon="cpu" href="/examples/advanced-applications">
-    Real-time brain state monitoring and training
-  </Card>
-</CardGroup>
-
-## Quickstart FAQ
+## FAQ
 
 <AccordionGroup>
   <Accordion title="Do I need an API key for both SDKs?" icon="key">
-    No. The Python SDK (`nimbus-bci`) runs locally and does not require an API key. The Julia SDK (`NimbusSDK.jl`) requires an API key for installation and model access.
+    No. The Python SDK (`nimbus-bci`) runs locally and does not require an API key. The Julia SDK (`NimbusSDK.jl`) requires an API key to install and use NimbusSDKCore.
+  </Accordion>
+  <Accordion title="Which quickstart should I choose?" icon="arrow-right">
+    Choose Python if you want sklearn/MNE integration and local installation. Choose Julia if you want the NimbusSDK.jl workflow, RxInfer-backed models, or access to Julia model registry tooling.
   </Accordion>
   <Accordion title="What data format does Nimbus expect?" icon="database">
-    Use extracted features, not raw EEG. Typical shape is `(n_features x n_samples x n_trials)` for batch workflows. See [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) for full guidance.
-  </Accordion>
-  <Accordion title="What should I read next after setup?" icon="arrow-right">
-    Continue with [Streaming Inference](/inference-configuration/streaming-inference), [Feature Normalization](/inference-configuration/feature-normalization), and [Basic Examples](/examples/basic-examples).
+    Use extracted features, not raw EEG. Python examples usually use `(n_trials, n_features)` arrays for classifiers. Julia batch data usually uses `(n_features, n_samples, n_trials)` inside `BCIData`.
   </Accordion>
 </AccordionGroup>
-
-## Troubleshooting
-
-<AccordionGroup>
-  <Accordion icon="alert-triangle" title="Common Issues">
-    **API Key Issues:**
-    - Ensure your API key is set correctly
-    - Contact hello@nimbusbci.com if your key isn't working
-    
-    **Data Format Issues:**
-    - Features must be in shape: `(n_features × n_samples × n_trials)`
-    - Ensure you've applied preprocessing (filtering, artifact removal, feature extraction)
-    - No NaN or Inf values in data
-    
-    **Model Loading Issues:**
-    - Check that you have a valid model name
-    - Ensure your internet connection is working (for pre-trained models)
-    - Verify API key is authenticated
-  </Accordion>
-  
-  <Accordion icon="help-circle" title="Getting Help">
-    Need assistance? We're here to help:
-    
-    - **Email**: hello@nimbusbci.com for technical support
-    - **Documentation**: Browse our comprehensive guides
-    - **Examples**: Check out working code samples in the SDK
-    - **API Documentation**: See [Julia SDK Reference](/julia-sdk/api-reference)
-    
-    When reporting issues, please include:
-    - Your Julia version and OS
-    - The exact error message
-    - A minimal code example that reproduces the issue
-    - Your data shape and preprocessing steps
-  </Accordion>
-</AccordionGroup>
-
-## Performance Tips
-
-<Tip>
-**Optimize for Production:**
-- Use batch inference for multiple trials (more efficient than streaming)
-- Implement proper error handling with try-catch blocks
-- Monitor API usage and quotas
-- Cache model information locally after loading
-- Use appropriate confidence thresholds for your application
-- Check preprocessing quality with `diagnose_preprocessing()`
-</Tip>
-
-Congratulations! 🎉 You've successfully set up NimbusSDK.jl and run your first brain-computer interface inference. You're now ready to build powerful BCI applications with sub-20ms latency and production-ready Bayesian inference.

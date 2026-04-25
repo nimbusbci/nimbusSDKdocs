@@ -1,1601 +1,190 @@
 ---
 title: "Advanced Applications"
-description: "Advanced BCI workflows with NimbusLDA/NimbusQDA and Bayesian multinomial models, including training, calibration, and adaptive deployment."
-keywords: ["advanced applications", "BCI applications", "model training", "calibration", "adaptive BCI", "NimbusLDA", "NimbusQDA", "NimbusProbit", "advanced examples", "BCI development", "custom models"]
+description: "Advanced Nimbus BCI patterns for cross-subject training, hybrid systems, adaptive learning, multi-session experiments, and robust deployment."
+keywords: ["advanced applications", "BCI applications", "cross-subject", "adaptive BCI", "hybrid BCI", "multi-session", "NimbusSTS"]
 icon: "rocket"
 ---
 
 # Advanced BCI Applications
 
-This section demonstrates sophisticated applications of Nimbus for complex BCI scenarios. Examples shown in both Python and Julia.
+This page summarizes advanced BCI patterns without duplicating full SDK walkthroughs. Use it as an implementation checklist, then follow the linked SDK guides for exact APIs.
 
 <Note>
-**Python SDK**: See [Streaming Inference](/python-sdk/streaming-inference) and [sklearn Integration](/python-sdk/sklearn-integration) for Python-specific advanced patterns.
+For Python-specific streaming and sklearn patterns, see [Python Streaming Inference](/python-sdk/streaming-inference) and [sklearn Integration](/python-sdk/sklearn-integration). For Julia streaming, see [Julia Streaming Inference](/julia-sdk/streaming-inference).
 </Note>
 
-## Cross-Subject Model Training
+## Cross-Subject Training
 
-Train models that generalize across multiple subjects.
+Cross-subject models combine calibration data from multiple users and then adapt to a new user with a small amount of labeled data.
 
-### Multi-Subject Training Dataset
+Core workflow:
+
+1. Extract the same feature type for every subject.
+2. Normalize using training subjects only.
+3. Train a conservative baseline model.
+4. Evaluate with subject-wise splits, not random trial splits.
+5. Personalize with a small calibration set for the target subject.
 
 <Tabs>
   <Tab title="Python">
 ```python
-from nimbus_bci import NimbusLDA
-from nimbus_bci import estimate_normalization_params, apply_normalization
-import numpy as np
+from nimbus_bci import NimbusLDA, estimate_normalization_params, apply_normalization
+from sklearn.model_selection import LeaveOneGroupOut
 
-# Collect data from multiple subjects
-subjects = ["S001", "S002", "S003", "S004", "S005"]
-all_features = []
-all_labels = []
+X, y, groups = load_multi_subject_features()
 
-for subject_id in subjects:
-    print(f"Loading subject {subject_id}...")
-    subj_features, subj_labels = load_subject_data(subject_id)
-    all_features.append(subj_features)
-    all_labels.append(subj_labels)
+logo = LeaveOneGroupOut()
+for train_idx, test_idx in logo.split(X, y, groups):
+    norm = estimate_normalization_params(X[train_idx], method="zscore")
+    X_train = apply_normalization(X[train_idx], norm)
+    X_test = apply_normalization(X[test_idx], norm)
 
-# Concatenate all subject data
-X = np.vstack(all_features)
-y = np.concatenate(all_labels)
-
-print(f"\nCombined dataset:")
-print(f"  Total trials: {X.shape[0]}")
-print(f"  Features: {X.shape[1]}")
-print(f"  Subjects: {len(subjects)}")
-
-# Normalize across all subjects
-norm_params = estimate_normalization_params(X, method="zscore")
-X_norm = apply_normalization(X, norm_params)
-
-# Train cross-subject model
-clf = NimbusLDA(mu_scale=5.0)  # Higher regularization for cross-subject
-clf.fit(X_norm, y)
-
-print(f"Cross-subject model trained")
+    clf = NimbusLDA(mu_scale=5.0)
+    clf.fit(X_train, y[train_idx])
+    score = clf.score(X_test, y[test_idx])
 ```
   </Tab>
   <Tab title="Julia">
 ```julia
 using NimbusSDK
 
-NimbusSDK.install_core("your-api-key")
+features, labels, subject_ids = load_multi_subject_features()
 
-# Collect data from multiple subjects
-subjects = ["S001", "S002", "S003", "S004", "S005"]
-all_features = []
-all_labels = []
+for subject in unique(subject_ids)
+    train_mask = subject_ids .!= subject
+    test_mask = subject_ids .== subject
 
-for subject_id in subjects
-    println("Loading subject $subject_id...")
-    subj_features, subj_labels = load_subject_data(subject_id)
-    push!(all_features, subj_features)
-    push!(all_labels, subj_labels)
-end
+    norm = estimate_normalization_params(features[:, :, train_mask]; method=:zscore)
+    train_features = apply_normalization(features[:, :, train_mask], norm)
+    test_features = apply_normalization(features[:, :, test_mask], norm)
 
-# Concatenate all subject data
-combined_features = cat(all_features..., dims=3)
-combined_labels = vcat(all_labels...)
-
-println("\nCombined dataset:")
-println("  Total trials: $(size(combined_features, 3))")
-println("  Features: $(size(combined_features, 1))")
-println("  Subjects: $(length(subjects))")
-
-# Train cross-subject model
-train_data = BCIData(
-    combined_features,
-    BCIMetadata(
-        sampling_rate = 250.0,
-        paradigm = :motor_imagery,
-        feature_type = :csp,
-        n_features = 16,
-```
-  </Tab>
-</Tabs>
-
-### Transfer to New Subject
-
-Use cross-subject model as baseline for new subjects:
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA
-import numpy as np
-import pickle
-
-# Load cross-subject baseline
-with open("cross_subject_model.pkl", "rb") as f:
-    baseline_clf = pickle.load(f)
-
-# Collect minimal calibration from new subject (Subject 006)
-X_calib, y_calib = collect_calibration_trials(
-    subject_id="S006",
-    trials_per_class=12  # Only 12 trials per class needed!
-)
-
-# Personalize using online learning
-personalized_clf = NimbusLDA()
-personalized_clf.fit(X_baseline, y_baseline)  # Initialize with baseline
-
-# Fine-tune on new subject's calibration data
-for _ in range(10):  # Multiple passes for adaptation
-    personalized_clf.partial_fit(X_calib, y_calib)
-
-# Test on new subject
-X_test_new, y_test_new = load_subject_test_data("S006")
-predictions = personalized_clf.predict(X_test_new)
-
-accuracy = np.mean(predictions == y_test_new)
-print(f"New subject accuracy: {accuracy * 100:.1f}%")
-print(f"(With only 48 calibration trials total!)")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-
-# Load cross-subject baseline
-baseline = load_model(NimbusLDA, "cross_subject_model.jld2")
-
-# Collect minimal calibration from new subject (Subject 006)
-new_subj_calib = collect_calibration_trials(
-    subject_id="S006",
-    trials_per_class=12  # Only 12 trials per class needed!
-)
-
-# Calibrate for new subject
-personalized = calibrate_model(
-    baseline,
-    new_subj_calib;
-    iterations = 20
-)
-
-# Test on new subject
-test_data_new = load_subject_test_data("S006")
-results = predict_batch(personalized, test_data_new)
-
-accuracy = sum(results.predictions .== test_data_new.labels) / length(test_data_new.labels)
-println("New subject accuracy: $(round(accuracy * 100, digits=1))%")
-println("(With only 48 calibration trials total!)")
-```
-  </Tab>
-</Tabs>
-
-## Hybrid BCI: Combining Multiple Paradigms
-
-Combine motor imagery and P300 for robust control.
-
-### Dual-Paradigm System
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA, NimbusQDA
-from dataclasses import dataclass
-from typing import Optional
-import numpy as np
-import pickle
-
-# Load both models
-with open("motor_imagery_4class.pkl", "rb") as f:
-    mi_clf = pickle.load(f)
-with open("p300_binary.pkl", "rb") as f:
-    p300_clf = pickle.load(f)
-
-@dataclass
-class HybridBCIResult:
-    mi_prediction: int
-    mi_confidence: float
-    p300_confirmed: bool
-    p300_confidence: float
-    final_action: Optional[int]
-
-def hybrid_inference(mi_features, p300_features):
-    """
-    Combined motor imagery + P300 for high-confidence control.
-    
-    Args:
-        mi_features: Motor imagery features (1, n_features)
-        p300_features: P300 ERP features (1, n_features)
-    
-    Returns:
-        HybridBCIResult with combined inference
-    """
-    # Motor imagery: Determine intended direction
-    mi_pred = mi_clf.predict(mi_features)[0]
-    mi_probs = mi_clf.predict_proba(mi_features)[0]
-    mi_conf = np.max(mi_probs)
-    
-    # P300: Confirm intention
-    p300_pred = p300_clf.predict(p300_features)[0]
-    p300_probs = p300_clf.predict_proba(p300_features)[0]
-    p300_confirmed = (p300_pred == 1)  # Target detected
-    p300_conf = p300_probs[1] if p300_confirmed else p300_probs[0]
-    
-    # Decision logic: Require both high confidence
-    final_action = None
-    if mi_conf > 0.75 and p300_confirmed and p300_conf > 0.75:
-        final_action = mi_pred
-    
-    return HybridBCIResult(
-        mi_prediction=mi_pred,
-        mi_confidence=mi_conf,
-        p300_confirmed=p300_confirmed,
-        p300_confidence=p300_conf,
-        final_action=final_action
-    )
-
-# Example usage: Wheelchair control
-def hybrid_wheelchair_control():
-    while is_active():
-        # Collect motor imagery trial (direction intent)
-        mi_features = collect_mi_trial()
-        
-        # Collect P300 confirmation trial
-        p300_features = collect_p300_confirmation()
-        
-        result = hybrid_inference(mi_features, p300_features)
-        
-        if result.final_action is not None:
-            print(f"✓ Confirmed action: {result.final_action}")
-            execute_wheelchair_command(result.final_action)
-        else:
-            print("⚠️  Low confidence - no action")
-            print(f"  MI: {result.mi_confidence:.2f}")
-            print(f"  P300: {result.p300_confirmed} ({result.p300_confidence:.2f})")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-
-NimbusSDK.install_core("your-api-key")
-
-# Load both models
-mi_model = load_model(NimbusLDA, "motor_imagery_4class_v1")  # Bayesian LDA
-p300_model = load_model(NimbusLDA, "p300_binary_v1")  # Bayesian LDA
-
-struct HybridBCIResult
-    mi_prediction::Int
-    mi_confidence::Float64
-    p300_confirmed::Bool
-    p300_confidence::Float64
-    final_action::Union{Int, Nothing}
-end
-
-function hybrid_inference(mi_trial, p300_trial)
-    """
-    Combined motor imagery + P300 for high-confidence control
-    """
-    
-    # Motor imagery: Determine intended direction
-    mi_results = predict_batch(mi_model, mi_trial)
-    mi_pred = mi_results.predictions[1]
-    mi_conf = mi_results.confidences[1]
-    
-    # P300: Confirm intention
-    p300_results = predict_batch(p300_model, p300_trial)
-    p300_confirmed = p300_results.predictions[1] == 1  # Target detected
-    p300_conf = p300_results.confidences[1]
-    
-    # Decision logic: Require both high confidence
-    final_action = nothing
-    if mi_conf > 0.75 && p300_confirmed && p300_conf > 0.75
-        final_action = mi_pred
-    end
-    
-    return HybridBCIResult(
-        mi_pred,
-        mi_conf,
-        p300_confirmed,
-        p300_conf,
-        final_action
-    )
-end
-
-# Example usage: Wheelchair control
-function hybrid_wheelchair_control()
-    while is_active()
-        # Collect motor imagery trial (direction intent)
-        mi_trial = collect_mi_trial()
-        
-        # Collect P300 confirmation trial
-        p300_trial = collect_p300_confirmation()
-        
-        result = hybrid_inference(mi_trial, p300_trial)
-        
-        if !isnothing(result.final_action)
-            println("✓ Confirmed action: $(result.final_action)")
-            execute_wheelchair_command(result.final_action)
-        else
-            println("⚠️  Low confidence - no action")
-            println("  MI: $(round(result.mi_confidence, digits=2))")
-            println("  P300: $(result.p300_confirmed) ($(round(result.p300_confidence, digits=2)))")
-        end
-    end
+    train_data = BCIData(train_features, metadata, labels[train_mask])
+    model = train_model(NimbusLDA, train_data; iterations=50)
+    results = predict_batch(model, BCIData(test_features, metadata, labels[test_mask]))
 end
 ```
   </Tab>
 </Tabs>
 
-## Continuous Control with Smoothing
+## Hybrid BCI
 
-Implement smooth continuous control for cursor/prosthetics.
+Hybrid BCIs combine evidence from multiple paradigms, such as motor imagery plus P300.
 
-### Exponential Moving Average
+Recommended pattern:
 
-<Tabs>
-  <Tab title="Python">
+- Keep one model per paradigm.
+- Normalize each feature family separately.
+- Combine posterior probabilities or confidence-weighted decisions.
+- Log disagreement between paradigms for later review.
+
 ```python
-from nimbus_bci import StreamingSession
-from collections import deque
-import numpy as np
+mi_proba = mi_model.predict_proba(mi_features)
+p300_proba = p300_model.predict_proba(p300_features)
 
-# Setup streaming
-session = StreamingSession(clf.model_, metadata)
-
-# Smoothing filter class
-class MovingAverageFilter:
-    def __init__(self, window_size=5, n_classes=4):
-        self.predictions = deque(maxlen=window_size)
-        self.confidences = deque(maxlen=window_size)
-        self.window_size = window_size
-        self.n_classes = n_classes
-    
-    def smooth_prediction(self, new_pred, new_conf):
-        """Apply moving average smoothing with confidence weighting."""
-        self.predictions.append(new_pred)
-        self.confidences.append(new_conf)
-        
-        # Weighted voting by confidence
-        class_scores = np.zeros(self.n_classes)
-        for pred, conf in zip(self.predictions, self.confidences):
-            class_scores[pred] += conf
-        
-        # Smoothed prediction
-        smoothed_pred = np.argmax(class_scores)
-        smoothed_conf = np.max(class_scores) / np.sum(class_scores)
-        
-        return smoothed_pred, smoothed_conf
-
-# Real-time control with smoothing
-filter = MovingAverageFilter(window_size=5, n_classes=4)
-
-for chunk in eeg_stream:
-    # Get raw prediction
-    raw_result = session.process_chunk(chunk)
-    
-    # Apply smoothing
-    smoothed_pred, smoothed_conf = filter.smooth_prediction(
-        raw_result.prediction, raw_result.confidence
-    )
-    
-    # Execute smoothed command
-    if smoothed_conf > 0.7:
-        execute_smooth_control(smoothed_pred, smoothed_conf)
-    
-    session.reset()
+combined = 0.6 * mi_proba + 0.4 * p300_proba
+prediction = combined.argmax(axis=1)
+confidence = combined.max(axis=1)
 ```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
 
-# Setup streaming
-session = init_streaming(model, metadata)
+Use conservative thresholds for high-stakes actions and require confirmation when paradigms disagree.
 
-# Smoothing parameters
-struct MovingAverageFilter
-    predictions::Vector{Int}
-    confidences::Vector{Float64}
-    alpha::Float64  # Smoothing factor (0-1)
-    window_size::Int
-end
+## Continuous Control
 
-function smooth_prediction(filter::MovingAverageFilter, new_pred::Int, new_conf::Float64)
-    push!(filter.predictions, new_pred)
-    push!(filter.confidences, new_conf)
-    
-    # Keep only recent window
-    if length(filter.predictions) > filter.window_size
-        popfirst!(filter.predictions)
-        popfirst!(filter.confidences)
-    end
-    
-    # Weighted voting by confidence
-    class_scores = zeros(4)
-    for (pred, conf) in zip(filter.predictions, filter.confidences)
-        class_scores[pred] += conf
-    end
-    
-    # Smoothed prediction
-    smoothed_pred = argmax(class_scores)
-    smoothed_conf = maximum(class_scores) / sum(class_scores)
-    
-    return (prediction=smoothed_pred, confidence=smoothed_conf)
-end
+Continuous control maps repeated predictions into a smoothed command stream.
 
-# Real-time control with smoothing
-filter = MovingAverageFilter(Int[], Float64[], 0.7, 5)
-
-for chunk in eeg_stream
-    # Get raw prediction
-    raw_result = process_chunk(session, chunk)
-    
-    # Apply smoothing
-    smoothed = smooth_prediction(filter, raw_result.prediction, raw_result.confidence)
-    
-    # Execute smoothed command
-    if smoothed.confidence > 0.7
-        execute_smooth_control(smoothed.prediction, smoothed.confidence)
-    end
-end
-```
-  </Tab>
-</Tabs>
-
-### Velocity-Based Control
-
-Control velocity instead of discrete actions:
-
-<Tabs>
-  <Tab title="Python">
 ```python
-from nimbus_bci import StreamingSession
-import numpy as np
+alpha = 0.3
+smoothed = None
 
-def velocity_control(clf, metadata, eeg_stream):
-    """Continuous velocity-based BCI control."""
-    session = StreamingSession(clf.model_, metadata)
-    
-    velocity = np.array([0.0, 0.0])  # [vx, vy]
-    max_velocity = 1.0
-    acceleration = 0.1
-    friction = 0.95
-    
-    for chunk in eeg_stream:
-        result = session.process_chunk(chunk)
-        
-        if result.confidence > 0.7:
-            # Map predictions to velocity changes
-            if result.prediction == 0:  # Left
-                velocity[0] -= acceleration * result.confidence
-            elif result.prediction == 1:  # Right
-                velocity[0] += acceleration * result.confidence
-            elif result.prediction == 2:  # Up
-                velocity[1] += acceleration * result.confidence
-            elif result.prediction == 3:  # Down
-                velocity[1] -= acceleration * result.confidence
-        
-        # Apply friction
-        velocity *= friction
-        
-        # Clamp velocity
-        velocity = np.clip(velocity, -max_velocity, max_velocity)
-        
-        # Update position
-        update_cursor_velocity(velocity)
-        
-        session.reset()
+for posterior in posterior_stream:
+    command = posterior_to_velocity(posterior)
+    smoothed = command if smoothed is None else alpha * command + (1 - alpha) * smoothed
+    send_control(smoothed)
 ```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
 
-function velocity_control(model, eeg_stream)
-    session = init_streaming(model, metadata)
-    
-    velocity = [0.0, 0.0]  # [vx, vy]
-    max_velocity = 1.0
-    acceleration = 0.1
-    friction = 0.95
-    
-    for chunk in eeg_stream
-        result = process_chunk(session, chunk)
-        
-        if result.confidence > 0.7
-            # Map predictions to velocity changes
-            if result.prediction == 1  # Left
-                velocity[1] -= acceleration * result.confidence
-            elseif result.prediction == 2  # Right
-                velocity[1] += acceleration * result.confidence
-            elseif result.prediction == 3  # Up
-                velocity[2] += acceleration * result.confidence
-            elseif result.prediction == 4  # Down
-                velocity[2] -= acceleration * result.confidence
-            end
-        end
-        
-        # Apply friction
-        velocity .*= friction
-        
-        # Clamp velocity
-        velocity = clamp.(velocity, -max_velocity, max_velocity)
-        
-        # Update position
-        update_cursor_velocity(velocity)
-    end
-end
-```
-  </Tab>
-</Tabs>
+Keep smoothing outside the classifier. The model should report uncertainty; the control layer should decide how aggressively to act on it.
 
-## Adaptive Learning During Use
+## Adaptive Learning
 
-Update model parameters online based on implicit feedback.
+Adaptation is useful when signal distributions drift during long sessions or across days.
 
-### Online Model Adaptation
+Choose the adaptation mechanism by feedback type:
 
-<Tabs>
-  <Tab title="Python">
+| Feedback Available | Pattern |
+| --- | --- |
+| Immediate labels | `partial_fit` or retraining on recent labeled trials. |
+| Delayed labels | Buffer predictions and update when labels arrive. |
+| No labels | Use active learning or calibration sufficiency checks. |
+| Non-stationary state | Use `NimbusSTS` in Python. |
+
 ```python
-from nimbus_bci import NimbusLDA
-import numpy as np
+prediction = clf.predict(trial_features)
 
-# Start with baseline classifier
-clf = NimbusLDA()
-clf.fit(X_baseline, y_baseline)
-
-# Collect online data with implicit labels
-online_features = []
-online_labels = []
-
-adaptation_interval = 20  # Adapt every 20 trials
-
-for trial_idx in range(1, 201):
-    # Collect trial
-    trial_features = collect_trial()  # (1, n_features)
-    
-    # Get prediction
-    prediction = clf.predict(trial_features)[0]
-    proba = clf.predict_proba(trial_features)[0]
-    confidence = np.max(proba)
-    
-    # Implicit labeling: Assume high-confidence predictions are correct
-    if confidence > 0.85:
-        online_features.append(trial_features[0])
-        online_labels.append(prediction)
-        
-        print(f"Trial {trial_idx}: Confident prediction added to adaptation set")
-    
-    # Periodic adaptation using partial_fit
-    if trial_idx % adaptation_interval == 0 and len(online_labels) >= 10:
-        print(f"\n=== Adapting model at trial {trial_idx} ===")
-        
-        # Create adaptation dataset
-        X_adapt = np.array(online_features)
-        y_adapt = np.array(online_labels)
-        
-        # Online learning: update model with new data
-        for _ in range(5):  # Multiple passes for better adaptation
-            clf.partial_fit(X_adapt, y_adapt)
-        
-        print(f"Model adapted with {len(online_labels)} trials")
-        
-        # Keep sliding window (keep last 10 trials)
-        if len(online_features) > 10:
-            online_features = online_features[-10:]
-            online_labels = online_labels[-10:]
+if label_available:
+    clf.partial_fit(trial_features, [true_label])
 ```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
 
-# Start with baseline Bayesian LDA model
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
+For Python active learning, see [Active Learning](/python-sdk/active-learning).
 
-# Collect online data with implicit labels
-online_features = []
-online_labels = []
+## Multi-Session Experiments
 
-adaptation_interval = 20  # Adapt every 20 trials
+For experiments that span days or weeks:
 
-for trial_idx in 1:200
-    # Collect trial
-    trial_features = collect_trial()
-    
-    # Get prediction
-    trial_data = BCIData(trial_features, metadata)
-    result = predict_batch(model, trial_data)
-    
-    # Implicit labeling: Assume high-confidence predictions are correct
-    if result.confidences[1] > 0.85
-        push!(online_features, trial_features)
-        push!(online_labels, result.predictions[1])
-        
-        println("Trial $trial_idx: Confident prediction added to adaptation set")
-    end
-    
-    # Periodic adaptation
-    if trial_idx % adaptation_interval == 0 && length(online_labels) >= 10
-        println("\n=== Adapting model at trial $trial_idx ===")
-        
-        # Create adaptation dataset
-        adapt_features = cat(online_features..., dims=3)
-        adapt_data = BCIData(adapt_features, metadata, online_labels)
-        
-        # Calibrate with online data
-        model = calibrate_model(model, adapt_data; iterations=15)
-        
-        println("Model adapted with $(length(online_labels)) trials")
-        
-        # Clear buffer (or keep sliding window)
-        online_features = online_features[end-10:end]
-        online_labels = online_labels[end-10:end]
-    end
-end
+- Use a stable preprocessing pipeline and save its parameters.
+- Save normalization parameters with each trained model.
+- Track hardware, montage, impedance, session time, and participant state.
+- Evaluate same-session and cross-session performance separately.
+- Compare adaptation against a no-adaptation baseline.
+
+Suggested metadata to log:
+
+```json
+{
+  "subject_id": "S001",
+  "session_id": "2026-04-25-AM",
+  "paradigm": "motor_imagery",
+  "feature_type": "csp",
+  "model": "NimbusLDA",
+  "normalization": "zscore",
+  "sampling_rate": 250
+}
 ```
-  </Tab>
-</Tabs>
 
-### Continuous Adaptation with NimbusSTS
+## Robust Deployment
 
-NimbusSTS provides **native support** for online adaptation with delayed feedback, making it ideal for adaptive BCI:
+Production systems should separate classification, control, and safety policy:
 
-<Tabs>
-  <Tab title="Python">
+1. Classifier returns prediction, posterior, and confidence.
+2. Quality gate accepts, rejects, or asks for confirmation.
+3. Control layer maps accepted predictions to actions.
+4. Monitoring logs confidence, latency, rejection rate, and drift.
+
+Use fallback behavior when confidence is low:
+
 ```python
-from nimbus_bci import NimbusSTS
-import numpy as np
-import time
-
-# Train initial model on calibration data
-clf = NimbusSTS(
-    transition_cov=0.05,  # Moderate drift tracking
-    learning_rate=0.1,    # Fast adaptation
-    num_steps=100,
-    verbose=False
-)
-clf.fit(X_calibration, y_calibration)
-
-print(f"Initial calibration complete: {len(X_calibration)} trials")
-print(f"Starting adaptive session...")
-
-# Online adaptive BCI session
-accuracy_window = []
-window_size = 20
-session_start = time.time()
-
-for trial_idx in range(1, 201):
-    # 1. Propagate state forward in time
-    clf.propagate_state(n_steps=1)
-    
-    # 2. Collect and predict on new trial
-    trial_features = collect_trial()  # Your data collection function
-    
-    # Make prediction using current state
-    prediction = clf.predict(trial_features.reshape(1, -1))[0]
-    proba = clf.predict_proba(trial_features.reshape(1, -1))[0]
-    confidence = np.max(proba)
-    
-    # 3. Execute BCI command based on prediction
-    execute_command(prediction)
-    
-    # 4. Get feedback after user completes action
-    #    (This is delayed - user acts, then we get true label)
-    true_label = wait_for_feedback()  # Your feedback function
-    
-    # 5. Update model with true label (EKF measurement update)
-    clf.partial_fit(trial_features.reshape(1, -1), [true_label])
-    
-    # Track performance
-    correct = (prediction == true_label)
-    accuracy_window.append(correct)
-    if len(accuracy_window) > window_size:
-        accuracy_window.pop(0)
-    
-    recent_acc = np.mean(accuracy_window)
-    
-    # Monitor adaptation
-    if trial_idx % 10 == 0:
-        elapsed = time.time() - session_start
-        z_mean, z_cov = clf.get_latent_state()
-        uncertainty = np.trace(z_cov)
-        
-        print(f"\nTrial {trial_idx} ({elapsed/60:.1f} min):")
-        print(f"  Recent accuracy: {recent_acc:.1%}")
-        print(f"  Current confidence: {confidence:.3f}")
-        print(f"  State uncertainty: {uncertainty:.3f}")
-        
-        # Alert if drift is detected
-        if uncertainty > 5.0:  # Threshold
-            print(f"  ⚠️ High uncertainty - consider recalibration")
-
-print(f"\n{'='*60}")
-print(f"Session complete!")
-print(f"Final accuracy (last {window_size} trials): {recent_acc:.1%}")
-
-# Save adapted model for next session
-z_final, P_final = clf.get_latent_state()
-import pickle
-with open("adapted_model.pkl", "wb") as f:
-    pickle.dump({
-        'model': clf,
-        'state': (z_final, P_final),
-        'session_info': {
-            'n_trials': 200,
-            'final_accuracy': recent_acc,
-            'timestamp': time.time()
-        }
-    }, f)
-
-print("Model saved with final state for next session")
-```
-  </Tab>
-</Tabs>
-
-**Key Advantages of NimbusSTS for Adaptive BCI:**
-✅ **Stateful**: Maintains temporal context across trials
-✅ **Delayed feedback**: Natural handling of prediction → action → feedback loop
-✅ **Continuous adaptation**: Every trial updates the state
-✅ **Drift tracking**: Automatically adapts to non-stationarity
-✅ **State persistence**: Save/load state across sessions
-
-### Cross-Day Adaptive BCI with State Transfer
-
-Transfer learning across days using NimbusSTS state persistence:
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusSTS
-import pickle
-import numpy as np
-from datetime import datetime
-
-# ==================== DAY 1 ====================
-print("="*60)
-print("DAY 1: Initial Training")
-print("="*60)
-
-# Full training session
-clf_day1 = NimbusSTS(
-    transition_cov=0.01,  # Conservative (short session)
-    num_steps=100
-)
-clf_day1.fit(X_day1_full, y_day1_full)
-
-# Run day 1 session with online adaptation
-for trial_features, true_label in day1_session:
-    clf_day1.propagate_state()
-    prediction = clf_day1.predict(trial_features.reshape(1, -1))
-    # ... execute action ...
-    clf_day1.partial_fit(trial_features.reshape(1, -1), [true_label])
-
-# Save final state
-z_day1, P_day1 = clf_day1.get_latent_state()
-day1_acc = clf_day1.score(X_day1_test, y_day1_test)
-
-with open("model_day1.pkl", "wb") as f:
-    pickle.dump({
-        'model': clf_day1,
-        'state': (z_day1, P_day1),
-        'accuracy': day1_acc,
-        'date': datetime.now()
-    }, f)
-
-print(f"\nDay 1 complete!")
-print(f"  Final accuracy: {day1_acc:.1%}")
-print(f"  Final state: {z_day1}")
-
-# ==================== DAY 2 ====================
-print("\n" + "="*60)
-print("DAY 2: Minimal Calibration + State Transfer")
-print("="*60)
-
-# Load day 1 model
-with open("model_day1.pkl", "rb") as f:
-    saved = pickle.load(f)
-
-# Strategy A: Train from scratch (baseline)
-clf_day2_baseline = NimbusSTS()
-clf_day2_baseline.fit(X_day2_calib, y_day2_calib)  # Just 20 trials
-acc_baseline = clf_day2_baseline.score(X_day2_test, y_day2_test)
-
-# Strategy B: Transfer state from day 1
-clf_day2_transfer = NimbusSTS(transition_cov=0.01)
-clf_day2_transfer.fit(X_day2_calib, y_day2_calib)  # Same 20 trials
-
-# Transfer state with decay (account for time elapsed)
-z_day1_prior = saved['state'][0]
-P_day1_prior = saved['state'][1]
-
-clf_day2_transfer.set_latent_state(
-    z_mean=z_day1_prior * 0.5,  # 50% decay toward zero
-    z_cov=P_day1_prior * 2.0     # 2x uncertainty (time elapsed)
-)
-
-acc_transfer = clf_day2_transfer.score(X_day2_test, y_day2_test)
-
-# Results
-print(f"\nDay 2 Results (with {len(X_day2_calib)} calibration trials):")
-print(f"  Baseline (no transfer):  {acc_baseline:.1%}")
-print(f"  With state transfer:     {acc_transfer:.1%}")
-print(f"  Improvement:             {(acc_transfer - acc_baseline)*100:+.1f}%")
-
-# Continue day 2 session
-print(f"\nStarting Day 2 session with transferred state...")
-for trial_features, true_label in day2_session:
-    clf_day2_transfer.propagate_state()
-    prediction = clf_day2_transfer.predict(trial_features.reshape(1, -1))
-    # ... execute action ...
-    clf_day2_transfer.partial_fit(trial_features.reshape(1, -1), [true_label])
-
-# Save day 2 state
-z_day2, P_day2 = clf_day2_transfer.get_latent_state()
-with open("model_day2.pkl", "wb") as f:
-    pickle.dump({
-        'model': clf_day2_transfer,
-        'state': (z_day2, P_day2),
-        'accuracy': acc_transfer,
-        'date': datetime.now()
-    }, f)
-
-print(f"Day 2 complete and saved!")
-```
-  </Tab>
-</Tabs>
-
-**Transfer Learning Benefits:**
-- 🎯 **10-20% improvement** over training from scratch with minimal calibration
-- ⚡ **Faster calibration**: 20 trials instead of 80-100
-- 🧠 **Knowledge preservation**: Prior session informs new session
-- 🔄 **Adaptive**: State continues to evolve during day 2
-
-### Long-Duration Fatigue-Adaptive BCI
-
-NimbusSTS automatically compensates for fatigue in long sessions:
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusSTS
-import numpy as np
-import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
-
-# Setup for long session (60 minutes)
-clf = NimbusSTS(
-    transition_cov=0.05,  # Allow significant adaptation
-    learning_rate=0.15,   # Faster adaptation for fatigue
-    num_steps=100
-)
-clf.fit(X_calibration, y_calibration)
-
-# Track metrics over time
-timestamps = []
-accuracies = []
-confidences = []
-state_norms = []
-predictions_correct = []
-
-session_start = datetime.now()
-window_size = 10
-
-print("Starting 60-minute adaptive BCI session...")
-print("Model will automatically adapt to fatigue effects\n")
-
-for trial_idx in range(1, 361):  # ~60 min at 1 trial/10s
-    # Time-based metadata
-    elapsed = datetime.now() - session_start
-    timestamps.append(elapsed.total_seconds() / 60)  # minutes
-    
-    # Propagate state
-    clf.propagate_state()
-    
-    # Collect trial (user may be getting fatigued)
-    trial_features = collect_trial_with_potential_fatigue(trial_idx)
-    
-    # Predict
-    prediction = clf.predict(trial_features.reshape(1, -1))[0]
-    proba = clf.predict_proba(trial_features.reshape(1, -1))[0]
-    confidence = np.max(proba)
-    
-    # Execute and get feedback
-    execute_command(prediction)
-    true_label = wait_for_feedback()
-    
-    # Update model (compensates for drift/fatigue)
-    clf.partial_fit(trial_features.reshape(1, -1), [true_label])
-    
-    # Track metrics
-    correct = (prediction == true_label)
-    predictions_correct.append(correct)
-    confidences.append(confidence)
-    
-    # Get state info
-    z_mean, z_cov = clf.get_latent_state()
-    state_norms.append(np.linalg.norm(z_mean))
-    
-    # Windowed accuracy
-    if len(predictions_correct) >= window_size:
-        recent_acc = np.mean(predictions_correct[-window_size:])
-        accuracies.append(recent_acc)
-    
-    # Periodic reporting
-    if trial_idx % 30 == 0:
-        print(f"[{elapsed}] Trial {trial_idx}:")
-        print(f"  Recent accuracy: {recent_acc:.1%}")
-        print(f"  Mean confidence: {np.mean(confidences[-30:]):.3f}")
-        print(f"  State adaptation: {state_norms[-1]:.3f}")
-
-# Visualize adaptation over time
-fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-
-# Accuracy over time
-axes[0, 0].plot(timestamps[window_size:], accuracies, label='Accuracy (windowed)')
-axes[0, 0].axhline(y=0.25, color='r', linestyle='--', label='Chance (25%)')
-axes[0, 0].set_xlabel('Time (minutes)')
-axes[0, 0].set_ylabel('Accuracy')
-axes[0, 0].set_title('Accuracy Over 60-Minute Session')
-axes[0, 0].legend()
-axes[0, 0].grid(True)
-
-# Confidence over time
-axes[0, 1].plot(timestamps, confidences, alpha=0.3, label='Per-trial')
-# Smooth with moving average
-smoothed_conf = np.convolve(confidences, np.ones(window_size)/window_size, mode='valid')
-axes[0, 1].plot(timestamps[window_size-1:], smoothed_conf, label='Smoothed', linewidth=2)
-axes[0, 1].set_xlabel('Time (minutes)')
-axes[0, 1].set_ylabel('Confidence')
-axes[0, 1].set_title('Prediction Confidence Over Time')
-axes[0, 1].legend()
-axes[0, 1].grid(True)
-
-# State norm (adaptation strength)
-axes[1, 0].plot(timestamps, state_norms)
-axes[1, 0].set_xlabel('Time (minutes)')
-axes[1, 0].set_ylabel('State Norm')
-axes[1, 0].set_title('Latent State Adaptation')
-axes[1, 0].grid(True)
-
-# Accuracy by session segment
-segment_size = 60  # trials per segment
-n_segments = len(predictions_correct) // segment_size
-segment_accs = [
-    np.mean(predictions_correct[i*segment_size:(i+1)*segment_size])
-    for i in range(n_segments)
-]
-segment_times = [(i+0.5) * segment_size * 10 / 60 for i in range(n_segments)]  # minutes
-axes[1, 1].bar(segment_times, segment_accs, width=8, alpha=0.7)
-axes[1, 1].axhline(y=0.25, color='r', linestyle='--', label='Chance')
-axes[1, 1].set_xlabel('Session Segment (minutes)')
-axes[1, 1].set_ylabel('Accuracy')
-axes[1, 1].set_title('Accuracy by Time Segment')
-axes[1, 1].legend()
-axes[1, 1].grid(True, axis='y')
-
-plt.tight_layout()
-plt.savefig('adaptive_bci_session.png', dpi=150)
-plt.show()
-
-print(f"\n{'='*60}")
-print("Session Analysis:")
-print(f"  Total duration: {timestamps[-1]:.1f} minutes")
-print(f"  Overall accuracy: {np.mean(predictions_correct):.1%}")
-print(f"  First 10 min accuracy: {np.mean(predictions_correct[:60]):.1%}")
-print(f"  Last 10 min accuracy: {np.mean(predictions_correct[-60:]):.1%}")
-print(f"  Adaptation maintained performance despite fatigue!")
-```
-  </Tab>
-</Tabs>
-
-**Why NimbusSTS Works for Long Sessions:**
-- 📉 Detects gradual performance degradation
-- 🔄 Continuously adapts to changing user state
-- 🧠 Maintains accuracy despite fatigue
-- 📊 Provides interpretable state evolution
-
-<Note>
-**Key Insight**: In a 60-minute session, static models typically see 10-15% accuracy drop due to fatigue. NimbusSTS maintains stable performance through continuous adaptation.
-</Note>
-
-## Multi-Session Experiment Design
-
-Run systematic experiments across multiple sessions.
-
-### Experiment Framework
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA, NimbusQDA
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
-import numpy as np
-import pickle
-
-@dataclass
-class ExperimentSession:
-    session_id: str
-    subject_id: str
-    date: datetime
-    model_type: str  # 'lda' or 'qda'
-    n_trials: int
-    predictions: Optional[np.ndarray] = None
-    probabilities: Optional[np.ndarray] = None
-    accuracy: Optional[float] = None
-    mean_confidence: Optional[float] = None
-
-def run_experiment_session(
-    subject_id: str,
-    session_id: str,
-    model_type: str,
-    n_trials: int
-):
-    """Run a single experiment session."""
-    print("\n" + "=" * 60)
-    print(f"Experiment Session: {session_id}")
-    print(f"Subject: {subject_id}")
-    print(f"Model: {model_type}")
-    print(f"Date: {datetime.now()}")
-    print("=" * 60)
-    
-    # Load appropriate model
-    if model_type == 'lda':
-        with open("motor_imagery_4class_lda.pkl", "rb") as f:
-            clf = pickle.load(f)
-    else:
-        with open("motor_imagery_4class_qda.pkl", "rb") as f:
-            clf = pickle.load(f)
-    
-    # Collect data
-    print(f"\nCollecting {n_trials} trials...")
-    X, y = collect_experiment_trials(n_trials)
-    
-    # Run inference
-    print("Running inference...")
-    predictions = clf.predict(X)
-    probabilities = clf.predict_proba(X)
-    
-    # Calculate metrics
-    accuracy = np.mean(predictions == y)
-    mean_confidence = np.mean(np.max(probabilities, axis=1))
-    
-    print("\n" + "=" * 60)
-    print("Session Results")
-    print("=" * 60)
-    print(f"Accuracy: {accuracy * 100:.1f}%")
-    print(f"Mean confidence: {mean_confidence:.3f}")
-    print("=" * 60)
-    
-    # Return session data
-    return ExperimentSession(
-        session_id=session_id,
-        subject_id=subject_id,
-        date=datetime.now(),
-        model_type=model_type,
-        n_trials=n_trials,
-        predictions=predictions,
-        probabilities=probabilities,
-        accuracy=accuracy,
-        mean_confidence=mean_confidence
-    )
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-using Dates
-
-struct ExperimentSession
-    session_id::String
-    subject_id::String
-    date::DateTime
-    model_type::Symbol  # :rxlda or :qda
-    n_trials::Int
-    results::Union{Nothing, BatchResult}
-    accuracy::Union{Nothing, Float64}
-    itr::Union{Nothing, Float64}
-end
-
-function run_experiment_session(
-    subject_id::String,
-    session_id::String,
-    model_type::Symbol,
-    n_trials::Int
-)
-    println("\n" * "="^60)
-    println("Experiment Session: $session_id")
-    println("Subject: $subject_id")
-    println("Model: $model_type")
-    println("Date: $(Dates.now())")
-    println("="^60)
-    
-    # Authenticate    
-    NimbusSDK.install_core("your-api-key")
-    
-    # Load appropriate model
-    model = if model_type == :rxlda
-        load_model(NimbusLDA, "motor_imagery_4class_v1")  # Bayesian LDA
-    else
-        load_model(NimbusQDA, "motor_imagery_4class_qda_v1")  # Bayesian QDA
-    end
-    
-    # Collect data
-    println("\nCollecting $n_trials trials...")
-    features, labels = collect_experiment_trials(n_trials)
-    
-    data = BCIData(
-        features,
-        BCIMetadata(
-            sampling_rate = 250.0,
-            paradigm = :motor_imagery,
-            feature_type = :csp,
-            n_features = 16,
-            n_classes = 4
-        ),
-        labels
-    )
-    
-    # Run inference
-    println("Running inference...")
-    results = predict_batch(model, data)
-    
-    # Calculate metrics
-    accuracy = sum(results.predictions .== labels) / length(labels)
-    itr = calculate_ITR(accuracy, 4, 4.0)
-    
-    println("\n" * "="^60)
-    println("Session Results")
-    println("="^60)
-    println("Accuracy: $(round(accuracy * 100, digits=1))%")
-    println("ITR: $(round(itr, digits=1)) bits/minute")
-    println("Mean confidence: $(round(mean(results.confidences), digits=3))")
-    println("="^60)
-    
-    # Return session data
-    return ExperimentSession(
-        session_id,
-        subject_id,
-        Dates.now(),
-        model_type,
-        n_trials,
-        results,
-        accuracy,
-        itr
-    )
-end
-```
-  </Tab>
-</Tabs>
-
-**Example: Run multi-session experiment**
-
-<Tabs>
-  <Tab title="Python">
-```python
-import numpy as np
-
-def run_multi_session_experiment():
-    """Run experiments across multiple subjects and sessions."""
-    subjects = ["S001", "S002", "S003"]
-    sessions = []
-    
-    for subject in subjects:
-        # Session 1: NimbusLDA baseline
-        session1 = run_experiment_session(
-            subject_id=subject,
-            session_id=f"{subject}_session1_lda",
-            model_type="lda",
-            n_trials=80
-        )
-        sessions.append(session1)
-        
-        # Session 2: NimbusQDA comparison
-        session2 = run_experiment_session(
-            subject_id=subject,
-            session_id=f"{subject}_session2_qda",
-            model_type="qda",
-            n_trials=80
-        )
-        sessions.append(session2)
-    
-    # Aggregate results
-    print("\n\n" + "=" * 60)
-    print("Experiment Summary")
-    print("=" * 60)
-    
-    for session in sessions:
-        print(f"\n{session.session_id}:")
-        print(f"  Accuracy: {session.accuracy * 100:.1f}%")
-        print(f"  Mean confidence: {session.mean_confidence:.3f}")
-    
-    # Statistical analysis
-    lda_accs = [s.accuracy for s in sessions if s.model_type == 'lda']
-    qda_accs = [s.accuracy for s in sessions if s.model_type == 'qda']
-    
-    print("\n" + "=" * 60)
-    print("Model Comparison")
-    print("=" * 60)
-    print(f"NimbusLDA mean accuracy: {np.mean(lda_accs) * 100:.1f}% ± {np.std(lda_accs) * 100:.1f}%")
-    print(f"NimbusQDA mean accuracy: {np.mean(qda_accs) * 100:.1f}% ± {np.std(qda_accs) * 100:.1f}%")
-    
-    return sessions
-
-# Run the experiment
-sessions = run_multi_session_experiment()
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Run multi-session experiment
-function run_multi_session_experiment()
-    subjects = ["S001", "S002", "S003"]
-    sessions = []
-    
-    for subject in subjects
-        # Session 1: NimbusLDA baseline
-        session1 = run_experiment_session(
-            subject,
-            "$(subject)_session1_rxlda",
-            :rxlda,  # Bayesian LDA
-            80
-        )
-        push!(sessions, session1)
-        
-        # Session 2: NimbusQDA comparison
-        session2 = run_experiment_session(
-            subject,
-            "$(subject)_session2_qda",
-            :qda,  # Bayesian QDA
-            80
-        )
-        push!(sessions, session2)
-    end
-    
-    # Aggregate results
-    println("\n\n" * "="^60)
-    println("Experiment Summary")
-    println("="^60)
-    
-    for session in sessions
-        println("\n$(session.session_id):")
-        println("  Accuracy: $(round(session.accuracy * 100, digits=1))%")
-        println("  ITR: $(round(session.itr, digits=1)) bits/min")
-    end
-    
-    # Statistical analysis
-    rxlda_accs = [s.accuracy for s in sessions if s.model_type == :rxlda]
-    qda_accs = [s.accuracy for s in sessions if s.model_type == :qda]
-    
-    println("\n" * "="^60)
-    println("Model Comparison")
-    println("="^60)
-    println("Bayesian LDA mean accuracy: $(round(mean(rxlda_accs) * 100, digits=1))% ± $(round(std(rxlda_accs) * 100, digits=1))%")
-    println("Bayesian QDA mean accuracy: $(round(mean(qda_accs) * 100, digits=1))% ± $(round(std(qda_accs) * 100, digits=1))%")
-    
-    return sessions
-end
-```
-  </Tab>
-</Tabs>
-
-## Error Recovery and Robustness
-
-Handle errors and maintain reliable operation.
-
-### Automatic Retry with Fallback
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA
-from dataclasses import dataclass
-from typing import Optional
-import time
-import numpy as np
-
-@dataclass
-class InferenceResult:
-    success: bool
-    predictions: Optional[np.ndarray]
-    probabilities: Optional[np.ndarray]
-    attempts: int
-
-def robust_inference(clf, X, max_retries=3, confidence_threshold=0.65):
-    """Inference with automatic retry and fallback."""
-    
-    for attempt in range(1, max_retries + 1):
-        try:
-            predictions = clf.predict(X)
-            probabilities = clf.predict_proba(X)
-            
-            # Quality check
-            mean_confidence = np.mean(np.max(probabilities, axis=1))
-            
-            if mean_confidence > confidence_threshold:
-                return InferenceResult(
-                    success=True,
-                    predictions=predictions,
-                    probabilities=probabilities,
-                    attempts=attempt
-                )
-            else:
-                print(f"⚠️  Low quality results (confidence: {mean_confidence:.3f}) on attempt {attempt}")
-                if attempt < max_retries:
-                    print("Retrying...")
-                    continue
-            
-        except Exception as e:
-            print(f"❌ Inference failed: {e} (attempt {attempt})")
-            
-            if attempt < max_retries:
-                print("Retrying after error...")
-                time.sleep(0.1)  # Brief pause before retry
-                continue
-            else:
-                # All retries exhausted
-                return InferenceResult(
-                    success=False,
-                    predictions=None,
-                    probabilities=None,
-                    attempts=attempt
-                )
-    
-    # If we get here, all retries failed
-    return InferenceResult(
-        success=False,
-        predictions=None,
-        probabilities=None,
-        attempts=max_retries
-    )
-
-# Usage
-result = robust_inference(clf, X)
-
-if result.success:
-    print(f"✓ Inference successful after {result.attempts} attempt(s)")
-    process_results(result.predictions)
+if confidence >= 0.9:
+    execute(prediction)
+elif confidence >= 0.7:
+    request_confirmation(prediction)
 else:
-    print(f"⚠️  Inference failed after {result.attempts} attempts")
-    handle_failure()
+    reject_trial("low confidence")
 ```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
 
-function robust_inference(model, data; max_retries=3)
-    """
-    Inference with automatic retry and fallback
-    """
-    
-    for attempt in 1:max_retries
-        try
-            results = predict_batch(model, data)
-            
-            # Quality check
-            quality = assess_trial_quality(results)
-            
-            if quality.confidence_acceptable
-                return (success=true, results=results, attempts=attempt)
-            else
-                @warn "Low quality results" quality.overall_score attempt
-                if attempt < max_retries
-                    println("Retrying...")
-                    continue
-                end
-            end
-            
-        catch e
-            @error "Inference failed" exception=e attempt
-            
-            if attempt < max_retries
-                println("Retrying after error...")
-                sleep(0.1)  # Brief pause before retry
-                continue
-            else
-                # All retries exhausted
-                return (success=false, results=nothing, attempts=attempt)
-            end
-        end
-    end
-    
-    # If we get here, all retries failed
-    return (success=false, results=nothing, attempts=max_retries)
-end
-
-# Usage
-result = robust_inference(model, data)
-
-if result.success
-    println("Inference successful after $(result.attempts) attempt(s)")
-    process_results(result.results)
-else
-    println("⚠️  Inference failed after $(result.attempts) attempts")
-    handle_failure()
-end
-```
-  </Tab>
-</Tabs>
-
-### Session Health Monitoring
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA
-from dataclasses import dataclass, field
-from collections import deque
-import numpy as np
-
-@dataclass
-class SessionHealth:
-    trial_count: int = 0
-    success_count: int = 0
-    failure_count: int = 0
-    mean_confidence: float = 0.0
-    recent_accuracies: list = field(default_factory=list)
-
-def monitor_session_health(clf, eeg_stream, health_window=10):
-    """Monitor BCI session health with real-time metrics."""
-    health = SessionHealth()
-    recent_acc_window = deque(maxlen=health_window)
-    
-    for trial in eeg_stream:
-        health.trial_count += 1
-        
-        try:
-            # Run inference
-            X_trial = trial['features'].reshape(1, -1)
-            y_trial = trial.get('label')
-            
-            prediction = clf.predict(X_trial)[0]
-            proba = clf.predict_proba(X_trial)[0]
-            confidence = np.max(proba)
-            
-            # Update health metrics
-            health.success_count += 1
-            health.mean_confidence = (
-                (health.mean_confidence * (health.success_count - 1) + confidence) /
-                health.success_count
-            )
-            
-            # Track recent accuracy
-            if y_trial is not None:
-                correct = (prediction == y_trial)
-                recent_acc_window.append(float(correct))
-            
-            # Health checks
-            if health.mean_confidence < 0.6:
-                print(f"⚠️  Mean confidence dropping: {health.mean_confidence:.3f}")
-            
-            if len(recent_acc_window) >= health_window:
-                recent_acc = np.mean(list(recent_acc_window))
-                if recent_acc < 0.65:
-                    print(f"⚠️  Recent accuracy low - consider recalibration: {recent_acc:.3f}")
-            
-        except Exception as e:
-            health.failure_count += 1
-            print(f"❌ Trial failed: {e} (trial #{health.trial_count})")
-            
-            if health.failure_count / health.trial_count > 0.1:
-                raise RuntimeError("Session failure rate too high - aborting")
-        
-        # Periodic health report
-        if health.trial_count % 20 == 0:
-            print("\n=== Session Health Report ===")
-            print(f"Trials: {health.trial_count}")
-            print(f"Success rate: {100 * health.success_count / health.trial_count:.1f}%")
-            print(f"Mean confidence: {health.mean_confidence:.3f}")
-            if len(recent_acc_window) > 0:
-                print(f"Recent accuracy: {np.mean(list(recent_acc_window)) * 100:.1f}%")
-            print("=" * 30)
-    
-    return health
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-
-struct SessionHealth
-    trial_count::Int
-    success_count::Int
-    failure_count::Int
-    mean_confidence::Float64
-    recent_accuracies::Vector{Float64}
-end
-
-function monitor_session_health(
-    model,
-    eeg_stream;
-    health_window=10
-)
-    health = SessionHealth(0, 0, 0, 0.0, Float64[])
-    
-    for trial in eeg_stream
-        health.trial_count += 1
-        
-        try
-            # Run inference
-            data = BCIData(trial.features, metadata, trial.label)
-            results = predict_batch(model, data)
-            
-            # Update health metrics
-            health.success_count += 1
-            health.mean_confidence = (
-                (health.mean_confidence * (health.success_count - 1) + 
-                 results.confidences[1]) / health.success_count
-            )
-            
-            # Track recent accuracy
-            if !isnothing(trial.label)
-                correct = results.predictions[1] == trial.label
-                push!(health.recent_accuracies, Float64(correct))
-                
-                if length(health.recent_accuracies) > health_window
-                    popfirst!(health.recent_accuracies)
-                end
-            end
-            
-            # Health checks
-            if health.mean_confidence < 0.6
-                @warn "Mean confidence dropping" health.mean_confidence
-            end
-            
-            if length(health.recent_accuracies) >= health_window
-                recent_acc = mean(health.recent_accuracies)
-                if recent_acc < 0.65
-                    @warn "Recent accuracy low - consider recalibration" recent_acc
-                end
-            end
-            
-        catch e
-            health.failure_count += 1
-            @error "Trial failed" exception=e trial_num=health.trial_count
-            
-            if health.failure_count / health.trial_count > 0.1
-                error("Session failure rate too high - aborting")
-            end
-        end
-        
-        # Periodic health report
-        if health.trial_count % 20 == 0
-            println("\n=== Session Health Report ===")
-            println("Trials: $(health.trial_count)")
-            println("Success rate: $(round(100 * health.success_count / health.trial_count, digits=1))%")
-            println("Mean confidence: $(round(health.mean_confidence, digits=3))")
-            if !isempty(health.recent_accuracies)
-                println("Recent accuracy: $(round(mean(health.recent_accuracies) * 100, digits=1))%")
-            end
-            println("="^30)
-        end
-    end
-    
-    return health
-end
-```
-  </Tab>
-</Tabs>
+For detailed safeguards, see [Error Handling](/inference-configuration/error-handling).
 
 ## Next Read
 
 <CardGroup cols={2}>
   <Card title="Basic Examples" icon="play" href="/examples/basic-examples">
-    Fundamental BCI examples
+    Compact starter recipes.
   </Card>
-  <Card title="Basic Examples" icon="play" href="/examples/basic-examples">
-    Complete working code
+  <Card title="Model Specification" icon="brain" href="/model-specification">
+    Compare models before choosing an architecture.
   </Card>
-  <Card title="Industry Use Cases" icon="briefcase" href="/examples/industry-use-cases">
-    Real-world applications
+  <Card title="Python Active Learning" icon="lightbulb" href="/python-sdk/active-learning">
+    Query strategy and calibration stopping guidance.
   </Card>
-  <Card title="Julia SDK" icon="code" href="/julia-sdk/api-reference">
-    Complete SDK reference
+  <Card title="Streaming Configuration" icon="activity" href="/inference-configuration/streaming-inference">
+    Chunking and aggregation decisions.
   </Card>
 </CardGroup>
-
----
-
-<Note>
-All examples use actual NimbusSDK.jl functions and real Bayesian LDA (NimbusLDA) and Bayesian QDA (NimbusQDA) models. These are production-ready patterns used in real BCI applications.
-</Note>

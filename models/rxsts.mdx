@@ -768,32 +768,13 @@ print(f"Process noise covariance:\n{Q}")
 ❌ **Not Ideal for Stationary Data**: Use NimbusLDA if data is stable  
 ❌ **Memory**: Maintains state history (minimal overhead)  
 
-## Comparison: NimbusSTS vs Static Models
+## Model Selection Context
 
-| Aspect | NimbusSTS (Stateful) | NimbusLDA/NimbusQDA/NimbusSoftmax (Stateless) |
-|--------|----------------------|-----------------------------------|
-| **Temporal Modeling** | ✅ Explicit state dynamics | ❌ No temporal modeling |
-| **Non-Stationarity** | ✅ Adapts to drift | ❌ Degrades over time |
-| **State Management** | ✅ Explicit API | ❌ Not applicable |
-| **Inference Speed** | ~20-30ms | ~10-25ms (faster) |
-| **API Complexity** | Higher | Lower |
-| **Best For** | Long sessions, cross-day | Short sessions, stable data |
-| **Online Learning** | ✅ Natural with delayed feedback | ✅ Supported but stateless |
-| **Cross-Session Transfer** | ✅ State persistence | ❌ Retrain from scratch |
+Use `NimbusSTS` when prediction quality degrades over a long session, across days, or after electrode/user-state drift. Static models (`NimbusLDA`, `NimbusQDA`, `NimbusSoftmax`, `NimbusProbit`) are usually simpler and faster for stable sessions.
 
-### Decision Tree
+**Rule of thumb**: If accuracy degrades by more than 10% from start to end of session, evaluate `NimbusSTS`.
 
-```
-Is your data non-stationary (drift over time)?
-├─ Yes → How long are your sessions?
-│   ├─ >30 min → NimbusSTS (essential)
-│   └─ &lt;30 min → Try NimbusSTS, compare with static models
-└─ No → Do classes have different covariances?
-    ├─ Yes → NimbusQDA
-    └─ No → NimbusLDA (fastest)
-```
-
-**Rule of thumb**: If accuracy degrades >10% from start to end of session, use NimbusSTS.
+For the canonical side-by-side comparison, see [Model Specification](/model-specification).
 
 ## Practical Examples
 

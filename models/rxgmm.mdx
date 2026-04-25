@@ -865,34 +865,11 @@ end
 ❌ **Higher Memory**: Stores n_classes precision matrices  
 ❌ **More Complex**: Longer training time  
 
-## Comparison: Bayesian QDA vs Bayesian LDA vs Bayesian Softmax vs Bayesian STS
+## Model Selection Context
 
-| Aspect | Bayesian QDA (NimbusQDA) | Bayesian LDA (NimbusLDA) | NimbusProbit | Bayesian STS (NimbusSTS) |
-|--------|-------|-------|-------|-------|
-| **Precision Matrix** | Class-specific | Shared (one for all) | Latent-space precision (K-1) | N/A (state-space) |
-| **Mathematical Model** | Heteroscedastic Gaussian Classifier (HGC) | Pooled Gaussian Classifier (PGC) | Multinomial Logistic Regression | State-Space Model (EKF) |
-| **Temporal Modeling** | Static (stateless) | Static (stateless) | Static (stateless) | **Dynamic (stateful)** |
-| **Training Speed** | Slower | Faster | Moderate | Moderate |
-| **Inference Speed** | 15-25ms | 10-15ms | 15-25ms | 20-30ms |
-| **Flexibility** | High | Moderate | Highest (non-Gaussian) | Adaptive |
-| **Data Requirements** | More | Less | Moderate | Moderate |
-| **Memory Usage** | Higher | Lower | Moderate | Moderate (stores state) |
-| **Best For** | Heterogeneous class spreads | Homogeneous classes | Complex decision boundaries / non-Gaussian structure | **Non-stationary, long sessions** |
-| **Accuracy Gain** | +2-5% (when applicable) | Baseline | Often improves on non-Gaussian tasks | +5-15% (on drifting data) |
+Use `NimbusQDA` when the task is stationary but classes have different spreads, covariance structure, or overlapping distributions. If speed and simple class structure matter more, start with `NimbusLDA`. If the boundary is non-Gaussian, consider `NimbusSoftmax` in Python or `NimbusProbit` in Julia. If class distributions drift over time, use `NimbusSTS` in Python.
 
-### Decision Tree
-
-```
-Is your data non-stationary (drift over time)?
-├─ Yes → Use Bayesian STS (adaptive, handles temporal dynamics)
-└─ No → Is speed critical (&lt;15ms)?
-    ├─ Yes → Use Bayesian LDA
-    └─ No → Do classes have different spreads / covariances?
-        ├─ Yes → Use Bayesian QDA (more accurate)
-        └─ No → Is the decision boundary complex / non-Gaussian?
-            ├─ Yes → Use Bayesian Softmax (most flexible)
-            └─ No → Use Bayesian LDA (simplest)
-```
+For the canonical side-by-side comparison, see [Model Specification](/model-specification).
 
 ## Practical Examples
 
@@ -945,8 +922,11 @@ end
   <Card title="Bayesian LDA (NimbusLDA)" icon="brain" href="/models/rxlda">
     Faster model with shared covariance
   </Card>
-  <Card title="NimbusProbit" icon="brain" href="/models/nimbusprobit">
-    Most flexible multinomial classifier for complex decision boundaries
+  <Card title="NimbusSoftmax (Python)" icon="brain" href="/models/rxpolya">
+    Python non-Gaussian static classifier for complex decision boundaries
+  </Card>
+  <Card title="NimbusProbit (Julia)" icon="brain" href="/models/nimbusprobit">
+    Julia non-Gaussian static classifier for complex decision boundaries
   </Card>
   <Card title="Bayesian STS (NimbusSTS)" icon="wave-pulse" href="/models/rxsts">
     Adaptive model for non-stationary data

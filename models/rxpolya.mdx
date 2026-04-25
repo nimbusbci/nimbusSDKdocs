@@ -1,1215 +1,245 @@
 ---
-title: "Bayesian Multinomial"
-description: "Bayesian multinomial classifier for non-Gaussian BCI decision boundaries, with uncertainty quantification and 15-25ms inference for complex tasks."
-keywords: ["Bayesian Softmax", "NimbusSoftmax", "Multinomial Logistic Regression", "multinomial classification", "BCI", "logistic regression", "RxInfer", "NimbusSoftmax", "probabilistic classification"]
+title: "NimbusSoftmax (Python)"
+description: "NimbusSoftmax for Python: Bayesian multinomial logistic regression with Polya-Gamma variational inference for non-Gaussian BCI decision boundaries."
+keywords: ["NimbusSoftmax", "Bayesian Softmax", "Python SDK", "nimbus-bci", "Polya-Gamma", "multinomial logistic regression", "BCI", "non-Gaussian classification"]
 icon: "brain"
 ---
 
-# Bayesian Multinomial (NimbusSoftmax / NimbusProbit)
+# NimbusSoftmax — Bayesian Softmax Classifier
 
-**Python**: `NimbusSoftmax` | **Julia**: `NimbusProbit`  
-**Model family**: Non-Gaussian multinomial classification with uncertainty quantification
+**Python**: `NimbusSoftmax` | **Julia equivalent**: [`NimbusProbit`](/models/nimbusprobit)<br/>
+**Mathematical model**: Bayesian multinomial logistic regression with Polya-Gamma variational inference
 
-The Bayesian multinomial family provides non-Gaussian classification with uncertainty quantification. In Python, `NimbusSoftmax` uses Polya-Gamma variational inference. In Julia, `NimbusProbit` uses Bayesian multinomial probit regression.
+`NimbusSoftmax` is the Python SDK's flexible non-Gaussian static classifier. Use it when `NimbusLDA` and `NimbusQDA` are too restrictive, but you still want posterior uncertainty, sklearn compatibility, and active-learning support.
 
 <Note>
 **Availability**
-- **Python SDK**: ✅ `NimbusSoftmax` (Polya-Gamma VI; optional dependency)
-- **Julia SDK**: ✅ `NimbusProbit`
+- **Python SDK**: ✅ `NimbusSoftmax` via the optional `softmax` extra
+- **Julia SDK**: ❌ Use [`NimbusProbit`](/models/nimbusprobit) for Julia's non-Gaussian static classifier
 </Note>
 
-## Start Here
+## Install
 
-<CardGroup cols={3}>
-  <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Start with SDK setup and first inference workflow.
-  </Card>
-  <Card title="Model Selection" icon="box" href="/model-specification">
-    Compare Nimbus models by data characteristics and use case.
-  </Card>
-  <Card title="Examples" icon="braces" href="/examples/basic-examples">
-    See practical BCI examples for training and inference.
-  </Card>
-</CardGroup>
-
-## Overview
-
-Bayesian multinomial models provide powerful alternatives to traditional Gaussian classifiers:
-✅ **Full Bayesian inference** with posterior probability distributions<br/>
-✅ **Uncertainty quantification** for each prediction<br/>
-✅ **Continuous transition mapping** from features to latent space<br/>
-✅ **Flexible decision boundaries** (non-Gaussian)<br/>
-✅ **Fast inference** (~15-25ms per trial)<br/>
-✅ **Training and calibration** support<br/>
-✅ **Batch and streaming** inference modes
-
-## Quick Start
-
-<Tabs>
-  <Tab title="Python">
-Install the optional Softmax extra first:
+`NimbusSoftmax` depends on the optional JAX-based softmax backend:
 
 ```bash
 pip install nimbus-bci[softmax]
 ```
 
+## Quick Start
+
 ```python
 from nimbus_bci import NimbusSoftmax
-import numpy as np
 
-# Create and fit classifier
-clf = NimbusSoftmax(w_scale=1.0)
-clf.fit(X_train, y_train)
-
-# Predict with uncertainty
-predictions = clf.predict(X_test)
-probabilities = clf.predict_proba(X_test)
-
-# Good for non-Gaussian decision boundaries
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-
-# Train model
-model = train_model(
-    NimbusProbit,
-    train_data;
-    iterations=50
+clf = NimbusSoftmax(
+    w_scale=1.0,
+    num_steps=50,
+    num_posterior_samples=50,
 )
 
-# Predict
-results = predict_batch(model, test_data)
+clf.fit(X_train, y_train)
+
+predictions = clf.predict(X_test)
+probabilities = clf.predict_proba(X_test)
 ```
-  </Tab>
-</Tabs>
 
-### When to Use Bayesian Softmax
+<Tip>
+`NimbusSoftmax` expects preprocessed feature rows shaped `(n_trials, n_features)`, not raw EEG. Use CSP, ERP amplitude, bandpower, or your own feature extraction before fitting.
+</Tip>
 
-**Bayesian Softmax is ideal for:**
-- Complex multinomial classification tasks
-- When you need full posterior uncertainty over multinomial distributions
-- Advanced BCI applications requiring flexible classification
-- Problems where Gaussian class-conditional structure (NimbusLDA/NimbusQDA) is a poor fit
-- When NimbusLDA/NimbusQDA accuracy is insufficient for complex distributions
+## When to Use NimbusSoftmax
 
-**Consider [Bayesian LDA](/models/rxlda) or [Bayesian QDA](/models/rxgmm) instead if:**
-- You need faster inference (NimbusLDA/NimbusQDA are 5-10ms faster)
-- Classes are well-separated with Gaussian distributions
-- Interpretability of class centers is important (Bayesian Softmax is discriminative)
-- You want Mahalanobis distance-based outlier detection
+- You are using the **Python SDK** and need a flexible static classifier.
+- Class boundaries are non-Gaussian or not well represented by class-conditional means/covariances.
+- You need uncertainty-aware outputs for rejection policies, active learning, or calibration analysis.
+- `NimbusLDA` / `NimbusQDA` accuracy has plateaued on a complex multinomial task.
+
+## When Not to Use It
+
+- If latency is the top priority: start with `NimbusLDA`, then `NimbusQDA`.
+- If class centers and Mahalanobis distance are important for interpretability or outlier diagnostics: use `NimbusLDA` or `NimbusQDA`.
+- If the session is drifting over time: use `NimbusSTS`.
+- If you are using Julia: use [`NimbusProbit`](/models/nimbusprobit).
 
 ## Model Architecture
 
-### Mathematical Foundation
+`NimbusSoftmax` fits a Bayesian multinomial logistic regression model. It uses a reference-class parameterization, so one class has zero logits and the remaining classes are modeled relative to it.
 
-The Python and Julia SDKs expose related Bayesian multinomial classifiers with different implementations:
-
-- **Python `NimbusSoftmax`**: Bayesian multinomial logistic regression with a reference-class softmax parameterization and Polya-Gamma variational inference.
-- **Julia `NimbusProbit`**: Bayesian multinomial probit model implemented with RxInfer.
-
-For Python `NimbusSoftmax`, the fitted model stores posterior Gaussian approximations for non-reference class weights:
-
-```
+```text
 beta_k ~ Normal(beta_mean_k, beta_cov_k)
 logits = X_aug @ beta_mean.T
 p(y = k | x) = softmax(logits)_k
 ```
 
-The reference class has zero logits, and the remaining classes are modeled relative to it.
+The fitted model stores posterior Gaussian approximations for non-reference class weights. Predictions can draw posterior samples to quantify uncertainty.
 
-### Hyperparameters
+## Hyperparameters
 
-Both SDKs support configurable hyperparameters, but the names differ by implementation.
-
-**Python `NimbusSoftmax`:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `w_loc` | float | 0.0 | Prior mean for feature weights |
-| `w_scale` | float | 1.0 | Prior scale for feature weights |
-| `b_loc` | float | 0.0 | Prior mean for bias terms |
-| `b_scale` | float | 1.0 | Prior scale for bias terms |
-| `learning_rate` | float | 0.2 | Damping factor for variational updates |
-| `num_steps` | int | 50 | Number of coordinate-ascent sweeps |
-| `num_posterior_samples` | int | 50 | Posterior samples used for prediction |
-
-**Julia `NimbusProbit`:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `N` | Int | 1 | Number of trials per observation |
-| `ξβ` | Vector{Float64} | ones((K-1)×D) | Prior mean for regression coefficients |
-| `Wβ` | Matrix{Float64} | 1e-5 × I | Prior precision for regression coefficients |
-| `W_df` | Float64 | K + 5 | Wishart degrees of freedom |
-| `W_scale` | Matrix{Float64} | I | Wishart scale matrix |
-
-<Note>
-**Hyperparameter configuration** allows you to optimize model behavior for your specific dataset characteristics (SNR, trial count, data quality).
-</Note>
-
-### Model Structure
-
-```julia
-struct NimbusProbit <: BCIModel
-    B_posterior                        # Learned regression coefficients posterior
-    W_posterior                        # Learned precision matrix posterior
-    metadata::ModelMetadata            # Model info
-    N::Int                            # Trials per observation
-    ξβ::Vector{Float64}               # Prior mean for B
-    Wβ::Matrix{Float64}               # Prior precision for B
-    W_df::Float64                     # Wishart DOF
-    W_scale::Matrix{Float64}          # Wishart scale matrix
-end
-```
-
-### Julia RxInfer Implementation
-
-The Julia `NimbusProbit` model uses RxInfer.jl for variational Bayesian inference:
-
-**Learning Phase:**
-```julia
-@model function RxPolya_learning_model(obs, N, X, n_classes, n_features, 
-                                       ξβ, Wβ, W_df, W_scale)
-    # Prior on regression coefficients
-    B ~ MvNormalWeightedMeanPrecision(ξβ, Wβ)
-    
-    # Prior on precision matrix
-    W ~ Wishart(W_df, W_scale)
-    
-    # Likelihood with continuous transition
-    for i in eachindex(obs)
-        Ψ[i] ~ ContinuousTransition(X[i], B, W)
-        obs[i] ~ MultinomialPolya(N, Ψ[i])
-    end
-end
-```
-
-**Prediction Phase:**
-```julia
-@model function RxPolya_predictive(obs, N, X, B_posterior, W_posterior, 
-                                   n_classes, n_features)
-    B ~ B_posterior
-    W ~ W_posterior
-    
-    # Predict latent representations
-    for i in eachindex(X)
-        Ψ[i] ~ ContinuousTransition(X[i], B, W)
-        obs[i] ~ MultinomialPolya(N, Ψ[i])
-    end
-end
-```
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `w_loc` | `0.0` | Prior mean for feature weights |
+| `w_scale` | `1.0` | Prior scale for feature weights |
+| `b_loc` | `0.0` | Prior mean for bias terms |
+| `b_scale` | `1.0` | Prior scale for bias terms |
+| `learning_rate` | `0.2` | Damping factor for variational updates |
+| `num_steps` | `50` | Number of coordinate-ascent update sweeps |
+| `num_posterior_samples` | `50` | Posterior samples used for prediction |
+| `rng_seed` | `0` | Random seed for reproducible posterior sampling |
 
 ## Usage
 
-### 1. Load Pre-trained Model
+### Train and Predict
 
-<Note>
-**Python SDK**: The Python SDK trains models locally. See [Python SDK Quickstart](/python-sdk/quickstart) for training examples.
-</Note>
-
-<Tabs>
-  <Tab title="Python">
 ```python
 from nimbus_bci import NimbusSoftmax
-import pickle
 
-# Python SDK: Train locally
-clf = NimbusSoftmax(w_scale=1.0)
+clf = NimbusSoftmax(w_scale=1.0, num_steps=50)
 clf.fit(X_train, y_train)
 
-# Save and load
-with open("my_motor_imagery_softmax.pkl", "wb") as f:
-    pickle.dump(clf, f)
-
-with open("my_motor_imagery_softmax.pkl", "rb") as f:
-    clf = pickle.load(f)
-
-print(f"Model info: {clf.classes_} classes, {clf.n_features_in_} features")
+probs = clf.predict_proba(X_test)
+preds = clf.predict(X_test)
 ```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
 
-# Authenticate
-NimbusSDK.install_core("nbci_live_your_key")
-
-# Load from Nimbus model zoo
-model = load_model(NimbusProbit, "motor_imagery_polya_v1")
-
-println("Model loaded:")
-println("  Features: $(get_n_features(model))")
-println("  Classes: $(get_n_classes(model))")
-println("  Paradigm: $(get_paradigm(model))")
-```
-  </Tab>
-</Tabs>
-
-### 2. Train Custom Model
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusSoftmax
-from nimbus_bci.compat import extract_csp_features
-import mne
-import pickle
-
-# Load and preprocess EEG data
-raw = mne.io.read_raw_gdf("motor_imagery.gdf", preload=True)
-raw.filter(8, 30)
-
-events = mne.find_events(raw)
-event_id = {'left': 1, 'right': 2, 'feet': 3, 'tongue': 4}
-epochs = mne.Epochs(raw, events, event_id, tmin=0, tmax=4, preload=True)
-
-# Extract CSP features
-csp_features, csp = extract_csp_features(epochs, n_components=8)
-labels = epochs.events[:, 2]
-
-# Train NimbusSoftmax with default hyperparameters
-clf = NimbusSoftmax()
-clf.fit(csp_features, labels)
-
-# Or train with custom hyperparameters
-clf_tuned = NimbusSoftmax(
-    w_scale=1.0,        # Prior scale for weights
-    num_steps=100       # More variational updates
-)
-clf_tuned.fit(csp_features, labels)
-
-# Save
-with open("my_motor_imagery_softmax.pkl", "wb") as f:
-    pickle.dump(clf_tuned, f)
-
-print(f"Training accuracy: {clf_tuned.score(csp_features, labels):.1%}")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-
-# Prepare training data with labels
-train_features = csp_features  # (16 × 250 × 100)
-train_labels = [1, 2, 3, 4, 1, 2, ...]  # 100 labels
-
-train_data = BCIData(
-    train_features,
-    BCIMetadata(
-        sampling_rate = 250.0,
-        paradigm = :motor_imagery,
-        feature_type = :csp,
-        n_features = 16,
-        n_classes = 4,
-        chunk_size = nothing
-    ),
-    train_labels  # Required for training!
-)
-
-# Train NimbusSoftmax model with default hyperparameters
-model = train_model(
-    NimbusProbit,
-    train_data;
-    iterations = 50,        # Inference iterations
-    showprogress = true,    # Show progress bar
-    name = "my_motor_imagery_polya",
-    description = "4-class MI classifier with NimbusSoftmax"
-)
-
-# Or train with custom hyperparameters
-model = train_model(
-    NimbusProbit,
-    train_data;
-    iterations = 50,
-    showprogress = true,
-    name = "my_motor_imagery_polya_tuned",
-    description = "4-class MI with tuned hyperparameters",
-    N = 1,                           # Trials per observation (default: 1)
-    ξβ = nothing,                    # Auto-configured if not provided
-    Wβ = nothing,                    # Auto-configured if not provided
-    W_df = nothing,                  # Auto-configured if not provided
-    W_scale = nothing                # Auto-configured if not provided
-)
-
-# Save for later use
-save_model(model, "my_model.jld2")
-```
-  </Tab>
-</Tabs>
-
-**Training Parameters:**
-- `iterations`: Number of variational inference iterations (default: 50)
-  - More iterations = better convergence but slower training
-  - 50-100 is typically sufficient
-- `showprogress`: Display progress bar during training
-- `name`: Model identifier
-- `description`: Model description for documentation
-- `N`: Trials per observation (default: 1, range: [1, ∞))
-- `ξβ`: Prior mean for B (default: ones((K-1)×D))
-- `Wβ`: Prior precision for B (default: 1e-5 × I)
-- `W_df`: Wishart degrees of freedom (default: K + 5)
-- `W_scale`: Wishart scale matrix (default: I)
-
-### 3. Subject-Specific Calibration
-
-Fine-tune a pre-trained model with subject-specific data (much faster than training from scratch):
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusSoftmax
-import pickle
-
-# Load baseline model
-with open("motor_imagery_softmax_baseline.pkl", "rb") as f:
-    base_clf = pickle.load(f)
-
-# Collect 10-20 calibration trials from new subject
-X_calib, y_calib = collect_calibration_trials()
-
-# Personalize using online learning
-personalized_clf = NimbusSoftmax()
-personalized_clf.fit(X_baseline, y_baseline)
-
-for _ in range(10):
-    personalized_clf.partial_fit(X_calib, y_calib)
-
-# Save
-with open("subject_001_calibrated.pkl", "wb") as f:
-    pickle.dump(personalized_clf, f)
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Load base model
-base_model = load_model(NimbusProbit, "motor_imagery_polya_baseline_v1")
-
-# Collect 10-20 calibration trials from new subject
-calib_features = collect_calibration_trials()  # Your function
-calib_labels = [1, 2, 3, 4, 1, 2, ...]
-
-calib_data = BCIData(calib_features, metadata, calib_labels)
-
-# Calibrate (personalize) the model
-personalized_model = calibrate_model(
-    base_model,
-    calib_data;
-    iterations = 20  # Fewer iterations needed
-)
-
-save_model(personalized_model, "subject_001_calibrated.jld2")
-```
-  </Tab>
-</Tabs>
-
-**Calibration Benefits:**
-- Requires only 10-20 trials per class (vs 50-100 for training from scratch)
-- Faster: 20 iterations vs 50-100
-- Better generalization: Uses pre-trained model as prior
-- Typical accuracy improvement: 5-15% over generic model
-- **Hyperparameters preserved**: `calibrate_model()` automatically uses the same hyperparameters as the base model
-
-### 4. Batch Inference
-
-Process multiple trials efficiently:
-
-<Tabs>
-  <Tab title="Python">
-```python
-import numpy as np
-
-# Run batch inference
-predictions = clf.predict(X_test)
-probabilities = clf.predict_proba(X_test)
-confidences = np.max(probabilities, axis=1)
-
-# Analyze results
-print(f"Predictions: {predictions}")
-print(f"Mean confidence: {np.mean(confidences):.3f}")
-
-# Calculate accuracy
-accuracy = np.mean(predictions == y_test)
-print(f"Accuracy: {accuracy * 100:.1f}%")
-
-# Calculate ITR
-from nimbus_bci.metrics import calculate_itr
-itr = calculate_itr(accuracy, n_classes=4, trial_duration=4.0)
-print(f"ITR: {itr:.1f} bits/minute")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Prepare test data
-test_data = BCIData(test_features, metadata, test_labels)
-
-# Run batch inference
-results = predict_batch(model, test_data; iterations=10)
-
-# Analyze results
-println("Predictions: ", results.predictions)
-println("Mean confidence: ", mean(results.confidences))
-
-# Calculate accuracy
-accuracy = sum(results.predictions .== test_labels) / length(test_labels)
-println("Accuracy: $(round(accuracy * 100, digits=1))%")
-
-# Calculate ITR
-itr = calculate_ITR(accuracy, 4, 4.0)  # 4 classes, 4-second trials
-println("ITR: $(round(itr, digits=1)) bits/minute")
-```
-  </Tab>
-</Tabs>
-
-### 5. Streaming Inference
-
-Real-time chunk-by-chunk processing:
-
-<Note>
-For detailed Python streaming examples, see [Python SDK Streaming Inference](/python-sdk/streaming-inference).
-</Note>
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import StreamingSession
-
-# Initialize streaming session
-session = StreamingSession(clf.model_, metadata_with_chunk_size)
-
-# Process chunks as they arrive
-for chunk in eeg_feature_stream:
-    result = session.process_chunk(chunk)
-    print(f"Chunk: pred={result.prediction}, conf={result.confidence:.3f}")
-
-# Finalize trial with aggregation
-final_result = session.finalize_trial()
-print(f"Final: pred={final_result.prediction}, conf={final_result.confidence:.3f}")
-
-session.reset()
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Initialize streaming session
-session = init_streaming(model, metadata_with_chunk_size)
-
-# Process chunks as they arrive
-for chunk in eeg_feature_stream
-    result = process_chunk(session, chunk; iterations=10)
-    println("Chunk: pred=$(result.prediction), conf=$(round(result.confidence, digits=3))")
-end
-
-# Finalize trial with aggregation
-final_result = finalize_trial(session; method=:weighted_vote)
-println("Final: pred=$(final_result.prediction), conf=$(round(final_result.confidence, digits=3))")
-```
-  </Tab>
-</Tabs>
-
-## Hyperparameter Tuning
-
-Fine-tune Bayesian Softmax for optimal performance on your specific dataset.
-
-### When to Tune Hyperparameters
-
-Consider tuning when:
-- Default performance is unsatisfactory
-- You have specific data characteristics (very noisy or very clean)
-- You have limited or extensive training data
-- You want to optimize for your specific paradigm
-
-### Tuning Strategies
-
-#### For High SNR / Clean Data / Many Trials
-
-Use weaker priors to let the data drive the model:
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusSoftmax
-
-# Weaker prior shrinkage for clean data
-clf = NimbusSoftmax(w_scale=2.0)
-clf.fit(X_train, y_train)
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-model = train_model(
-    NimbusProbit,
-    train_data;
-    iterations = 50,
-    N = 1,
-    Wβ = 1e-6 * diageye((n_classes - 1) * n_features),  # Weaker prior
-    W_df = Float64(n_classes + 2)                       # Less regularization
-)
-```
-  </Tab>
-</Tabs>
-
-**Use when:**
-- SNR > 5 dB
-- 100+ trials per class
-- Clean, artifact-free data
-- Well-controlled experimental conditions
-
-#### For Low SNR / Noisy Data / Few Trials
-
-Use stronger priors for stability:
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusSoftmax
-
-# Stronger prior shrinkage for noisy data
-clf = NimbusSoftmax(w_scale=0.5)
-clf.fit(X_train, y_train)
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-model = train_model(
-    NimbusProbit,
-    train_data;
-    iterations = 50,
-    N = 1,
-    Wβ = 1e-4 * diageye((n_classes - 1) * n_features),  # Stronger prior
-    W_df = Float64(n_classes + 10)                      # More regularization
-)
-```
-  </Tab>
-</Tabs>
-
-**Use when:**
-- SNR < 2 dB
-- 40-80 trials per class
-- Noisy data or limited artifact removal
-- Challenging recording conditions
-
-#### Balanced / Default Settings
-
-The defaults work well for most scenarios:
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusSoftmax
-
-# Default prior scale (balanced)
-clf = NimbusSoftmax(w_scale=1.0)  # Default
-clf.fit(X_train, y_train)
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-model = train_model(
-    NimbusProbit,
-    train_data;
-    iterations = 50,
-    N = 1,                           # Standard (default)
-    Wβ = 1e-5 * diageye(B_dim),     # Balanced (default)
-    W_df = Float64(n_classes + 5)    # Balanced (default)
-)
-```
-  </Tab>
-</Tabs>
-
-**Use when:**
-- Moderate SNR (2-5 dB)
-- 80-150 trials per class
-- Standard BCI recording conditions
-- Starting point for experimentation
-
-### Hyperparameter Search Example
-
-Systematically search for optimal hyperparameters:
-
-<Tabs>
-  <Tab title="Python">
+### Tune with sklearn
 
 ```python
 from sklearn.model_selection import GridSearchCV, train_test_split
 from nimbus_bci import NimbusSoftmax
 
-# Split data
-X_train, X_val, y_train, y_val = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
-
-# Define search grid
 param_grid = {
-    'w_scale': [0.5, 1.0, 2.0],
-    'num_steps': [50, 100]
+    "w_scale": [0.5, 1.0, 2.0],
+    "num_steps": [50, 100],
 }
 
-# GridSearchCV
+grid = GridSearchCV(
+    NimbusSoftmax(),
+    param_grid,
+    cv=5,
+    scoring="accuracy",
+)
+grid.fit(X_train, y_train)
+
+print(grid.best_params_)
+```
+
+### Online Updates
+
+```python
 clf = NimbusSoftmax()
-grid_search = GridSearchCV(
-    clf, param_grid, cv=5, scoring='accuracy', verbose=2
-)
-grid_search.fit(X_train, y_train)
+clf.fit(X_seed, y_seed)
 
-# Best parameters
-print("\nBest hyperparameters:")
-print(f"  w_scale: {grid_search.best_params_['w_scale']}")
-print(f"  num_steps: {grid_search.best_params_['num_steps']}")
-print(f"  Validation accuracy: {grid_search.best_score_ * 100:.1f}%")
-
-# Use best model
-best_clf = grid_search.best_estimator_
+for X_new, y_new in calibration_batches:
+    clf.partial_fit(X_new, y_new)
 ```
-</Tab>
-  <Tab title="Julia">
 
-```julia
-using NimbusSDK
+### Active Learning
 
-# Define search grid
-Wβ_scales = [1e-6, 1e-5, 1e-4]
-W_df_offsets = [2, 5, 10]
+`NimbusSoftmax` supports BALD through posterior predictive samples, so it can drive label-efficient calibration loops.
 
-# Split data into train/validation
-train_data, val_data = split_data(all_data, ratio=0.8)
+```python
+from nimbus_bci.active_learning import calibration_sufficient, suggest_next_trial
 
-best_accuracy = 0.0
-best_params = nothing
+previous = clf.get_model()
 
-println("Searching hyperparameters...")
-for Wβ_scale in Wβ_scales
-    for df_offset in W_df_offsets
-        B_dim = (n_classes - 1) * n_features
-        
-        # Train model with these hyperparameters
-        model = train_model(
-            NimbusProbit,
-            train_data;
-            iterations = 50,
-            N = 1,
-            Wβ = Wβ_scale * diageye(B_dim),
-            W_df = Float64(n_classes + df_offset),
-            showprogress = false
-        )
-        
-        # Validate
-        results = predict_batch(model, val_data)
-        accuracy = sum(results.predictions .== val_data.labels) / length(val_data.labels)
-        
-        println("  Wβ_scale=$Wβ_scale, df_offset=$df_offset: $(round(accuracy*100, digits=1))%")
-        
-        # Track best
-        if accuracy > best_accuracy
-            best_accuracy = accuracy
-            best_params = (Wβ_scale=Wβ_scale, df_offset=df_offset)
-        end
-    end
-end
+ranked = suggest_next_trial(
+    clf,
+    X_pool,
+    strategy="bald",
+    n=4,
+    num_posterior_samples=256,
+)
 
-println("\nBest hyperparameters:")
-println("  Wβ_scale: $(best_params.Wβ_scale)")
-println("  W_df offset: $(best_params.df_offset)")
-println("  Validation accuracy: $(round(best_accuracy*100, digits=1))%")
+X_new, y_new = collect_labels_for(ranked.indices)
+clf.partial_fit(X_new, y_new)
 
-# Retrain on all data with best hyperparameters
-final_model = train_model(
-    NimbusProbit,
-    all_data;
-    iterations = 50,
-    N = 1,
-    Wβ = best_params.Wβ_scale * diageye((n_classes - 1) * n_features),
-    W_df = Float64(n_classes + best_params.df_offset)
+status = calibration_sufficient(
+    clf,
+    X_pool,
+    criterion="posterior_stability",
+    previous=previous,
+    threshold=0.02,
 )
 ```
-</Tab>
-</Tabs>
 
-### Quick Tuning Guidelines
-
-| Scenario | `Wβ` scale | `W_df` offset | Notes |
-|----------|------------|---------------|-------|
-| **Excellent data quality** | 1e-6 | 2 | Minimal regularization |
-| **Good data quality** | 1e-5 (default) | 5 (default) | Balanced approach |
-| **Moderate data quality** | 1e-5 to 1e-4 | 5-8 | Slight regularization |
-| **Poor data quality** | 1e-4 | 10 | Strong regularization |
-| **Very limited trials** | 1e-4 | 15 | Maximum regularization |
-
-<Tip>
-**Pro Tip**: Start with defaults (Wβ = 1e-5 × I, W_df = K + 5) and only tune if performance is unsatisfactory. The defaults are optimized for typical BCI scenarios.
-</Tip>
+See [Active Learning](/python-sdk/active-learning) for the full calibration workflow.
 
 ## Training Requirements
 
-### Data Requirements
+- **Minimum**: at least 2 observations are required.
+- **Recommended**: 40+ trials per class for stable estimates.
+- **Feature normalization**: strongly recommended for cross-session stability.
+- **Input shape**: `(n_trials, n_features)`.
 
-- **Minimum**: 40 trials per class (160 total for 4-class)
-- **Recommended**: 80+ trials per class (320+ total for 4-class)
-- **For calibration**: 10-20 trials per class sufficient
-
-<Warning>
-**NimbusSoftmax requires at least 2 observations** to estimate regression coefficients and the precision matrix. Single-trial training will raise an error.
-</Warning>
-
-### Feature Normalization
-
-<Tip>
-**Critical for cross-session BCI performance!**
-
-Normalize your features before training for 15-30% accuracy improvement across sessions.
-</Tip>
-
-<Tabs>
-  <Tab title="Python">
 ```python
 from sklearn.preprocessing import StandardScaler
-import pickle
+from nimbus_bci import NimbusSoftmax
 
-# Estimate normalization from training data
 scaler = StandardScaler()
 X_train_norm = scaler.fit_transform(X_train)
+X_test_norm = scaler.transform(X_test)
 
-# Train with normalized features
 clf = NimbusSoftmax()
 clf.fit(X_train_norm, y_train)
-
-# Save model and scaler together
-with open("model_with_scaler.pkl", "wb") as f:
-    pickle.dump({'model': clf, 'scaler': scaler}, f)
-
-# Later: Apply same normalization to test data
-X_test_norm = scaler.transform(X_test)
 predictions = clf.predict(X_test_norm)
 ```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Estimate normalization from training data
-norm_params = estimate_normalization_params(train_features; method=:zscore)
-train_norm = apply_normalization(train_features, norm_params)
-
-# Train with normalized features
-train_data = BCIData(train_norm, metadata, labels)
-model = train_model(NimbusProbit, train_data)
-
-# Save params with model
-@save "model.jld2" model norm_params
-
-# Later: Apply same params to test data
-test_norm = apply_normalization(test_features, norm_params)
-```
-  </Tab>
-</Tabs>
-
-See the [Feature Normalization](/inference-configuration/feature-normalization) guide for complete details.
-
-### Feature Requirements
-
-Bayesian Softmax expects **preprocessed features**, not raw EEG:
-
-✅ **Required preprocessing:**
-- Bandpass filtering (8-30 Hz for motor imagery)
-- Artifact removal (ICA recommended)
-- Spatial filtering (CSP for motor imagery)
-- Feature extraction (log-variance for CSP features)
-
-❌ **NOT accepted:**
-- Raw EEG channels
-- Unfiltered data
-- Non-extracted features
-
-See [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) for details.
 
 ## Performance Characteristics
 
-### Computational Performance
+| Operation | Typical cost | Notes |
+| --- | --- | --- |
+| Training | Moderate | More expensive than `NimbusLDA` / `NimbusQDA` |
+| Batch inference | ~15-25ms per trial | Depends on posterior sample count |
+| Streaming chunk | ~15-25ms | Use lower sample counts if latency is binding |
 
-| Operation | Latency | Notes |
-|-----------|---------|-------|
-| **Training** | 15-40 seconds | 50 iterations, 100 trials per class |
-| **Calibration** | 8-20 seconds | 20 iterations, 20 trials per class |
-| **Batch Inference** | 15-25ms per trial | 10 iterations |
-| **Streaming Chunk** | 15-25ms | 10 iterations per chunk |
-
-Slightly slower than NimbusLDA/NimbusQDA due to continuous transition complexity.
-
-### Classification Accuracy
-
-| Paradigm | Classes | Typical Accuracy | When to Use NimbusSoftmax |
-|----------|---------|------------------|---------------------|
-| Motor Imagery | 2-4 | 70-85% | When NimbusLDA/NimbusQDA insufficient |
-| P300 | 2 (Target/Non-target) | 85-95% | Complex distributions |
-| SSVEP | 2-6 | 85-98% | Advanced applications |
-
-<Note>
-Bayesian Softmax typically provides comparable or slightly better accuracy than NimbusLDA/NimbusQDA for complex distributions, at the cost of ~5-10ms additional latency.
-</Note>
+`NimbusSoftmax` is usually slower than `NimbusLDA` and `NimbusQDA`, but can improve accuracy when class boundaries are not well represented by Gaussian class-conditionals.
 
 ## Model Inspection
 
-### View Model Parameters
-
-<Tabs>
-  <Tab title="Python">
 ```python
-import numpy as np
-
 params = clf.model_.params
 
-# Posterior parameters for non-reference classes
 print("Posterior weight means:")
-print(f"  Shape: {params['beta_mean'].shape}")
-print(f"  Means:\n{params['beta_mean']}")
+print(params["beta_mean"])
 
-print("\nPosterior covariance Cholesky factors:")
-print(f"  Shape: {params['beta_cov_chol'].shape}")
+print("Posterior covariance Cholesky factors:")
+print(params["beta_cov_chol"].shape)
 
-print("\nReference class:")
-print(f"  Class index: {params['ref_class']}")
-
-# Model info
-print("\nModel info:")
-print(f"  Features: {clf.n_features_in_}")
-print(f"  Classes: {clf.classes_}")
-print(f"  Weight prior scale: {clf.w_scale}")
-
-# Class probabilities (from training)
-print("\nClass priors (estimated from training):")
-for k, class_label in enumerate(clf.classes_):
-    prior = np.sum(y_train == class_label) / len(y_train)
-    print(f"  Class {class_label}: {prior:.3f}")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Learned posteriors
-println("B posterior (regression coefficients):")
-println("  Type: ", typeof(model.B_posterior))
-println("  Mean: ", mean(model.B_posterior))
-
-println("\nW posterior (precision matrix):")
-println("  Type: ", typeof(model.W_posterior))
-println("  Mean: ", mean(model.W_posterior))
-
-# Hyperparameters
-println("\nHyperparameters:")
-println("  N: ", model.N)
-println("  ξβ dimensions: ", size(model.ξβ))
-println("  Wβ dimensions: ", size(model.Wβ))
-println("  W_df: ", model.W_df)
-println("  W_scale dimensions: ", size(model.W_scale))
-
-# Model metadata
-println("\nMetadata:")
-println("  Name: ", model.metadata.name)
-println("  Paradigm: ", model.metadata.paradigm)
-println("  Features: ", model.metadata.n_features)
-println("  Classes: ", model.metadata.n_classes)
-```
-  </Tab>
-</Tabs>
-
-### Compare Models
-
-<Tabs>
-  <Tab title="Python">
-```python
-from sklearn.model_selection import cross_val_score
-from nimbus_bci import NimbusSoftmax
-
-# Compare different weight prior scales
-results = []
-for w_scale in [0.5, 1.0, 2.0]:
-    clf = NimbusSoftmax(w_scale=w_scale)
-    scores = cross_val_score(clf, X_train, y_train, cv=5)
-    accuracy = np.mean(scores)
-    
-    print(f"w_scale: {w_scale} -> Accuracy: {accuracy * 100:.1f}%")
-    results.append((w_scale, clf, accuracy))
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Train multiple models and compare
-models = []
-for n_iter in [20, 50, 100]
-    model = train_model(NimbusProbit, train_data; iterations=n_iter)
-    results = predict_batch(model, test_data)
-    accuracy = sum(results.predictions .== test_labels) / length(test_labels)
-    
-    println("Iterations: $n_iter, Accuracy: $(round(accuracy*100, digits=1))%")
-    push!(models, (n_iter, model, accuracy))
-end
-```
-  </Tab>
-</Tabs>
-
-## Advantages & Limitations
-
-### Advantages
-
-✅ **Flexible Multinomial Classification**: Natural handling of multinomial distributions  
-✅ **Continuous Transition Mapping**: Sophisticated feature-to-latent-space transformation  
-✅ **Full Bayesian Uncertainty**: Complete posterior distributions over predictions  
-✅ **No Gaussian Assumption**: More flexible than Gaussian classifiers (NimbusLDA/NimbusQDA)  
-✅ **Production-Ready**: Battle-tested in real BCI applications  
-✅ **Calibration Support**: Fast subject-specific adaptation  
-
-### Limitations
-
-❌ **More Complex**: More parameters than NimbusLDA, requires careful hyperparameter tuning  
-❌ **Slower Inference**: ~15-25ms vs ~10-15ms for NimbusLDA  
-❌ **(K-1) Dimensional Space**: Works in reduced dimension (not always intuitive)  
-❌ **No Mahalanobis Distance**: Discriminative model lacks explicit class centers for outlier detection  
-❌ **Requires Multiple Trials**: Cannot train on single trial (minimum 2 observations)  
-❌ **Less Interpretable**: Harder to interpret than generative models with explicit means
-
-## Comparison: Bayesian Softmax vs NimbusLDA vs NimbusQDA vs NimbusSTS
-
-| Aspect | Bayesian Softmax | NimbusLDA | NimbusQDA | NimbusSTS |
-|--------|---------|-------|-------|-------|
-| **Mathematical Model** | Bayesian Multinomial Logistic Regression | Pooled Gaussian Classifier (PGC) | Heteroscedastic Gaussian Classifier (HGC) | State-Space Model (EKF) |
-| **Representation** | (K-1) dimensional latent space | K class means with shared precision | K class means with class-specific precisions | Features + latent state dynamics |
-| **Temporal Modeling** | Static (stateless) | Static (stateless) | Static (stateless) | **Dynamic (stateful)** |
-| **Training Speed** | Moderate | Fastest | Moderate | Moderate |
-| **Inference Speed** | 15-25ms | 10-15ms | 15-20ms | 20-30ms |
-| **Flexibility** | Highest | Lowest | High | Adaptive |
-| **Best For** | Complex multinomial tasks | Well-separated classes | Overlapping classes with different covariances | **Non-stationary, long sessions** |
-| **Interpretability** | Low (discriminative) | High (generative with means) | High (generative with means) | Moderate (state evolution) |
-| **Mahalanobis Distance** | ❌ No (no explicit means) | ✅ Yes | ✅ Yes | ❌ N/A |
-| **Entropy Metrics** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
-| **Free Energy** | ✅ Yes (training only) | ✅ Yes | ✅ Yes | ✅ Yes |
-
-### Decision Tree
-
-```
-Is your data non-stationary (temporal drift)?
-├─ Yes → Use NimbusSTS (handles temporal dynamics)
-└─ No → Do you need Mahalanobis-based outlier detection?
-    ├─ Yes → Use NimbusLDA or NimbusQDA
-    └─ No → Are classes well-separated with Gaussian structure?
-        ├─ Yes → Use NimbusLDA (fastest)
-        └─ No → Do classes have different covariances?
-            ├─ Yes → Use NimbusQDA
-            └─ No → Are distributions complex/non-Gaussian?
-                ├─ Yes → Use Bayesian Softmax
-                └─ No → Use NimbusLDA (simplest)
+print("Reference class:")
+print(params["ref_class"])
 ```
 
-## Practical Examples
+## Model Selection Context
 
-### Motor Imagery Classification
+Use `NimbusSoftmax` when you are in Python and need a non-Gaussian static classifier with posterior sampling support. If you need explicit class centers or Mahalanobis diagnostics, use `NimbusLDA` or `NimbusQDA`. If the session drifts over time, use `NimbusSTS`.
 
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusSoftmax
-from sklearn.metrics import classification_report
-
-# Train on motor imagery data (4-class MI)
-clf = NimbusSoftmax(w_scale=1.0)
-clf.fit(X_train, y_train)  # CSP features, 4 classes
-
-# Test
-predictions = clf.predict(X_test)
-
-# Calculate per-class accuracy
-print(classification_report(y_test, predictions))
-
-# Per-class breakdown
-for class_id in clf.classes_:
-    class_mask = y_test == class_id
-    class_acc = np.mean(predictions[class_mask] == class_id)
-    print(f"Class {class_id} accuracy: {class_acc * 100:.1f}%")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Bayesian Softmax for complex motor imagery with overlapping classes
-
-# Train on motor imagery data
-mi_data = BCIData(csp_features, mi_metadata, labels)  # 4-class MI
-model = train_model(NimbusProbit, mi_data; iterations=50)
-
-# Test
-results = predict_batch(model, test_data)
-
-# Calculate per-class accuracy
-for class_id in 1:4
-    class_mask = test_labels .== class_id
-    class_accuracy = sum(results.predictions[class_mask] .== class_id) / sum(class_mask)
-    println("Class $class_id accuracy: $(round(class_accuracy * 100, digits=1))%")
-end
-```
-  </Tab>
-</Tabs>
-
-### P300 Detection
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusSoftmax
-from sklearn.metrics import confusion_matrix
-
-# Train on P300 data (binary: 0=non-target, 1=target)
-clf = NimbusSoftmax(w_scale=1.0)
-clf.fit(X_train, y_train)  # ERP features
-
-# Test
-predictions = clf.predict(X_test)
-
-# Calculate sensitivity/specificity
-cm = confusion_matrix(y_test, predictions)
-tn, fp, fn, tp = cm.ravel()
-
-sensitivity = tp / (tp + fn)
-specificity = tn / (tn + fp)
-
-print(f"Sensitivity: {sensitivity * 100:.1f}%")
-print(f"Specificity: {specificity * 100:.1f}%")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Bayesian Softmax for P300 target/non-target classification
-
-# Train on P300 data
-p300_data = BCIData(erp_features, p300_metadata, labels)  # 1=target, 2=non-target
-model = train_model(NimbusProbit, p300_data; iterations=50)
-
-# Test
-results = predict_batch(model, test_data)
-
-# Calculate sensitivity/specificity
-targets = test_labels .== 1
-target_preds = results.predictions .== 1
-
-sensitivity = sum(target_preds .& targets) / sum(targets)
-specificity = sum(.!target_preds .& .!targets) / sum(.!targets)
-
-println("Sensitivity: $(round(sensitivity * 100, digits=1))%")
-println("Specificity: $(round(specificity * 100, digits=1))%")
-```
-  </Tab>
-</Tabs>
-
-### Comparing with NimbusLDA/NimbusQDA
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusSTS
-
-# Train all models
-lda_clf = NimbusLDA()
-lda_clf.fit(X_train, y_train)
-
-qda_clf = NimbusQDA()
-qda_clf.fit(X_train, y_train)
-
-softmax_clf = NimbusSoftmax()
-softmax_clf.fit(X_train, y_train)
-
-sts_clf = NimbusSTS()
-sts_clf.fit(X_train, y_train)
-
-# Evaluate all models
-models = [
-    ("NimbusLDA", lda_clf),
-    ("NimbusQDA", qda_clf),
-    ("NimbusSoftmax", softmax_clf),
-    ("NimbusSTS", sts_clf)
-]
-
-for name, clf in models:
-    predictions = clf.predict(X_test)
-    probas = clf.predict_proba(X_test)
-    
-    accuracy = np.mean(predictions == y_test)
-    mean_conf = np.mean(np.max(probas, axis=1))
-    mean_entropy = -np.mean(np.sum(probas * np.log(probas + 1e-10), axis=1))
-    
-    print(f"{name}:")
-    print(f"  Accuracy: {accuracy * 100:.1f}%")
-    print(f"  Mean confidence: {mean_conf:.3f}")
-    print(f"  Mean entropy: {mean_entropy:.3f} bits")
-    print()
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-# Compare Bayesian Softmax with other models
-# Note: NimbusSTS (Bayesian STS) is currently Python-only
-
-# Train all three Julia models
-rxlda_model = train_model(NimbusLDA, train_data)
-qda_model = train_model(NimbusQDA, train_data)
-rxpolya_model = train_model(NimbusProbit, train_data)
-
-# Evaluate all three
-models = [
-    ("NimbusLDA", rxlda_model),
-    ("NimbusQDA", qda_model),
-    ("Bayesian Softmax", rxpolya_model)
-]
-
-for (name, model) in models
-    results = predict_batch(model, test_data)
-    accuracy = sum(results.predictions .== test_labels) / length(test_labels)
-    mean_conf = mean(results.confidences)
-    mean_entropy = mean(results.entropy)
-    
-    println("$name:")
-    println("  Accuracy: $(round(accuracy*100, digits=1))%")
-    println("  Mean confidence: $(round(mean_conf, digits=3))")
-    println("  Mean entropy: $(round(mean_entropy, digits=3)) bits")
-    println("  Latency: $(results.latency_ms) ms")
-    println()
-end
-```
-  </Tab>
-</Tabs>
+For the canonical side-by-side comparison, see [Model Specification](/model-specification).
 
 ## Next Read
 
 <CardGroup cols={2}>
-  <Card title="Bayesian LDA (NimbusLDA)" icon="brain" href="/models/rxlda">
-    Faster model with shared covariance
+  <Card title="NimbusProbit (Julia)" icon="brain" href="/models/nimbusprobit">
+    Julia's non-Gaussian static classifier.
   </Card>
-  <Card title="Bayesian QDA (NimbusQDA)" icon="brain" href="/models/rxgmm">
-    Flexible model with class-specific covariances
+  <Card title="Python API Reference" icon="book" href="/python-sdk/api-reference">
+    Full `NimbusSoftmax` constructor and method reference.
   </Card>
-  <Card title="Bayesian STS (NimbusSTS)" icon="wave-pulse" href="/models/rxsts">
-    Adaptive model for non-stationary data
+  <Card title="Active Learning" icon="target" href="/python-sdk/active-learning">
+    Use posterior samples to reduce calibration labels.
   </Card>
-  <Card title="Training Guide" icon="graduation-cap" href="/examples/advanced-applications">
-    Complete training tutorial
-  </Card>
-  <Card title="Code Examples" icon="braces" href="/examples/basic-examples">
-    Working examples
-  </Card>
-  <Card title="Preprocessing Requirements" icon="filter" href="/inference-configuration/preprocessing-requirements">
-    Feature extraction guide
+  <Card title="Model Selection" icon="box" href="/model-specification">
+    Compare Nimbus model families.
   </Card>
 </CardGroup>
 
 ## References
 
 **Implementation:**
-- RxInfer.jl: https://rxinfer.com/
 - Python source code: `nimbus_bci/models/nimbus_softmax/` in `nimbus-bci`
-- Julia source code: `src/models/nimbus_probit/` in NimbusSDKCore
 
 **Theory:**
-- Polson, N. G., Scott, J. G., & Windle, J. (2013). "Bayesian inference for logistic models using Pólya–Gamma latent variables"
-- Windle, J., Polson, N. G., & Scott, J. G. (2014). "Sampling Pólya–Gamma random variates: alternative and approximate techniques"
-- Bayesian multinomial logistic regression (softmax) with Pólya–Gamma augmentation and variational inference
-
-**BCI Applications:**
-- Blankertz et al. (2008). "Optimizing spatial filters for robust EEG single-trial analysis"
-- Lotte et al. (2018). "A review of classification algorithms for EEG-based BCI"
+- Polson, N. G., Scott, J. G., & Windle, J. (2013). "Bayesian inference for logistic models using Pólya-Gamma latent variables"
+- Windle, J., Polson, N. G., & Scott, J. G. (2014). "Sampling Pólya-Gamma random variates: alternative and approximate techniques"
+- Bayesian multinomial logistic regression with Polya-Gamma augmentation and variational inference
 
 <script
   type="application/ld+json"
@@ -1217,9 +247,9 @@ end
     __html: JSON.stringify({
       '@context': 'https://schema.org',
       '@type': 'TechArticle',
-      headline: 'Bayesian Softmax (NimbusSoftmax)',
+      headline: 'NimbusSoftmax (Python)',
       description:
-        'Bayesian Multinomial Logistic Regression with uncertainty quantification using RxInfer.jl. Flexible 15-25ms inference for complex multinomial BCI classification tasks.',
+        'Python Bayesian multinomial logistic regression with Polya-Gamma variational inference for non-Gaussian BCI classification.',
       author: {
         '@type': 'Organization',
         name: 'Nimbus BCI',
@@ -1233,10 +263,10 @@ end
       about: {
         '@type': 'Thing',
         name: 'Brain-Computer Interface',
-        description: 'Bayesian multinomial classification for complex BCI tasks',
+        description: 'Bayesian softmax classification for complex BCI tasks',
       },
       keywords:
-        'Bayesian Softmax, NimbusSoftmax, Multinomial Logistic Regression, multinomial classification, BCI, logistic regression, RxInfer, NimbusSoftmax',
+        'NimbusSoftmax, Bayesian Softmax, Python SDK, multinomial logistic regression, Polya-Gamma, BCI',
       inLanguage: 'en-US',
       isAccessibleForFree: true,
     }),

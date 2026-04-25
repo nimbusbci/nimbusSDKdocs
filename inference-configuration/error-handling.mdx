@@ -1,718 +1,171 @@
 ---
 title: "BCI Error Handling"
-description: "Implement robust Nimbus error handling with confidence thresholds, quality checks, and recovery flows for production BCI systems."
-keywords: ["error handling", "error recovery", "quality checks", "confidence thresholds", "production BCI", "robust BCI", "error management", "BCI reliability", "quality assessment"]
+description: "Handle Nimbus BCI failures with validation checks, confidence thresholds, streaming recovery, and production safeguards."
+keywords: ["error handling", "error recovery", "quality checks", "confidence thresholds", "production BCI", "BCI reliability"]
 icon: "shield"
 ---
 
-# Error Handling for BCI Systems
+# Error Handling For BCI Systems
 
-Robust error handling is critical for BCI applications, especially in medical and assistive technology contexts where system failures can have serious consequences. Both SDKs provide comprehensive validation and error detection to ensure reliable operation.
+BCI applications should fail predictably. The most important safeguards are input validation, confidence-aware decisions, and clear fallback behavior when signal quality or streaming health degrades.
 
 <Note>
-**Python SDK**: No authentication errors (fully local). Focus on data validation and inference errors.
-
-**Julia SDK**: Includes API authentication and installation error handling.
+Python SDK workflows are local and focus on validation, inference, and preprocessing errors. Julia SDK workflows also include API key and core installation errors.
 </Note>
 
-## Error Categories
+## Common Failure Modes
 
-### Authentication Errors (Julia SDK Only)
+| Category | Typical Symptom | First Check |
+| --- | --- | --- |
+| Authentication | Julia core install or model access fails | API key, network, cached core state |
+| Data shape | Dimension mismatch | Expected feature and trial shape |
+| Invalid values | NaN, Inf, or unstable predictions | Preprocessing output and export path |
+| Model mismatch | Low confidence or feature errors | Feature count, class count, model family |
+| Poor preprocessing | Near-chance accuracy | Frequency band, artifacts, normalization |
+| Streaming drift | Confidence falls over time | Session state, electrode quality, fatigue |
 
-Common installation and setup issues for Julia SDK:
+## Validate Before Inference
 
-```julia
-using NimbusSDK
+Check the data contract before calling model APIs:
 
-# 1. Invalid API Key Format
-try
-    NimbusSDK.install_core("short_key")  # Too short
-catch e
-    # Error: "Invalid API key format. API keys must be at least 20 characters."
-    println("Installation failed: Please check your API key")
-end
-
-# 2. Core Already Installed
-# The core is installed once per machine.
-# To reinstall or update, you can force reinstall:
-if NimbusSDK.is_core_installed()
-    println("Core already installed - no need to reinstall")
-else
-    NimbusSDK.install_core("your-api-key")
-end
-
-# 3. Network Issues During Installation
-try
-    NimbusSDK.install_core("your-api-key")
-catch e
-    # Error: "Cannot connect to Nimbus API. Please check your internet connection."
-    println("Please check your internet connection and try again")
-end
-```
-
-**Best Practice: Handle Installation Errors Gracefully**
-
-```julia
-function safe_install_core(api_key::String; max_retries::Int=3)
-    # Check if already installed
-    if NimbusSDK.is_core_installed()
-        println("✓ Core already installed")
-        return true
-    end
-    
-    for attempt in 1:max_retries
-        try
-            NimbusSDK.install_core(api_key)
-            println("✓ Core installed successfully")
-            return true
-        catch e
-            @warn "Installation attempt $attempt failed" exception=e
-            if attempt < max_retries
-                sleep_time = 2^attempt  # Exponential backoff
-                println("Retrying in $sleep_time seconds...")
-                sleep(sleep_time)
-            else
-                @error "Installation failed after $max_retries attempts"
-                return false
-            end
-        end
-    end
-    return false
-end
-
-# Usage
-if !safe_install_core("your-api-key")
-    println("❌ Cannot proceed without core installation")
-    exit(1)
-end
-```
-
-### Data Validation Errors
-
-Both SDKs validate data before inference to catch common issues:
-
-<Tabs>
-  <Tab title="Python">
+- Features are finite and non-constant.
+- Feature count matches metadata and model expectations.
+- Labels match trial count and class encoding.
+- Test data uses training normalization parameters.
+- Streaming chunks match `(n_features, chunk_size)`.
 
 ```python
-from nimbus_bci import NimbusLDA
 import numpy as np
 
-# 1. NaN or Inf values
-X = np.random.randn(100, 16)
-X[50, 8] = np.nan  # Inject NaN
-
-try:
-    clf = NimbusLDA()
-    clf.fit(X, y_train)
-except ValueError as e:
-    print(f"Data validation failed: {e}")
-    # Fix: Remove or impute NaN values
-    from sklearn.impute import SimpleImputer
-    imputer = SimpleImputer(strategy='mean')
-    X_clean = imputer.fit_transform(X)
-
-# 2. Dimension mismatches
-X_wrong = np.random.randn(100)  # 1D instead of 2D
-
-try:
-    clf.fit(X_wrong, y_train)
-except ValueError as e:
-    print(f"Dimension error: {e}")
-    # Expected: (n_samples, n_features)
-    X_correct = X_wrong.reshape(-1, 1)
-
-# 3. Feature dimension mismatch
-clf = NimbusLDA()
-clf.fit(X_train, y_train)  # Trained on 16 features
-
-X_test_wrong = np.random.randn(10, 8)  # Only 8 features!
-try:
-    clf.predict(X_test_wrong)
-except ValueError as e:
-    print(f"Feature mismatch: {e}")
-    # Expected: same number of features as training
+def validate_features(X, expected_features=None):
+    if not np.isfinite(X).all():
+        raise ValueError("Features contain NaN or Inf")
+    if expected_features is not None and X.shape[-1] != expected_features:
+        raise ValueError("Feature count mismatch")
 ```
-</Tab>
-  <Tab title="Julia">
 
 ```julia
-using NimbusSDK
-
-# 1. NaN or Inf values
-bad_features = randn(16, 250, 10)
-bad_features[5, 100, 3] = NaN  # Inject NaN
-
-try
-    data = BCIData(bad_features, metadata)
-    # Error: "Data contains NaN values. Please clean your data before inference."
-catch e
-    println("Data validation failed: Clean your data")
-    # Fix: Remove or interpolate NaN values
-    clean_features = replace_nan_with_mean(bad_features)
-end
-
-# 2. Dimension mismatches
-wrong_dim_features = randn(16, 250, 10, 2)  # 4D instead of 3D
-
-try
-    data = BCIData(wrong_dim_features, metadata)
-    # Error: "Features must be 2D or 3D array, got 4D"
-catch e
-    println("Dimension error: Expected 2D or 3D array")
-end
-
-# 3. Feature dimension mismatch
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    n_features = 16,  # Expects 16 features
-    n_classes = 4
-)
-features = randn(8, 250, 10)  # Only 8 features!
-
-try
-    data = BCIData(features, metadata)
-    model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-    results = predict_batch(model, data)
-    # Error: "Data has 8 features but model expects 16 features"
-catch e
-    println("Feature dimension mismatch: Check your preprocessing")
-end
-```
-</Tab>
-</Tabs>
-
-**Best Practice: Pre-validation Function**
-
-```julia
-function validate_bci_data(features, metadata)
-    errors = String[]
-    warnings = String[]
-    
-    # Check for NaN/Inf
-    if any(isnan.(features))
-        push!(errors, "Data contains NaN values")
-    end
-    if any(isinf.(features))
-        push!(errors, "Data contains Inf values")
-    end
-    
-    # Check dimensions
-    if ndims(features) < 2 || ndims(features) > 3
-        push!(errors, "Features must be 2D or 3D, got $(ndims(features))D")
-    end
-    
-    # Check feature dimension
-    actual_features = size(features, 1)
-    if actual_features != metadata.n_features
-        push!(errors, "Feature count mismatch: $actual_features vs $(metadata.n_features)")
-    end
-    
-    # Check for suspicious statistics
-    feature_std = std(features)
-    if feature_std < 1e-10
-        push!(warnings, "Very small std dev ($feature_std) - data may not be scaled")
-    end
-    if feature_std > 1e6
-        push!(warnings, "Very large std dev ($feature_std) - consider normalization")
-    end
-    
-    # Report issues
-    if !isempty(errors)
-        println("❌ Validation Errors:")
-        for err in errors
-            println("  • $err")
-        end
-        return false
-    end
-    
-    if !isempty(warnings)
-        println("⚠️  Validation Warnings:")
-        for warn in warnings
-            println("  • $warn")
-        end
-    end
-    
+function validate_chunk(chunk, metadata)
+    size(chunk, 1) == metadata.n_features || error("Feature count mismatch")
+    all(isfinite, chunk) || error("Chunk contains NaN or Inf")
     return true
 end
-
-# Usage
-if validate_bci_data(features, metadata)
-    data = BCIData(features, metadata)
-    results = predict_batch(model, data)
-else
-    println("Fix data issues before inference")
-end
 ```
 
-### Model Compatibility Errors
+## Confidence Gates
 
-```julia
-using NimbusSDK
+Do not map every prediction directly to an action. Use thresholds that match application risk.
 
-# Load a 4-class motor imagery model
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
+| Confidence | Suggested Action |
+| --- | --- |
+| `>= 0.9` | Execute low-risk command or accept trial. |
+| `0.7-0.9` | Ask for confirmation or show alternatives. |
+| `0.5-0.7` | Reject or request a clearer trial. |
+| `< 0.5` | Stop, recalibrate, or run diagnostics. |
 
-# But provide 2-class data
-metadata = BCIMetadata(
-    sampling_rate = 250.0,
-    n_features = 16,
-    n_classes = 2  # Wrong!
-)
-
-try
-    results = predict_batch(model, data)
-    # Error: "Data has 2 classes but model expects 4 classes"
-catch e
-    println("Class count mismatch: Use the correct model for your data")
-end
-```
-
-**Best Practice: Check Compatibility Before Inference**
-
-```julia
-function check_compatibility(data::BCIData, model)
-    # Get model requirements
-    model_features = get_n_features(model)
-    model_classes = get_n_classes(model)
-    
-    # Compare
-    compatible = true
-    
-    if data.metadata.n_features != model_features
-        @error "Feature mismatch" data=data.metadata.n_features model=model_features
-        compatible = false
-    end
-    
-    if data.metadata.n_classes != model_classes
-        @error "Class count mismatch" data=data.metadata.n_classes model=model_classes
-        compatible = false
-    end
-    
-    return compatible
-end
-
-# Usage
-if check_compatibility(data, model)
-    results = predict_batch(model, data)
-else
-    println("Model and data are incompatible")
-end
-```
-
-### Training Errors
-
-```julia
-using NimbusSDK
-
-# 1. Missing labels
-features = randn(16, 250, 50)
-metadata = BCIMetadata(...)
-data = BCIData(features, metadata)  # No labels!
-
-try
-    model = train_model(NimbusLDA, data)
-    # Error: "Training requires labeled data. Please provide labels in BCIData."
-catch e
-    println("Training requires labeled data")
-end
-
-# Fix: Provide labels
-labels = rand(1:4, 50)
-data_with_labels = BCIData(features, metadata, labels)
-model = train_model(NimbusLDA, data_with_labels)  # ✓ Works
-```
-
-### Streaming Errors
-
-```julia
-using NimbusSDK
-
-# 1. Chunk size mismatch
-metadata = BCIMetadata(
-    chunk_size = 250,  # Expects 250 samples per chunk
-    # ... other params
-)
-
-session = init_streaming(model, metadata)
-
-# But provide wrong-sized chunk
-wrong_chunk = randn(16, 125)  # Only 125 samples!
-
-try
-    result = process_chunk(session, wrong_chunk)
-    # Warning: "Chunk size mismatch" expected=250 actual=125
-catch e
-    println("Chunk size mismatch")
-end
-
-# 2. Feature dimension mismatch
-wrong_features_chunk = randn(8, 250)  # Only 8 features instead of 16!
-
-try
-    result = process_chunk(session, wrong_features_chunk)
-    # Error: "Chunk feature dimension (8) does not match metadata (16)"
-catch e
-    println("Feature dimension mismatch in chunk")
-end
-```
-
-**Best Practice: Validate Chunks Before Processing**
-
-```julia
-function safe_process_chunk(session, chunk, metadata)
-    # Validate chunk dimensions
-    n_features, n_samples = size(chunk)
-    
-    if n_features != metadata.n_features
-        @error "Feature dimension mismatch" expected=metadata.n_features actual=n_features
-        return nothing
-    end
-    
-    if !isnothing(metadata.chunk_size) && n_samples != metadata.chunk_size
-        @warn "Chunk size mismatch" expected=metadata.chunk_size actual=n_samples
-    end
-    
-    # Check for invalid values
-    if any(isnan.(chunk)) || any(isinf.(chunk))
-        @error "Chunk contains NaN or Inf values"
-        return nothing
-    end
-    
-    # Process chunk
-    try
-        result = process_chunk(session, chunk)
-        return result
-    catch e
-        @error "Chunk processing failed" exception=e
-        return nothing
-    end
-end
-
-# Usage in streaming loop
-for raw_chunk in eeg_stream
-    result = safe_process_chunk(session, raw_chunk, metadata)
-    
-    if !isnothing(result)
-        handle_prediction(result)
-    else
-        # Handle failed chunk
-        @warn "Skipping invalid chunk"
-    end
-end
-```
-
-## Warnings vs Errors
-
-NimbusSDK distinguishes between critical errors (throws exceptions) and warnings (logs but continues):
-
-### Errors (Execution Stops)
-- **NaN/Inf in data**: Cannot perform inference
-- **Dimension mismatches**: Incompatible with model
-- **Missing labels**: Cannot train without labels
-- **Invalid API key format**: Authentication fails
-
-### Warnings (Execution Continues)
-- **Low sampling rate**: Below recommended 250 Hz
-- **Very high sampling rate**: Unusually high (>10 kHz)
-- **Small/large feature std dev**: Potentially poor scaling
-- **Chunk size mismatch**: Unexpected chunk size
-- **Paradigm mismatch**: Data paradigm doesn't match model
-- **Large feature range**: Recommend standardization
-
-**Example: Handling Warnings**
-
-```julia
-using NimbusSDK
-using Logging
-
-# Configure logging to capture warnings
-logger = ConsoleLogger(stdout, Logging.Warn)
-
-with_logger(logger) do
-    # Low sampling rate triggers warning but continues
-    metadata = BCIMetadata(
-        sampling_rate = 128.0,  # Low!
-        n_features = 16,
-        n_classes = 4
-    )
-    # Warning: "Low sampling rate detected (128.0 Hz). Recommend ≥ 250 Hz..."
-    
-    data = BCIData(features, metadata)
-    results = predict_batch(model, data)  # Still works, but accuracy may suffer
-end
+```python
+if confidence >= 0.9:
+    execute(prediction)
+elif confidence >= 0.7:
+    request_confirmation(prediction)
+else:
+    reject_trial("low confidence")
 ```
 
 ## Preprocessing Diagnostics
 
-Use built-in diagnostics to identify data quality issues:
+When confidence is unexpectedly low, check data quality before tuning model hyperparameters.
 
 ```julia
-using NimbusSDK
+report = diagnose_preprocessing(bci_data)
 
-# Collect a diagnostic trial
-features = collect_your_eeg_trial()  # Your acquisition code
-metadata = BCIMetadata(...)
-data = BCIData(features, metadata)
-
-# Run diagnostics
-report = diagnose_preprocessing(data)
-
-# Check quality
-println("Quality Score: $(round(report.quality_score * 100, digits=1))%")
+if !isempty(report.errors)
+    error("Preprocessing failed: $(report.errors)")
+end
 
 if report.quality_score < 0.7
-    println("\n⚠️  Data quality issues detected:")
-    
-    # Show warnings
-    if !isempty(report.warnings)
-        for warning in report.warnings
-            println("  • $warning")
-        end
-    end
-    
-    # Show recommendations
-    if !isempty(report.recommendations)
-        println("\nRecommendations:")
-        for rec in report.recommendations
-            println("  • $rec")
-        end
-    end
-    
-    # Decide whether to proceed
-    if report.quality_score < 0.5
-        println("\n❌ Quality too low - cannot proceed")
-        exit(1)
-    else
-        println("\n⚠️  Proceeding with caution")
-    end
-else
-    println("✓ Data quality is acceptable")
+    @warn "Low preprocessing quality" score=report.quality_score
 end
 ```
 
-## Production Error Handling Pattern
+See [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) and [Feature Normalization](/inference-configuration/feature-normalization) for upstream fixes.
 
-Complete error handling for production systems:
+## Streaming Recovery
+
+Streaming systems should skip bad chunks, report error rates, and stop when consecutive errors exceed a safe limit.
 
 ```julia
-using NimbusSDK
-using Logging
+consecutive_errors = 0
+max_errors = 10
 
-function production_bci_inference(api_key::String, model_name::String, 
-                                  features::Array, metadata::BCIMetadata)
-    # 1. Authentication
+for chunk in stream
     try
-        NimbusSDK.install_core(api_key)
-    catch e
-        @error "Authentication failed" exception=e
-        return nothing
-    end
-    
-    # 2. Load model
-    local model
-    try
-        model = load_model(NimbusLDA, model_name)
-    catch e
-        @error "Failed to load model" model_name exception=e
-        return nothing
-    end
-    
-    # 3. Validate data
-    if !validate_bci_data(features, metadata)
-        @error "Data validation failed"
-        return nothing
-    end
-    
-    # 4. Create BCIData
-    local data
-    try
-        data = BCIData(features, metadata)
-    catch e
-        @error "Failed to create BCIData" exception=e
-        return nothing
-    end
-    
-    # 5. Check compatibility
-    if !check_compatibility(data, model)
-        @error "Model-data incompatibility"
-        return nothing
-    end
-    
-    # 6. Run inference
-    local results
-    try
-        results = predict_batch(model, data)
-    catch e
-        @error "Inference failed" exception=e
-        return nothing
-    end
-    
-    # 7. Validate results
-    if mean(results.confidences) < 0.5
-        @warn "Low average confidence" mean_conf=mean(results.confidences)
-    end
-    
-    return results
-end
+        validate_chunk(chunk, metadata)
+        result = process_chunk(session, chunk)
+        consecutive_errors = 0
+    catch err
+        consecutive_errors += 1
+        @warn "Skipping invalid chunk" exception=err
 
-# Usage
-results = production_bci_inference(
-    "your-api-key",
-    "motor_imagery_4class_v1",
-    features,
-    metadata
-)
-
-if !isnothing(results)
-    println("✓ Inference successful")
-    println("Accuracy: $(evaluate_accuracy(results))")
-else
-    println("❌ Inference pipeline failed - check logs")
+        if consecutive_errors >= max_errors
+            error("Stopping stream after repeated chunk failures")
+        end
+    end
 end
 ```
 
-## Streaming Error Recovery
+For chunk sizing and aggregation decisions, see [Streaming Inference Configuration](/inference-configuration/streaming-inference).
 
-Robust streaming with automatic recovery:
+## Julia Setup Errors
+
+For Julia SDK deployments:
+
+- Run `NimbusSDK.install_core(api_key)` during setup, not inside a hot inference loop.
+- Cache credentials/core installation where appropriate.
+- Handle missing or invalid API keys before starting acquisition.
+- Keep offline inference assumptions explicit in deployment docs.
 
 ```julia
 using NimbusSDK
 
-function robust_streaming_session(model, metadata, eeg_stream; 
-                                  max_consecutive_errors::Int=10)
-    session = init_streaming(model, metadata)
-    error_count = 0
-    total_chunks = 0
-    successful_chunks = 0
-    
-    for (i, raw_chunk) in enumerate(eeg_stream)
-        total_chunks += 1
-        
-        try
-            # Validate chunk dimensions
-            if size(raw_chunk, 1) != metadata.n_features
-                throw(DimensionMismatch("Feature count mismatch"))
-            end
-            
-            # Process chunk
-            result = process_chunk(session, raw_chunk)
-            
-            # Success - reset error counter
-            error_count = 0
-            successful_chunks += 1
-            
-            # Handle result
-            handle_bci_command(result)
-            
-        catch e
-            error_count += 1
-            @warn "Chunk processing failed" chunk=i exception=e
-            
-            if error_count >= max_consecutive_errors
-                @error "Too many consecutive errors - aborting session" 
-                break
-            end
-            
-            # Skip this chunk and continue
-            continue
-        end
-        
-        # Report progress periodically
-        if total_chunks % 100 == 0
-            success_rate = successful_chunks / total_chunks
-            println("Processed $total_chunks chunks ($(round(success_rate*100, digits=1))% success)")
-        end
-    end
-    
-    # Final report
-    println("\n=== Session Complete ===")
-    println("Total chunks: $total_chunks")
-    println("Successful: $successful_chunks")
-    println("Failed: $(total_chunks - successful_chunks)")
-end
-
-# Usage
-robust_streaming_session(model, metadata, eeg_stream)
-```
-
-## Logging Configuration
-
-Configure logging for different environments:
-
-```julia
-using Logging
-
-# Development: Verbose logging
-dev_logger = ConsoleLogger(stdout, Logging.Debug)
-
-# Production: Errors and warnings only
-prod_logger = ConsoleLogger(stdout, Logging.Warn)
-
-# Custom: Log to file
-function create_file_logger(path::String)
-    io = open(path, "w")
-    return ConsoleLogger(io, Logging.Info)
-end
-
-# Use logger
-global_logger(prod_logger)
-
-# Or use for specific blocks
-with_logger(dev_logger) do
-    # Detailed logging for this section
-    results = predict_batch(model, data)
+if !NimbusSDK.is_core_installed()
+    NimbusSDK.install_core(ENV["NIMBUS_API_KEY"])
 end
 ```
 
-## Troubleshooting Guide
+## Production Checklist
 
-### Common Issues and Solutions
+- Validate every calibration file before training.
+- Save model metadata, normalization parameters, and SDK versions.
+- Log prediction, confidence, posterior summary, latency, and rejection reason.
+- Separate classifier output from command execution.
+- Use stricter thresholds for safety-critical actions.
+- Monitor session-level confidence trends and rejection rates.
+- Provide a fallback path for stream loss, repeated bad chunks, or recalibration needs.
 
-| Issue | Symptom | Solution |
-|-------|---------|----------|
-| **NaN in predictions** | `results.predictions` contains NaN | Check input data for NaN/Inf values |
-| **Very low confidence** | All confidences < 0.3 | Run `diagnose_preprocessing()` - likely feature extraction issue |
-| **Dimension errors** | "Feature dimension mismatch" | Verify `n_features` matches your preprocessing output |
-| **Class mismatch** | "Model expects X classes" | Use correct model or verify your label encoding (1-indexed!) |
-| **Slow first inference** | First prediction takes seconds | Normal JIT compilation - run warmup inferences |
-| **Authentication fails** | Cannot validate API key | Check internet connection or use offline mode |
-| **Chunk size warnings** | "Chunk size mismatch" | Ensure all chunks have consistent size matching `chunk_size` |
+## Troubleshooting Quick Reference
 
-## Best Practices Summary
-
-<Card title="Error Handling Checklist" icon="check">
-  ✅ **Always validate data** before inference  
-  ✅ **Check compatibility** between model and data  
-  ✅ **Handle authentication errors** gracefully with offline fallback  
-  ✅ **Pre-allocate buffers** in real-time loops to avoid errors  
-  ✅ **Use try-catch** around critical operations  
-  ✅ **Log warnings** but continue execution when safe  
-  ✅ **Implement retry logic** for transient failures  
-  ✅ **Run preprocessing diagnostics** when confidence is low  
-  ✅ **Monitor error rates** in production systems  
-  ✅ **Test error paths** during development  
-</Card>
+| Issue | Likely Cause | Fix |
+| --- | --- | --- |
+| Accuracy near chance | Raw EEG or wrong feature band | Revisit preprocessing and feature extraction. |
+| Confidence always low | Poor normalization or noisy trial | Run diagnostics and reuse train normalization. |
+| Dimension mismatch | Feature count differs from metadata | Check export shape and model metadata. |
+| Works offline, fails streaming | Chunk shape or state handling | Validate chunks and reset sessions between trials. |
+| Cross-session drop | Electrode/session scale shift | Use saved normalization params. |
 
 ## Next Read
 
 <CardGroup cols={2}>
-  <Card title="Batch Processing" icon="layers" href="/inference-configuration/batch-processing">
-    Robust batch inference patterns
+  <Card title="Development Workflow" icon="code" href="/development">
+    Project structure and production guardrails.
   </Card>
-  <Card title="Streaming Inference" icon="signal" href="/inference-configuration/streaming-inference">
-    Real-time error recovery
+  <Card title="Streaming Configuration" icon="activity" href="/inference-configuration/streaming-inference">
+    Chunking, aggregation, and quality gates.
   </Card>
-  <Card title="Preprocessing Diagnostics" icon="stethoscope" href="/development/preprocessing-integration">
-    Debug data quality issues
+  <Card title="Preprocessing Requirements" icon="list-filter" href="/inference-configuration/preprocessing-requirements">
+    Prevent data-quality failures upstream.
   </Card>
-  <Card title="Code Examples" icon="code" href="/examples/basic-examples">
-    Working error handling examples
+  <Card title="Basic Examples" icon="play" href="/examples/basic-examples">
+    Compact recipes for common workflows.
   </Card>
 </CardGroup>
-
----
-
-<Note>
-**Tip**: Use `diagnose_preprocessing()` as your first debugging step when predictions are unexpectedly poor or confidence is low.
-</Note>

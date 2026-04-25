@@ -1,50 +1,28 @@
 ---
-title: "Probabilistic AI for BCI"
-description: "Learn how probabilistic AI improves BCI reliability with Bayesian inference, uncertainty quantification, and adaptive decision-making."
-keywords: ["probabilistic AI", "Bayesian inference", "uncertainty quantification", "BCI", "brain-computer interface", "adaptive systems", "posterior distributions", "confidence scores"]
+title: "Probabilistic AI & Uncertainty"
+description: "Learn how Nimbus uses Bayesian inference, posterior probabilities, confidence scores, and quality checks to make BCI systems more reliable."
+keywords: ["probabilistic AI", "Bayesian inference", "uncertainty quantification", "BCI", "posterior distributions", "confidence scores", "quality assessment"]
 icon: "star"
 ---
 
-# Probabilistic AI for Brain-Computer Interfaces
+# Probabilistic AI & Uncertainty
 
-Brain-computer interfaces operate in an inherently uncertain environment. Neural signals are noisy, brain states change dynamically, and individual differences create significant variability. Traditional deterministic approaches to BCI fail to capture this uncertainty, leading to brittle systems that break down when conditions change.
+Brain-computer interfaces operate in an uncertain environment. Neural signals are noisy, brain states change, and calibration data is often limited. Nimbus uses Bayesian inference to expose that uncertainty instead of hiding it behind a single overconfident prediction.
 
-Nimbus uses probabilistic AI to handle uncertainty naturally, providing robust, adaptive BCI systems that work reliably in real-world conditions.
-
-## The Uncertainty Challenge in BCI
-
-### Neural Signal Variability
-
-Brain signals are inherently noisy and variable:
+## Sources Of Uncertainty
 
 - **Signal-to-noise ratio**: Neural signals often have poor SNR, especially in non-invasive recordings
-- **Temporal dynamics**: Brain states change continuously, affecting signal patterns
-- **Individual differences**: Each person's brain produces unique signal characteristics
+- **Biological artifacts**: Eye blinks, muscle activity, cardiac signals, and movement can contaminate recordings
+- **Cognitive state**: Attention, fatigue, learning, and task engagement change signal patterns
+- **Limited calibration**: Small training sets increase model uncertainty for new users and sessions
+- **Temporal drift**: Brain and electrode conditions change during long sessions
 - **Environmental factors**: Movement, attention, fatigue all affect neural recordings
 
 <Warning>
 Traditional deterministic BCI systems assume clean, consistent signals. When these assumptions break down, the systems fail catastrophically with no indication of confidence or reliability.
 </Warning>
 
-### Why Deterministic Approaches Fail
-
-Most current BCI systems use deterministic classification that always returns a single answer with no uncertainty:
-
-**Traditional approach:**
-- Extract features from neural signals
-- Apply a classifier (SVM, LDA, etc.)
-- Return a single class prediction
-- No confidence measure or alternatives provided
-
-**Problems with this approach:**
-- **Overconfident predictions**: Always returns an answer, even with poor signal quality
-- **No adaptability**: Cannot adjust when brain states change
-- **Binary decisions**: Cannot express uncertainty or multiple possibilities
-- **Poor generalization**: Fails when conditions differ from training data
-
-## Probabilistic AI Solution
-
-### Bayesian Inference for BCI
+## Bayesian Inference For BCI
 
 Both SDKs use Bayesian inference to model uncertainty explicitly with production-ready models: Bayesian LDA, Bayesian QDA, Bayesian Softmax, and Bayesian STS (Python SDK).
 
@@ -71,10 +49,10 @@ for i, pred in enumerate(predictions):
     print(f"Confidence: {confidence:.3f}")
     print(f"Posterior distribution: {posterior}")
     print(f"Entropy: {entropy:.2f} bits")
-    
+
     # Make confidence-based decisions
     if confidence < 0.7:
-        print("⚠️  Low confidence - consider rejecting this trial")
+        print("Low confidence - consider rejecting this trial")
 ```
   </Tab>
   <Tab title="Julia">
@@ -96,10 +74,10 @@ for (i, pred) in enumerate(results.predictions)
     println("Prediction: $pred")
     println("Confidence: $(round(confidence, digits=3))")
     println("Posterior distribution: $(round.(posterior, digits=3))")
-    
+
     # Make confidence-based decisions
     if confidence < 0.7
-        println("⚠️  Low confidence - consider rejecting this trial")
+        println("Low confidence - consider rejecting this trial")
     end
 end
 ```
@@ -112,7 +90,7 @@ end
 - Can identify uncertain trials and request clarification
 - Gracefully handles poor signal quality
 
-### Key Advantages
+## What You Can Do With Uncertainty
 
 <Columns cols={2}>
   <Card title="Uncertainty Quantification" icon="gauge">
@@ -129,117 +107,62 @@ end
   </Card>
 </Columns>
 
-## Probabilistic Models for Neural Signals
+## Types Of Uncertainty
 
-### State-Space Models
+**Aleatoric uncertainty** is irreducible data uncertainty caused by noisy recordings, biological artifacts, or ambiguous signals. It is handled with quality checks, rejection thresholds, and better preprocessing.
 
-Neural signals can be modeled as observations from hidden brain states:
+**Epistemic uncertainty** is reducible model uncertainty caused by limited calibration data or unfamiliar sessions. It is reduced by collecting more labels, adapting online, or using active learning.
 
+## Confidence Measures
+
+Nimbus workflows commonly use:
+
+- **Maximum posterior probability**: confidence of the most likely class.
+- **Posterior entropy**: how spread out the class distribution is.
+- **Trial quality reports**: signal and preprocessing diagnostics.
+- **Calibration checks**: whether more labels are likely to improve the model.
+
+Example confidence-based decision:
+
+```julia
+using NimbusSDK
+
+confidence = results.confidences[end]
+posterior = results.posteriors[:, end]
+
+if confidence > 0.9
+    execute_command(results.predictions[end])
+elseif confidence > 0.7
+    show_confirmation_dialog(results.predictions[end], posterior)
+else
+    request_better_signal()
+end
 ```
-Hidden Brain State → Observable Neural Signal
-     ↓                        ↓
-  Intent/Command         EEG/EMG/etc.
-```
 
-This allows Nimbus to:
-- **Infer hidden states** from noisy observations
-- **Track state changes** over time
-- **Predict future states** for proactive responses
-- **Handle missing data** gracefully
+## Thresholds By Application
 
-### Hierarchical Models
-
-Brain activity operates at multiple scales:
-
-- **Local neural populations**: Individual electrode signals
-- **Regional networks**: Coordinated activity across brain regions  
-- **Global brain states**: Overall attention, arousal, cognitive load
-- **Behavioral intentions**: High-level goals and commands
-
-Nimbus models these hierarchical relationships probabilistically.
-
-## Real-World Benefits
-
-### Medical Applications
+- **Safety-critical control**: require very high confidence and confirmation.
+- **Communication aids**: balance speed with rejection and correction flows.
+- **Gaming and feedback**: lower thresholds can improve responsiveness.
+- **Research**: log posterior distributions and confidence trends for analysis.
 
 <Note>
-For FDA-approved medical devices, explainability is crucial. Probabilistic models provide transparent reasoning that clinicians can understand and trust.
+For medical and assistive applications, uncertainty logging is part of system reliability: store confidence scores, quality flags, model versions, and rejected trials alongside predictions.
 </Note>
 
-**Example: Assistive Communication Device**
+## Model Families
 
-```julia
-using NimbusSDK
+Nimbus exposes probabilistic model families through SDK-native APIs:
 
-# Assess signal quality for each trial
-quality = assess_trial_quality(results)
+- `NimbusLDA`: fast Bayesian pooled Gaussian classifier.
+- `NimbusQDA`: class-specific covariance model for more complex distributions.
+- `NimbusSoftmax`: Python Bayesian softmax model for non-Gaussian boundaries.
+- `NimbusProbit`: Julia Bayesian multinomial probit model.
+- `NimbusSTS`: Python state-space model for non-stationary data.
 
-# Adaptive responses based on confidence
-if quality.confidence_acceptable
-    # High confidence - execute command immediately
-    execute_command(results.predictions[end])
-elseif results.confidences[end] > 0.5
-    # Medium confidence - show top 2 alternatives
-    show_alternatives(results.predictions[end], results.posteriors[:, end])
-else
-    # Low confidence - request clearer signal
-    display_message("Please focus and try again")
-end
-```
+## How It Is Implemented
 
-### Consumer Applications
-
-**Example: Motor Imagery BCI for Gaming**
-
-```julia
-using NimbusSDK
-
-# Initialize streaming for real-time gaming
-session = init_streaming(model, metadata)
-
-# Process continuous stream with quality monitoring
-for chunk in game_stream
-    chunk_result = process_chunk(session, chunk)
-    
-    # Adaptive difficulty based on performance
-    if chunk_result.confidence > 0.85
-        # User performing well - increase challenge
-        increase_game_difficulty()
-    elseif chunk_result.confidence < 0.55
-        # User struggling - provide hints or reduce challenge
-        adjust_game_assistance()
-    end
-end
-```
-
-### Research Applications
-
-**Example: BCI Performance Tracking**
-
-```julia
-using NimbusSDK
-
-# Track performance metrics in real-time
-tracker = OnlinePerformanceTracker(window_size=50)
-
-for (prediction, true_label, confidence) in zip(results.predictions, labels, results.confidences)
-    metrics = update_and_report!(tracker, prediction, true_label, confidence)
-    
-    println("Running accuracy: $(round(metrics.accuracy * 100, digits=1))%")
-    println("Mean confidence: $(round(metrics.mean_confidence, digits=3))")
-    
-    # Provide adaptive feedback
-    if metrics.accuracy < 0.6
-        println("⚠️  Consider recalibration")
-    end
-end
-```
-
-## Technical Implementation
-
-### RxInfer.jl Message Passing
-
-NimbusSDK uses **RxInfer.jl** for efficient Bayesian inference through reactive message passing:
+The Julia SDK uses **RxInfer.jl** for efficient Bayesian inference through reactive message passing:
 
 1. **Factor graphs** represent probabilistic relationships between neural features and brain states
 2. **Variational message passing** propagates information efficiently through the graph
@@ -247,56 +170,22 @@ NimbusSDK uses **RxInfer.jl** for efficient Bayesian inference through reactive 
 4. **Automatic inference** - RxInfer generates efficient inference algorithms automatically
 
 <Tip>
-The mathematical details are handled automatically by RxInfer. NimbusSDK provides Bayesian LDA (NimbusLDA), Bayesian QDA (NimbusQDA), and Bayesian STS (NimbusSTS - Python only) models pre-configured for optimal BCI performance.
+The mathematical details are handled by SDK APIs. Use model pages for algorithm-specific details and API references for exact function signatures.
 </Tip>
 
-### Performance Characteristics
-
-NimbusSDK achieves:
-- **Real-time processing**: 10-25ms inference latency per trial
-- **Batch efficiency**: Process hundreds of trials in seconds
-- **Memory efficiency**: Fixed memory usage for streaming
-- **Scalability**: Handle 100+ features without performance degradation
-
-### Supported Models
-
-**Bayesian LDA (NimbusLDA) - Pooled Gaussian Classifier**
-- API Name: `NimbusLDA`
-- Shared covariance across classes
-- Fast inference and training
-- Best for well-separated classes
-- Typical accuracy: 70-90% (motor imagery)
-
-**Bayesian QDA (NimbusQDA) - Heteroscedastic Gaussian Classifier**
-- API Name: `NimbusQDA`
-- Class-specific covariances
-- More flexible for overlapping distributions
-- Slightly slower than Bayesian LDA
-- Better for complex distributions
-- Handles complex class structures
-- Slightly slower but more robust
-
-## Getting Started
-
-Ready to build probabilistic BCI applications? 
+## Next Read
 
 <CardGroup cols={2}>
-  <Card title="Quick Start Guide" icon="play" href="/quickstart">
-    Build your first probabilistic BCI model
+  <Card title="Model Selection" icon="brain" href="/model-specification">
+    Compare available probabilistic models.
   </Card>
   <Card title="Real-time Processing" icon="bolt" href="/core-concepts/real-time-processing">
-    Learn about ultra-low latency inference
+    Learn about low-latency inference.
   </Card>
-  <Card title="API Reference" icon="code" href="/cloud-api/introduction">
-    Explore the Nimbus API
+  <Card title="Error Handling" icon="shield" href="/inference-configuration/error-handling">
+    Build confidence-aware safeguards.
   </Card>
   <Card title="Examples" icon="list" href="/examples/basic-examples">
-    See probabilistic BCI in action
+    See uncertainty-aware BCI recipes.
   </Card>
 </CardGroup>
-
----
-
-<Note>
-**Next**: Learn how Nimbus achieves [real-time processing](/core-concepts/real-time-processing) with sub-20ms latency for responsive BCI applications.
-</Note>

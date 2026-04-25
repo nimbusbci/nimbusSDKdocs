@@ -60,7 +60,6 @@
         "pages": [
           "core-concepts/probabilistic-ai",
           "core-concepts/real-time-processing",
-          "core-concepts/uncertainty-handling",
           "core-concepts/message-passing"
         ]
       },
@@ -69,8 +68,8 @@
         "pages": [
           "models/rxlda",
           "models/rxgmm",
-          "models/nimbusprobit",
           "models/rxpolya",
+          "models/nimbusprobit",
           "models/rxsts",
           "model-specification"
         ]
@@ -119,10 +118,10 @@
         "pages": [
           "julia-sdk/quickstart",
           "julia-sdk/api-reference",
+          "julia-sdk/streaming-inference",
           "cloud-api/introduction",
           "cloud-api/authentication",
-          "cloud-api/inference-endpoints",
-          "cloud-api/streaming-api"
+          "cloud-api/inference-endpoints"
         ]
       }
     ]
@@ -142,11 +141,19 @@
     },
     {
       "source": "/api-reference/streaming-api",
-      "destination": "/cloud-api/streaming-api"
+      "destination": "/julia-sdk/streaming-inference"
     },
     {
       "source": "/api-reference/julia-sdk",
       "destination": "/julia-sdk/api-reference"
+    },
+    {
+      "source": "/cloud-api/streaming-api",
+      "destination": "/julia-sdk/streaming-inference"
+    },
+    {
+      "source": "/core-concepts/uncertainty-handling",
+      "destination": "/core-concepts/probabilistic-ai"
     }
   ],
   "anchors": [

@@ -71,21 +71,9 @@ Some GET endpoints also accept `?api_key=nbci_live_...` for compatibility. Avoid
 | **Model Registry** | Not available | Pre-trained models |
 | **Licensing** | Proprietary (free eval) | Commercial tiers |
 
-## Quick Start (Julia SDK)
+## SDK Setup
 
-```julia
-using NimbusSDK
-
-# Authentication is handled automatically by the SDK
-NimbusSDK.install_core("nbci_live_your_key_here")
-
-# The SDK communicates with the API for:
-# - Key validation
-# - Model downloads
-# - Usage logging (optional)
-```
-
-**Python SDK**: No API setup needed. Install with `pip install nimbus-bci` and start using immediately.
+This page documents the backend API scope and endpoint surface. For the Julia installation and first-inference walkthrough, use the [Julia SDK Quickstart](/julia-sdk/quickstart). For Python, no API setup is required; install `nimbus-bci` from the [Python SDK Quickstart](/python-sdk/quickstart).
 
 ## Endpoints Overview
 
