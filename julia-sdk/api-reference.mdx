@@ -362,7 +362,7 @@ train_model(ModelType, train_data::BCIData; kwargs...) -> Model
 - `train_data::BCIData` - Labeled training data (must include labels!)
 - `iterations::Int` - Number of inference iterations (default: 50)
 - `showprogress::Bool` - Show training progress (default: false)
-- `name::String` - Model name (default: `"untitled_model"`)
+- `name::String` - Model name (defaults are model-specific: `"custom_nimbus_lda"`, `"custom_nimbus_qda"`, or `"custom_nimbus_probit"`)
 - `description::String` - Model description (default: `""`)
 
 **Model-specific hyperparameters:**
@@ -380,7 +380,7 @@ train_model(ModelType, train_data::BCIData; kwargs...) -> Model
 
 <Note>
 Hyperparameters for each model type are documented in more detail on the corresponding model pages:
-`/models/rxlda`, `/models/rxgmm`, and `/models/rxpolya`.
+`/models/rxlda`, `/models/rxgmm`, and `/models/nimbusprobit`.
 </Note>
 
 **Example (NimbusLDA):**
@@ -606,14 +606,16 @@ Finalize a trial by aggregating results from all processed chunks.
 finalize_trial(
     session::StreamingSession;
     method::Symbol = :weighted_vote,
-    temporal_weighting::Bool = true
+    temporal_weighting::Bool = true,
+    label::Union{Int, Nothing} = nothing
 ) -> StreamingResult
 ```
 
 **Parameters:**
 - `session::StreamingSession` - Active streaming session
-- `method::Symbol` - Aggregation method (`:weighted_vote`, `:max_confidence`, `:unanimous`)
+- `method::Symbol` - Aggregation method (`:weighted_vote`, `:max_confidence`, `:posterior_mean`, `:unanimous`)
 - `temporal_weighting::Bool` - Apply paradigm-specific temporal weights (default: true)
+- `label::Union{Int, Nothing}` - Optional ground-truth label for calibration metrics
 
 **Returns:** `StreamingResult` with final prediction and diagnostics
 
@@ -622,6 +624,7 @@ struct StreamingResult
   prediction::Int                      # Aggregated prediction
   confidence::Float64                  # Aggregated confidence
   posterior::Vector{Float64}           # Aggregated posterior
+  chunk_posteriors::Vector{Vector{Float64}}  # Per-chunk posterior distributions
   entropy::Float64                     # Entropy of final posterior (bits)
   aggregation_method::Symbol           # Aggregation method used
   n_chunks::Int                        # Number of chunks in trial
@@ -713,10 +716,10 @@ diagnose_preprocessing(data::BCIData) -> PreprocessingReport
 **Returns:**
 ```julia
 struct PreprocessingReport
-    quality_score::Float64
     errors::Vector{String}
     warnings::Vector{String}
     recommendations::Vector{String}
+    quality_score::Float64
 end
 ```
 
@@ -740,7 +743,7 @@ compute_fisher_score(features::Matrix{Float64}, labels::Vector{Int}) -> Vector{F
 ```
 
 **Parameters:**
-- `features::Matrix{Float64}` - Feature matrix (n_features × n_samples)
+- `features::Matrix{Float64}` - Feature matrix (n_trials × n_features)
 - `labels::Vector{Int}` - Class labels
 
 **Returns:** Fisher scores for each feature (higher scores indicate better discriminability)
@@ -765,7 +768,7 @@ rank_features_by_discriminability(features::Matrix{Float64}, labels::Vector{Int}
 ```
 
 **Parameters:**
-- `features::Matrix{Float64}` - Feature matrix (n_features × n_samples)
+- `features::Matrix{Float64}` - Feature matrix (n_trials × n_features)
 - `labels::Vector{Int}` - Class labels
 
 **Returns:** Indices of features sorted by discriminability (most discriminative first)
@@ -790,6 +793,7 @@ aggregate_chunks(
     predictions::Vector{Int},
     confidences::Vector{Float64},
     n_classes::Int;
+    posteriors::Union{Vector{Vector{Float64}}, Nothing} = nothing,
     method::Symbol = :weighted_vote
 ) -> NamedTuple
 ```
@@ -798,7 +802,8 @@ aggregate_chunks(
 - `predictions::Vector{Int}` - Predictions from each chunk
 - `confidences::Vector{Float64}` - Confidences from each chunk
 - `n_classes::Int` - Number of classes
-- `method::Symbol` - Aggregation method (`:weighted_vote`, `:majority_vote`, `:max_confidence`)
+- `posteriors` - Optional full posterior distributions from each chunk
+- `method::Symbol` - Aggregation method (`:weighted_vote`, `:max_confidence`, `:posterior_mean`, `:unanimous`)
 
 **Returns:** Named tuple with `prediction`, `confidence`, and `posterior`
 

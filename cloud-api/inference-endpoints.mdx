@@ -41,7 +41,7 @@ List available pre-trained models based on your license tier.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `api_key` | string | Your Nimbus API key (required) |
+| `api_key` | string | Your Nimbus API key (supported for compatibility; prefer the `X-API-Key` header) |
 | `paradigm` | string | Filter by BCI paradigm: `motor_imagery`, `p300`, `ssvep` (optional) |
 | `type` | string | Filter by model type: `NimbusLDA`, `NimbusQDA`, `NimbusProbit` (optional) |
 
@@ -52,7 +52,8 @@ The model registry is used by the **Julia SDK** and currently includes `NimbusLD
 
 **Request:**
 ```bash
-curl "https://api.nimbusbci.com/v1/models/list?api_key=nbci_live_your_key"
+curl https://api.nimbusbci.com/v1/models/list \
+  -H "X-API-Key: nbci_live_your_key"
 ```
 
 **Response:**
@@ -86,7 +87,7 @@ curl "https://api.nimbusbci.com/v1/models/list?api_key=nbci_live_your_key"
       "n_features": 8,
       "n_classes": 2,
       "size_mb": 1.8,
-      "download_url": "https://models.nimbusbci.com/rxgmm/p300_binary_v1.jld2",
+      "download_url": "https://models.nimbusbci.com/qda/p300_binary_v1.jld2",
       "checksum": "sha256:def456...",
       "requires_license": "research",
       "metadata": {
@@ -120,15 +121,17 @@ curl "https://api.nimbusbci.com/v1/models/list?api_key=nbci_live_your_key"
 
 ```bash
 # Get only motor imagery models
-curl "https://api.nimbusbci.com/v1/models/list?api_key=nbci_live_...&paradigm=motor_imagery"
+curl "https://api.nimbusbci.com/v1/models/list?paradigm=motor_imagery" \
+  -H "X-API-Key: nbci_live_..."
 
 # Get only NimbusLDA models
-curl "https://api.nimbusbci.com/v1/models/list?api_key=nbci_live_...&type=NimbusLDA"
+curl "https://api.nimbusbci.com/v1/models/list?type=NimbusLDA" \
+  -H "X-API-Key: nbci_live_..."
 ```
 
 ### Using in Julia SDK
 
-The SDK automatically uses this endpoint when loading pre-trained models:
+Use this endpoint through `list_available_models()` to discover model names that your license can access:
 
 ```julia
 using NimbusSDK
@@ -136,10 +139,11 @@ using NimbusSDK
 # Authenticate
 NimbusSDK.install_core("nbci_live_your_key")
 
-# Load pre-trained model (SDK calls /v1/models/list internally)
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")
+# Discover available models
+models = list_available_models(model_type="NimbusLDA")
 
-# SDK downloads, verifies checksum, and caches the model locally
+# Load a bundled or local model by name/path
+model = load_model(NimbusLDA, "motor_imagery_4class_v1")
 ```
 
 ## Analytics & Logging
@@ -308,7 +312,7 @@ using NimbusSDK
 # 1. Authenticate
 NimbusSDK.install_core("nbci_live_your_key")
 
-# 2. Load pre-trained model (calls /v1/models/list)
+# 2. Load a bundled or local pre-trained model
 model = load_model(NimbusLDA, "motor_imagery_4class_v1")
 
 # 3. Run inference (local, no API call)
@@ -324,14 +328,17 @@ println("Accuracy: $(sum(results.predictions .== labels) / length(labels))")
 
 ```bash
 # Get all models your license allows
-curl -X GET "https://api.nimbusbci.com/v1/models/list?api_key=nbci_live_your_key" | jq '.models[] | {name, type, paradigm}'
+curl -X GET https://api.nimbusbci.com/v1/models/list \
+  -H "X-API-Key: nbci_live_your_key" \
+  | jq '.models[] | {name, type, paradigm}'
 ```
 
 ### Check Model Availability
 
 ```bash
 # Check if specific model is available
-curl -X GET "https://api.nimbusbci.com/v1/models/list?api_key=nbci_live_your_key" \
+curl -X GET https://api.nimbusbci.com/v1/models/list \
+  -H "X-API-Key: nbci_live_your_key" \
   | jq '.models[] | select(.name=="motor_imagery_4class_v1")'
 ```
 
@@ -367,19 +374,19 @@ The API only provides:
 - Pre-trained model distribution
 - Optional analytics collection
 
-### Model Caching
+### Model Loading
 
-Models are downloaded once and cached locally:
+`load_model()` loads bundled models or local `.jld2` files by name/path:
 
 ```julia
-# First call: downloads from API
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")  # ~2-3 seconds
+# Load a bundled model by name
+model = load_model(NimbusLDA, "motor_imagery_4class_v1")
 
-# Subsequent calls: loads from cache
-model = load_model(NimbusLDA, "motor_imagery_4class_v1")  # &lt;100ms
+# Load a local model file
+model = load_model(NimbusLDA, "my_model.jld2")
 ```
 
-Cache location: `~/.nimbus/models/`
+Use `/v1/models/list` or `list_available_models()` to discover the model catalog before loading an available model.
 
 ## Endpoints FAQ
 
@@ -390,8 +397,8 @@ Cache location: `~/.nimbus/models/`
   <Accordion title="Which endpoint is required first?" icon="arrow-right">
     Start with authentication (`/v1/auth/validate` via SDK setup), then use `/v1/models/list` to discover available models for your license tier.
   </Accordion>
-  <Accordion title="Why can model loading be fast after first use?" icon="clock">
-    Models are cached locally after the first download, so subsequent `load_model(...)` calls typically avoid network fetches and complete much faster.
+  <Accordion title="Why can model loading be fast?" icon="clock">
+    `load_model(...)` reads bundled or local `.jld2` model files, so inference setup avoids network latency after SDK installation and authentication.
   </Accordion>
 </AccordionGroup>
 

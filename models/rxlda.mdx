@@ -152,7 +152,7 @@ The Bayesian LDA model uses RxInfer.jl for variational Bayesian inference:
 
 **Learning Phase:**
 ```julia
-@model function RxLDA_learning_model(y, labels, n_features, n_classes, dof_offset, mean_prior_precision)
+@model function NimbusLDA_learning_model(y, labels, n_features, n_classes, dof_offset, mean_prior_precision)
     # Prior on shared precision
     dof = n_features + dof_offset
     W ~ Wishart(dof, I)
@@ -170,26 +170,33 @@ The Bayesian LDA model uses RxInfer.jl for variational Bayesian inference:
 end
 ```
 
-**Prediction Phase (Per-Class Likelihood):**
+**Prediction Phase (Mixture Likelihood):**
 
-To avoid mixture collapse with single observations, inference computes per-class likelihoods independently:
+Inference uses the learned posterior distributions as priors in a mixture model:
 
 ```julia
-@model function RxLDA_predictive_single_class(y, class_mean, class_precision)
-    n_features = length(class_mean)
+@model function NimbusLDA_predictive(y, empirical_priors, n_features)
+    n_classes = length(empirical_priors)
     
-    # Prior for this specific class (illustrative; actual implementation uses full posteriors)
-    m ~ MvNormalMeanPrecision(class_mean, 1e6 * I)
-    w ~ Wishart(n_features + 2, class_precision)
+    # Class means and shared precision are initialized from trained posteriors.
+    local m
+    for k in 1:n_classes
+        m[k] ~ MvNormal(mean=zeros(n_features), precision=I)
+    end
+
+    local p
+    for k in 1:n_classes
+        p[k] ~ Wishart(n_features + 2, I)
+    end
     
-    # Observations (no mixture variable)
+    z ~ Categorical(empirical_priors)
     for i in eachindex(y)
-        y[i] ~ MvNormal(mean=m, precision=w)
+        y[i] ~ NormalMixture(switch = z, m = m, p = p)
     end
 end
 ```
 
-For each class k, compute p(y | μ_k, W) independently, then combine using Bayes' rule with softmax normalization.
+The trained mean and precision posteriors are supplied through RxInfer initialization so uncertainty is carried into prediction.
 
 ## Usage
 
@@ -272,7 +279,7 @@ clf.fit(csp_features, labels)
 # Or train with custom hyperparameters
 clf_tuned = NimbusLDA(
     mu_scale=3.0,        # Prior strength for means (default: 1.0)
-    sigma_scale=1.0      # Covariance regularization (default: 1.0)
+    class_prior_alpha=1.0
 )
 clf_tuned.fit(csp_features, labels)
 
@@ -541,7 +548,7 @@ from nimbus_bci import NimbusLDA
 # Lower regularization for clean data
 clf = NimbusLDA(
     mu_scale=1.0,      # Weaker prior, trust data more
-    sigma_scale=0.1    # Less covariance regularization
+    class_prior_alpha=0.5
 )
 clf.fit(X_train, y_train)
 ```
@@ -577,7 +584,7 @@ from nimbus_bci import NimbusLDA
 # Higher regularization for noisy data
 clf = NimbusLDA(
     mu_scale=5.0,      # Stronger prior
-    sigma_scale=10.0   # More covariance regularization
+    class_prior_alpha=2.0
 )
 clf.fit(X_train, y_train)
 ```
@@ -634,7 +641,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 # Define parameter grid
 param_grid = {
     'mu_scale': [1.0, 3.0, 5.0, 10.0],
-    'sigma_scale': [0.1, 1.0, 10.0]
+    'class_prior_alpha': [0.5, 1.0, 2.0]
 }
 
 # Split data
@@ -656,7 +663,7 @@ grid_search.fit(X_train_sub, y_train_sub)
 
 print("\nBest hyperparameters:")
 print(f"  mu_scale: {grid_search.best_params_['mu_scale']}")
-print(f"  sigma_scale: {grid_search.best_params_['sigma_scale']}")
+print(f"  class_prior_alpha: {grid_search.best_params_['class_prior_alpha']}")
 print(f"  CV accuracy: {grid_search.best_score_*100:.1f}%")
 
 # Get best model
@@ -869,14 +876,17 @@ Accuracy is highly subject-dependent. Subject-specific calibration typically imp
 ```python
 import numpy as np
 
-# Class means
-print("Class means:")
-for k, class_label in enumerate(clf.classes_):
-    print(f"  Class {class_label}: {clf.model_['means'][k]}")
+params = clf.model_.params
 
-# Shared covariance matrix (first 3x3)
-print("\nShared covariance matrix (first 3x3):")
-print(clf.model_['covariance'][:3, :3])
+# Posterior class means
+print("Posterior class means:")
+for k, class_label in enumerate(clf.classes_):
+    print(f"  Class {class_label}: {params['mu'][k]}")
+
+# Shared Normal-Wishart posterior parameters
+print("\nShared precision posterior:")
+print(f"  nu: {params['nu']}")
+print(f"  psi shape: {params['psi'].shape}")
 
 # Model info
 print("\nModel info:")
@@ -885,8 +895,9 @@ print(f"  Classes: {clf.classes_}")
 
 # Class priors (learned from data)
 print("\nClass priors:")
+priors = np.exp(params["log_priors"])
 for k, class_label in enumerate(clf.classes_):
-    print(f"  Class {class_label}: {clf.model_['priors'][k]:.3f}")
+    print(f"  Class {class_label}: {priors[k]:.3f}")
 ```
   </Tab>
   <Tab title="Julia">
@@ -1030,7 +1041,7 @@ end
 
 **Implementation:**
 - RxInfer.jl: https://rxinfer.com/
-- Source code: `/src/models/rxlda/` in NimbusSDK.jl
+- Source code: `src/models/nimbus_lda/` in NimbusSDKCore
 
 **Theory:**
 - Fisher, R. A. (1936). "The use of multiple measurements in taxonomic problems"

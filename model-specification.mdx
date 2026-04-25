@@ -196,18 +196,22 @@ best_clf = grid.best_estimator_
 
 ```julia
 # Grid search over hyperparameters
-mu_scales = [1.0, 3.0, 5.0, 7.0]
+mean_prior_precisions = [0.001, 0.01, 0.05, 0.1]
 best_accuracy = 0.0
 best_params = nothing
 
-for mu_scale in mu_scales
-    model = train_model(NimbusLDA, train_data; mu_scale=mu_scale)
+for mean_prior_precision in mean_prior_precisions
+    model = train_model(
+        NimbusLDA,
+        train_data;
+        mean_prior_precision=mean_prior_precision
+    )
     results = predict_batch(model, val_data)
     accuracy = sum(results.predictions .== val_data.labels) / length(val_data.labels)
     
     if accuracy > best_accuracy
         best_accuracy = accuracy
-        best_params = (mu_scale=mu_scale,)
+        best_params = (mean_prior_precision=mean_prior_precision,)
     end
 end
 ```

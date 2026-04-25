@@ -1,6 +1,8 @@
 # Nimbus Docs
 
-This repo contains the documentation site for **Nimbus** (MDX pages + Mintlify configuration).
+Documentation for Nimbus SDKs and APIs across Julia and Python, covering probabilistic inference, BCI workflows, preprocessing, authentication, batch and streaming inference, and integrations.
+
+These docs support language-specific model APIs, including cases where Julia and Python expose different model names or interfaces.
 
 ## Local development
 

@@ -26,9 +26,6 @@
     },
     {
       "apiKeyHeader": []
-    },
-    {
-      "apiKeyBody": []
     }
   ],
   "components": {
@@ -44,12 +41,6 @@
         "in": "header",
         "name": "X-API-Key",
         "description": "API key in header"
-      },
-      "apiKeyBody": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "Content-Type",
-        "description": "API key in request body (application/json)"
       }
     },
     "schemas": {
@@ -618,7 +609,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Nimbus API key (can also be provided via header or POST body)"
+            "description": "Nimbus API key. Prefer the X-API-Key header or POST request body when possible; query parameters can be logged by intermediaries."
           }
         ],
         "security": [
@@ -721,11 +712,11 @@
           {
             "name": "api_key",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
-            "description": "Nimbus API key"
+            "description": "Nimbus API key. Prefer X-API-Key header authentication; query parameters can be logged by intermediaries."
           },
           {
             "name": "paradigm",

@@ -19,7 +19,7 @@ This guide walks you through installation, basic usage, sklearn integration, and
 
 Before you begin:
 
-- **Python ≥ 3.10** installed
+- **Python ≥ 3.11** installed
 - **Basic understanding** of EEG data and BCI concepts
 - **Preprocessed features** (CSP, bandpower, etc.) - see [preprocessing requirements](/inference-configuration/preprocessing-requirements)
 
@@ -171,12 +171,47 @@ print("Model updated with new data")
 </Info>
   </Step>
 
+  <Step title="Optional: Active Learning">
+Use active learning to label only the most informative calibration trials:
+
+```python
+from nimbus_bci.active_learning import calibration_sufficient, suggest_next_trial
+
+previous = clf.get_model()
+
+ranked = suggest_next_trial(
+    clf,
+    X_pool,
+    strategy="bald",
+    n=4,
+    num_posterior_samples=256,
+)
+
+# Cue and label the selected pool rows, then update.
+X_new, y_new = collect_labels_for(ranked.indices)
+clf.partial_fit(X_new, y_new)
+
+status = calibration_sufficient(
+    clf,
+    X_pool,
+    criterion="posterior_stability",
+    previous=previous,
+    threshold=0.02,
+)
+```
+
+<Tip>
+Active learning expects feature rows shaped `(n_trials, n_features)`. See [Active Learning](/python-sdk/active-learning) for strategy guidance and stopping criteria.
+</Tip>
+  </Step>
+
   <Step title="Batch Inference with Diagnostics">
 Use batch inference for comprehensive diagnostics:
 
 ```python
 from nimbus_bci import predict_batch, NimbusLDA
 from nimbus_bci.data import BCIData, BCIMetadata
+import numpy as np
 
 # Train model
 clf = NimbusLDA()
@@ -191,9 +226,10 @@ metadata = BCIMetadata(
     n_classes=4
 )
 
-# X_test should be shape (n_features, n_samples, n_trials) for BCIData
-# For this example, reshape: (n_trials, n_features) -> (n_features, 1, n_trials)
-X_test_reshaped = X_test.T[:, np.newaxis, :]
+# BCIData expects (n_features, n_samples, n_trials). predict_batch()
+# requires at least 2 time samples, so duplicate tabular features across
+# a short temporal axis for this synthetic example.
+X_test_reshaped = np.repeat(X_test.T[:, np.newaxis, :], 2, axis=1)
 data = BCIData(X_test_reshaped, metadata)
 
 # Run batch inference
@@ -261,7 +297,7 @@ print(f"Entropy: {final.entropy:.2f} bits")
 Try different Bayesian models:
 
 ```python
-from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusSTS
+from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSTS
 
 # Bayesian LDA (shared covariance)
 clf_lda = NimbusLDA()
@@ -271,19 +307,20 @@ clf_lda.fit(X_train, y_train)
 clf_qda = NimbusQDA()
 clf_qda.fit(X_train, y_train)
 
-# Bayesian Softmax (Polya-Gamma VI)
-clf_softmax = NimbusSoftmax()
-clf_softmax.fit(X_train, y_train)
-
 # Bayesian STS (temporal state dynamics for non-stationary data)
 clf_sts = NimbusSTS(transition_cov=0.05)
 clf_sts.fit(X_train, y_train)
 
 # Compare performance
-for name, clf in [("LDA", clf_lda), ("QDA", clf_qda),
-                   ("Softmax", clf_softmax), ("STS", clf_sts)]:
+for name, clf in [("LDA", clf_lda), ("QDA", clf_qda), ("STS", clf_sts)]:
     score = clf.score(X_test, y_test)
     print(f"{name}: {score:.2%}")
+```
+
+`NimbusSoftmax` is also available for non-Gaussian decision boundaries after installing the optional extra:
+
+```bash
+pip install nimbus-bci[softmax]
 ```
 
 | Model | Best For | Speed | Statefulness |
@@ -355,7 +392,7 @@ with open("model_with_state.pkl", "wb") as f:
 ```
 
 <Info>
-**Key Difference**: Unlike static models (LDA, GMM, Softmax), NimbusSTS maintains a **latent state** that evolves over time, allowing it to adapt to non-stationary distributions. Use `propagate_state()` to explicitly advance time.
+**Key Difference**: Unlike static models (LDA, QDA, Softmax), NimbusSTS maintains a **latent state** that evolves over time, allowing it to adapt to non-stationary distributions. Use `propagate_state()` to explicitly advance time.
 </Info>
 
 ## MNE-Python Integration
@@ -407,8 +444,9 @@ probs = clf.predict_proba(X_test)
 preds = clf.predict(X_test)
 
 # Entropy (uncertainty)
-entropy = compute_entropy(probs)
-print(f"Mean entropy: {entropy.mean():.2f} bits")
+mean_entropy = compute_entropy(probs)
+trial_entropy = compute_entropy(probs[0])
+print(f"Mean entropy: {mean_entropy:.2f} bits")
 
 # Calibration metrics
 calib = compute_calibration_metrics(preds, probs.max(axis=1), y_test)
@@ -420,8 +458,12 @@ itr = calculate_itr(accuracy=accuracy, n_classes=4, trial_duration=4.0)
 print(f"ITR: {itr:.1f} bits/min")
 
 # Quality assessment
-quality = assess_trial_quality(probs, entropy)
-print(f"Quality: {quality.overall_quality}")
+quality = assess_trial_quality(
+    X_test[0],
+    confidence=float(probs[0].max()),
+    entropy=trial_entropy
+)
+print(f"Trial accepted: {quality.is_valid}")
 ```
 
 ## Feature Normalization
@@ -516,12 +558,12 @@ prediction = pipe.predict(new_trial.reshape(1, -1))[0]
 ```python
 from nimbus_bci import NimbusQDA
 
-# GMM works better for P300 (overlapping distributions)
+# QDA often works well for P300 (overlapping distributions)
 clf = NimbusQDA()
 clf.fit(erp_features, labels)  # 0=non-target, 1=target
 
 # Predict with confidence
-probs = clf.predict_proba(new_epochs)
+probs = clf.predict_proba(new_erp_features)
 high_confidence = probs[:, 1] > 0.8  # Target probability > 80%
 ```
 
@@ -536,13 +578,14 @@ clf.fit(X_calibration, y_calibration)
 
 # During use: adapt to user
 for trial in online_session:
-    prediction = clf.predict(trial.features)
+    trial_features = trial.features.reshape(1, -1)
+    prediction = clf.predict(trial_features)[0]
     
     # Get feedback (e.g., from user or task)
     true_label = get_feedback()
     
     # Update model
-    clf.partial_fit(trial.features.reshape(1, -1), [true_label])
+    clf.partial_fit(trial_features, [true_label])
 ```
 
 ## Quickstart FAQ
@@ -574,14 +617,14 @@ for trial in online_session:
     Try these improvements:
     - Normalize features with `estimate_normalization_params()`
     - Tune hyperparameters with `GridSearchCV`
-    - Use appropriate model (LDA for MI, GMM for P300)
+    - Use appropriate model (LDA for MI, QDA for P300)
     - Check preprocessing quality with `diagnose_preprocessing()`
   </Accordion>
   
   <Accordion title="Slow Inference" icon="clock">
     For faster inference:
     - Use batch prediction instead of single samples
-    - Ensure JAX is using CPU/GPU efficiently
+    - Install `nimbus-bci[softmax]` only if you need the optional JAX-based Softmax model
     - Consider using NimbusLDA (fastest) if appropriate
   </Accordion>
 </AccordionGroup>

@@ -1,7 +1,7 @@
 ---
 title: "Python SDK Installation"
 description: "Install and verify the nimbus-bci Python SDK with pip, dependencies, and setup checks for local BCI development."
-keywords: ["installation", "Python SDK", "nimbus-bci", "pip install", "Python setup", "BCI installation", "dependencies", "Python 3.10"]
+keywords: ["installation", "Python SDK", "nimbus-bci", "pip install", "Python setup", "BCI installation", "dependencies", "Python 3.11"]
 icon: "download"
 ---
 
@@ -13,7 +13,7 @@ Install the nimbus-bci Python SDK from PyPI and verify your setup.
 
 Before installing, ensure you have:
 
-- **Python ≥ 3.10** (Python 3.10, 3.11, or 3.12)
+- **Python ≥ 3.11** (Python 3.11, 3.12, or 3.13)
 - **pip** package manager
 - **64-bit system** (Linux, macOS, or Windows)
 
@@ -31,9 +31,8 @@ pip install nimbus-bci
 
 This installs the core package with all required dependencies:
 - NumPy ≥ 1.26
-- JAX ≥ 0.4.25
-- NumPyro ≥ 0.14.0
 - scikit-learn ≥ 1.4
+- SciPy ≥ 1.17.1
 
 ## Optional Dependencies
 
@@ -49,7 +48,6 @@ pip install nimbus-bci[mne]
 
 This adds:
 - MNE ≥ 1.6
-- SciPy ≥ 1.12
 
 ### Visualization
 
@@ -61,6 +59,17 @@ pip install nimbus-bci[viz]
 
 This adds:
 - Matplotlib ≥ 3.8
+
+### Softmax Model
+
+For the optional JAX-based `NimbusSoftmax` model:
+
+```bash
+pip install nimbus-bci[softmax]
+```
+
+This adds:
+- JAX ≥ 0.4.25
 
 ### All Optional Dependencies
 
@@ -96,9 +105,9 @@ Test your installation:
 import nimbus_bci
 print(f"nimbus-bci version: {nimbus_bci.__version__}")
 
-# Check available classifiers
-from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusSTS
-print("✓ All classifiers imported successfully")
+# Check available core classifiers
+from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSTS
+print("✓ Core classifiers imported successfully")
 
 # Quick test
 import numpy as np
@@ -112,8 +121,8 @@ print("✓ Basic functionality works")
 Expected output:
 
 ```
-nimbus-bci version: 0.2.7
-✓ All classifiers imported successfully
+nimbus-bci version: 0.4.1
+✓ Core classifiers imported successfully
 ✓ Basic functionality works
 ```
 
@@ -130,7 +139,7 @@ pip install nimbus-bci
 
 ### Linux
 
-Pre-built wheels for x86_64 (manylinux2014):
+Pre-built wheels for x86_64 and aarch64 use the manylinux_2_28 platform tag:
 
 ```bash
 pip install nimbus-bci
@@ -152,14 +161,14 @@ pip install nimbus-bci
 
 ### JAX Installation Issues
 
-If JAX installation fails, install it separately first:
+JAX is only required for `NimbusSoftmax`. If JAX installation fails, install it separately first:
 
 ```bash
 # CPU-only JAX
 pip install jax[cpu]
 
-# Then install nimbus-bci
-pip install nimbus-bci
+# Then install the softmax extra
+pip install nimbus-bci[softmax]
 ```
 
 For GPU support, see [JAX installation guide](https://github.com/google/jax#installation).
@@ -170,14 +179,12 @@ If you see import errors, verify dependencies:
 
 ```python
 import numpy
-import jax
-import numpyro
 import sklearn
+import scipy
 
 print(f"NumPy: {numpy.__version__}")
-print(f"JAX: {jax.__version__}")
-print(f"NumPyro: {numpyro.__version__}")
 print(f"scikit-learn: {sklearn.__version__}")
+print(f"SciPy: {scipy.__version__}")
 ```
 
 All versions should meet minimum requirements.

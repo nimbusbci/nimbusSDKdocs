@@ -113,20 +113,36 @@ probs = clf.predict_proba(X_test)
 
 Bayesian Multinomial Logistic Regression (Polya-Gamma VI).
 
+Install the optional extra before using this model:
+
+```bash
+pip install nimbus-bci[softmax]
+```
+
 ```python
 from nimbus_bci import NimbusSoftmax
 
 clf = NimbusSoftmax(
     w_loc=0.0,
     w_scale=1.0,
-    class_prior_alpha=1.0
+    b_loc=0.0,
+    b_scale=1.0,
+    learning_rate=0.2,
+    num_steps=50,
+    num_posterior_samples=50,
+    rng_seed=0
 )
 ```
 
 **Parameters:**
 - `w_loc` (float, default=0.0): Prior mean for weights
 - `w_scale` (float, default=1.0): Prior scale for weights
-- `class_prior_alpha` (float, default=1.0): Dirichlet smoothing
+- `b_loc` (float, default=0.0): Prior mean for biases
+- `b_scale` (float, default=1.0): Prior scale for biases
+- `learning_rate` (float, default=0.2): Damping factor for variational updates
+- `num_steps` (int, default=50): Number of variational update sweeps
+- `num_posterior_samples` (int, default=50): Number of posterior samples for prediction
+- `rng_seed` (int, default=0): Random seed for reproducibility
 
 **Methods:**
 - Same as NimbusLDA
@@ -292,14 +308,14 @@ Container for BCI features, metadata, and labels.
 from nimbus_bci.data import BCIData
 
 data = BCIData(
-    features,      # (n_features, n_samples, n_trials)
+    features,      # (n_features, n_samples, n_trials) or (n_features, n_samples)
     metadata,      # BCIMetadata instance
     labels=None    # Optional labels
 )
 ```
 
 **Parameters:**
-- `features` (np.ndarray): Feature array of shape `(n_features, n_samples, n_trials)`
+- `features` (np.ndarray): Feature array of shape `(n_features, n_samples, n_trials)` for multiple trials or `(n_features, n_samples)` for one trial
 - `metadata` (BCIMetadata): Metadata describing the data
 - `labels` (np.ndarray, optional): Trial labels
 
@@ -308,7 +324,6 @@ data = BCIData(
 - `metadata`: Metadata object
 - `labels`: Labels (if provided)
 - `n_trials`: Number of trials
-- `n_features`: Number of features
 - `n_samples`: Number of samples per trial
 
 ### BCIMetadata
@@ -325,18 +340,18 @@ metadata = BCIMetadata(
     n_features=16,
     n_classes=4,
     chunk_size=None,
-    temporal_aggregation=None
+    temporal_aggregation="mean"
 )
 ```
 
 **Parameters:**
 - `sampling_rate` (float): Sampling rate in Hz
-- `paradigm` (str): BCI paradigm ("motor_imagery", "p300", "ssvep")
-- `feature_type` (str): Feature type ("csp", "bandpower", "erp")
+- `paradigm` (str): BCI paradigm (`"motor_imagery"`, `"p300"`, `"ssvep"`, `"erp"`, or `"custom"`)
+- `feature_type` (str): Feature type (`"raw"`, `"csp"`, `"bandpower"`, `"erp_amplitude"`, or `"custom"`)
 - `n_features` (int): Number of features
 - `n_classes` (int): Number of classes
 - `chunk_size` (int, optional): Chunk size for streaming
-- `temporal_aggregation` (str, optional): Aggregation method ("mean", "logvar", "rms")
+- `temporal_aggregation` (str, default="mean"): Aggregation method (`"mean"`, `"logvar"`, `"last"`, `"max"`, `"median"`, `"var"`, or `"std"`)
 
 ## Inference
 
@@ -350,27 +365,26 @@ from nimbus_bci import predict_batch
 result = predict_batch(
     model,           # Trained model
     data,            # BCIData instance
-    return_probs=True,
-    return_entropy=True,
-    return_diagnostics=True
+    num_posterior_samples=50,
+    rng_seed=0
 )
 ```
 
 **Parameters:**
 - `model` (NimbusModel): Trained Nimbus model
 - `data` (BCIData): Data to predict on
-- `return_probs` (bool, default=True): Return probabilities
-- `return_entropy` (bool, default=True): Return entropy
-- `return_diagnostics` (bool, default=True): Return diagnostics
+- `num_posterior_samples` (int, default=50): Posterior samples for softmax models
+- `rng_seed` (int, default=0): Random seed for softmax prediction
 
 **Returns:**
-- `BatchResult`: Result object with predictions, probabilities, entropy, and diagnostics
+- `BatchResult`: Result object with predictions, posteriors, entropy, and diagnostics
 
 **Example:**
 
 ```python
 from nimbus_bci import predict_batch, NimbusLDA
 from nimbus_bci.data import BCIData, BCIMetadata
+import numpy as np
 
 clf = NimbusLDA()
 clf.fit(X_train, y_train)
@@ -382,10 +396,14 @@ metadata = BCIMetadata(
     n_features=16,
     n_classes=4
 )
+
+# BCIData expects (n_features, n_samples, n_trials).
+# Duplicate tabular test features across a short temporal axis for this example.
+features = np.repeat(X_test.T[:, np.newaxis, :], 2, axis=1)
 data = BCIData(features, metadata)
 
 result = predict_batch(clf.model_, data)
-print(f"Accuracy: {(result.predictions == labels).mean():.2%}")
+print(f"Accuracy: {(result.predictions == y_test).mean():.2%}")
 print(f"Mean entropy: {result.mean_entropy:.2f} bits")
 ```
 
@@ -444,9 +462,9 @@ Result from processing a single chunk.
 
 **Attributes:**
 - `prediction` (int): Predicted class
-- `probabilities` (np.ndarray): Class probabilities
 - `confidence` (float): Confidence (max probability)
-- `entropy` (float): Entropy in bits
+- `posterior` (np.ndarray): Class posterior probabilities
+- `latency_ms` (float): Processing latency in milliseconds
 
 ### StreamingResult
 
@@ -454,11 +472,16 @@ Result from finalizing a trial.
 
 **Attributes:**
 - `prediction` (int): Final predicted class
-- `probabilities` (np.ndarray): Aggregated probabilities
 - `confidence` (float): Final confidence
+- `posterior` (np.ndarray): Aggregated posterior probabilities
+- `chunk_posteriors` (list): Posterior from each chunk
 - `entropy` (float): Final entropy
-- `chunk_predictions` (list): Predictions from each chunk
 - `aggregation_method` (str): Method used for aggregation
+- `n_chunks` (int): Number of chunks processed
+- `latency_ms` (float): Total trial inference latency
+- `chunk_latencies_ms` (list): Latency for each chunk
+- `balance` (float): Class balance across chunks
+- `calibration` (CalibrationMetrics or None): Calibration metrics if a label was provided
 
 ### BatchResult
 
@@ -466,12 +489,16 @@ Result from batch inference.
 
 **Attributes:**
 - `predictions` (np.ndarray): Predicted classes
-- `probabilities` (np.ndarray): Class probabilities
+- `confidences` (np.ndarray): Maximum posterior probability per trial
+- `posteriors` (np.ndarray): Class posterior probabilities
 - `entropy` (np.ndarray): Entropy per trial
 - `mean_entropy` (float): Mean entropy
+- `mahalanobis_distances` (np.ndarray): Distance to each class center
+- `outlier_scores` (np.ndarray): Outlier score per trial
 - `balance` (float): Class balance
 - `latency_ms` (float): Inference latency
-- `calibration` (CalibrationMetrics): Calibration metrics
+- `per_trial_latency_ms` (np.ndarray): Estimated latency per trial
+- `calibration` (CalibrationMetrics or None): Calibration metrics if labels were provided
 
 ## Metrics
 
@@ -489,7 +516,7 @@ entropy = compute_entropy(probabilities)  # bits
 - `probabilities` (np.ndarray): Probability distributions
 
 **Returns:**
-- `np.ndarray`: Entropy in bits
+- `float`: Entropy in bits. For a 2D probability matrix, this is the mean entropy across rows.
 
 ### compute_calibration_metrics()
 
@@ -545,16 +572,21 @@ Assess quality of predictions.
 from nimbus_bci import assess_trial_quality
 
 quality = assess_trial_quality(
-    probabilities,
-    entropy,
+    features,
+    confidence,
+    entropy=entropy,
     confidence_threshold=0.7
 )
 ```
 
 **Parameters:**
-- `probabilities` (np.ndarray): Class probabilities
-- `entropy` (np.ndarray): Entropy values
-- `confidence_threshold` (float, default=0.7): Threshold for quality
+- `features` (np.ndarray): Trial features to check for NaN/Inf artifacts
+- `confidence` (float): Prediction confidence in `[0, 1]`
+- `confidence_threshold` (float, default=0.6): Minimum confidence for accepting prediction
+- `outlier_threshold` (float, default=5.0): Maximum outlier score for accepting prediction
+- `entropy` (float, optional): Prediction entropy in bits
+- `outlier_score` (float, optional): Mahalanobis-based outlier score
+- `entropy_threshold` (float, default=1.5): Maximum entropy for accepting prediction
 
 **Returns:**
 - `TrialQuality`: Object with quality metrics
@@ -587,15 +619,13 @@ from nimbus_bci import estimate_normalization_params
 
 params = estimate_normalization_params(
     X,
-    method="zscore",  # or "minmax", "robust"
-    axis=0
+    method="zscore"  # or "minmax", "robust"
 )
 ```
 
 **Parameters:**
 - `X` (np.ndarray): Data array
 - `method` (str): Normalization method
-- `axis` (int): Axis to normalize along
 
 **Returns:**
 - `NormalizationParams`: Parameters for normalization
@@ -625,16 +655,12 @@ Diagnose preprocessing quality.
 from nimbus_bci import diagnose_preprocessing
 
 report = diagnose_preprocessing(
-    features,
-    labels,
-    sampling_rate=250.0
+    bci_data
 )
 ```
 
 **Parameters:**
-- `features` (np.ndarray): Feature array
-- `labels` (np.ndarray): Labels
-- `sampling_rate` (float): Sampling rate
+- `data` (BCIData): Data to diagnose
 
 **Returns:**
 - `PreprocessingReport`: Diagnostic report
@@ -706,15 +732,13 @@ from nimbus_bci.compat import extract_csp_features
 
 features, csp = extract_csp_features(
     epochs,
-    n_components=8,
-    log=True
+    n_components=8
 )
 ```
 
 **Parameters:**
 - `epochs` (mne.Epochs): MNE Epochs object
 - `n_components` (int): Number of CSP components
-- `log` (bool): Apply log transform
 
 **Returns:**
 - `features` (np.ndarray): CSP features
@@ -727,20 +751,20 @@ Extract bandpower features from MNE Epochs.
 ```python
 from nimbus_bci.compat import extract_bandpower_features
 
-features = extract_bandpower_features(
+features, band_names = extract_bandpower_features(
     epochs,
     bands={"mu": (8, 12), "beta": (13, 30)},
-    method="welch"
+    log_transform=True
 )
 ```
 
 **Parameters:**
 - `epochs` (mne.Epochs): MNE Epochs object
 - `bands` (dict): Frequency bands
-- `method` (str): Method ("welch" or "multitaper")
+- `log_transform` (bool, default=True): Apply log transform to band powers
 
 **Returns:**
-- `np.ndarray`: Bandpower features
+- `tuple[np.ndarray, list[str]]`: Bandpower features and band names
 
 ### create_bci_pipeline()
 
@@ -748,18 +772,21 @@ Create complete BCI pipeline with MNE and nimbus-bci.
 
 ```python
 from nimbus_bci.compat import create_bci_pipeline
+from nimbus_bci import NimbusLDA
 
 pipeline = create_bci_pipeline(
-    classifier="lda",
+    NimbusLDA,
+    feature_extraction="csp",
     n_csp_components=8,
-    bands=(8, 30)
 )
 ```
 
 **Parameters:**
-- `classifier` (str): Classifier type ("lda", "gmm", "softmax")
-- `n_csp_components` (int): Number of CSP components
-- `bands` (tuple): Frequency band (low, high)
+- `model_class` (class): Classifier class (`NimbusLDA`, `NimbusQDA`, or `NimbusSoftmax`)
+- `preprocessor` (str, default="standard"): Preprocessing method (`"standard"`, `"robust"`, or `None`)
+- `feature_extraction` (str, optional): Feature extraction method (`"csp"` or `None`)
+- `n_csp_components` (int, default=8): Number of CSP components
+- `**model_kwargs`: Additional arguments passed to the classifier
 
 **Returns:**
 - `sklearn.pipeline.Pipeline`: Complete pipeline
@@ -775,9 +802,20 @@ from nimbus_bci import (
     nimbus_lda_predict_proba,
     nimbus_lda_update
 )
+import numpy as np
 
 # Fit
-model = nimbus_lda_fit(X, y, n_classes=4, label_base=0)
+model = nimbus_lda_fit(
+    X,
+    y,
+    n_classes=4,
+    label_base=0,
+    mu_loc=0.0,
+    mu_scale=3.0,
+    wishart_df=X.shape[1] + 2,
+    wishart_scale=np.eye(X.shape[1]),
+    class_prior_alpha=1.0,
+)
 
 # Predict
 probs = nimbus_lda_predict_proba(model, X_test)
@@ -787,22 +825,35 @@ preds = nimbus_lda_predict(model, X_test)
 model = nimbus_lda_update(model, X_new, y_new)
 ```
 
-### GMM Functions
+### QDA Functions
 
 ```python
 from nimbus_bci import (
-    nimbus_gmm_fit,
-    nimbus_gmm_predict,
-    nimbus_gmm_predict_proba,
-    nimbus_gmm_update
+    nimbus_qda_fit,
+    nimbus_qda_predict,
+    nimbus_qda_predict_proba,
+    nimbus_qda_update
 )
+import numpy as np
 
-# Same API as LDA functions
-model = nimbus_gmm_fit(X, y, n_classes=4, label_base=0)
-probs = nimbus_gmm_predict_proba(model, X_test)
+# Fit
+model = nimbus_qda_fit(
+    X,
+    y,
+    n_classes=4,
+    label_base=0,
+    mu_loc=0.0,
+    mu_scale=3.0,
+    wishart_df=X.shape[1] + 2,
+    wishart_scale=np.eye(X.shape[1]),
+    class_prior_alpha=1.0,
+)
+probs = nimbus_qda_predict_proba(model, X_test)
 ```
 
 ### Softmax Functions
+
+These functions require the optional `softmax` extra.
 
 ```python
 from nimbus_bci import (
@@ -812,9 +863,28 @@ from nimbus_bci import (
     nimbus_softmax_update
 )
 
-# Same API as LDA functions
-model = nimbus_softmax_fit(X, y, n_classes=4, label_base=0)
-probs = nimbus_softmax_predict_proba(model, X_test)
+# Fit
+model = nimbus_softmax_fit(
+    X,
+    y,
+    n_classes=4,
+    label_base=0,
+    w_loc=0.0,
+    w_scale=1.0,
+    b_loc=0.0,
+    b_scale=1.0,
+    rng_seed=0,
+    learning_rate=0.2,
+    num_steps=50,
+)
+
+# Predict
+probs = nimbus_softmax_predict_proba(
+    model,
+    X_test,
+    num_posterior_samples=50,
+    rng_seed=1,
+)
 ```
 
 ### STS Functions
@@ -862,6 +932,182 @@ nimbus_save(model, "model.npz")
 # Load model
 model = nimbus_load("model.npz")
 ```
+
+## Active Learning
+
+Active learning helpers reduce calibration cost by ranking unlabeled feature rows, deciding whether streaming trials are worth labeling, and stopping calibration when the model posterior stabilizes.
+
+```python
+from nimbus_bci.active_learning import (
+    CalibrationStatus,
+    QueryResult,
+    StreamingQueryDecision,
+    calibration_sufficient,
+    should_query,
+    suggest_next_trial,
+)
+```
+
+All helpers accept either a fitted Nimbus classifier (`NimbusLDA`, `NimbusQDA`, `NimbusSoftmax`, `NimbusSTS`) or a raw `NimbusModel` snapshot.
+
+<Info>
+Active learning expects preprocessed features. Use `X_pool` shaped `(n_pool, n_features)` for pool-based ranking and stopping, and `x_new` shaped `(n_features,)` or `(1, n_features)` for streaming query decisions.
+</Info>
+
+### `suggest_next_trial()`
+
+Rank an unlabeled feature pool by informativeness and return the top `n` candidates.
+
+```python
+suggest_next_trial(
+    model,
+    X_pool,
+    *,
+    strategy="bald",
+    n=1,
+    num_posterior_samples=256,
+    rng_seed=0,
+) -> QueryResult
+```
+
+**Parameters:**
+- `model` (`NimbusModel` or fitted Nimbus classifier): Model used to score candidates
+- `X_pool` (`np.ndarray`): Unlabeled feature rows with shape `(n_pool, n_features)`
+- `strategy` (`"entropy"`, `"margin"`, `"least_confidence"`, or `"bald"`, default=`"bald"`): Informativeness criterion
+- `n` (int, default=`1`): Number of candidates to return
+- `num_posterior_samples` (int, default=`256`): Posterior samples for `bald`; also forwarded to `NimbusSoftmax` probability estimates
+- `rng_seed` (int, default=`0`): Deterministic seed for posterior sampling
+
+**Returns:** `QueryResult`
+- `indices`: Top-`n` indices into `X_pool`, sorted from most to least informative
+- `scores`: Raw informativeness score for each row in `X_pool`
+- `strategy`: Strategy used
+- `n_posterior_samples`: Posterior samples used (`1` for cheap strategies)
+
+```python
+ranked = suggest_next_trial(
+    clf,
+    X_pool,
+    strategy="bald",
+    n=4,
+    num_posterior_samples=256,
+)
+
+X_new, y_new = collect_labels_for(ranked.indices)
+clf.partial_fit(X_new, y_new)
+```
+
+<Note>
+`strategy="bald"` is supported for `NimbusLDA`, `NimbusQDA`, and `NimbusSoftmax`. `NimbusSTS` supports only the cheap strategies in this release.
+</Note>
+
+### `should_query()`
+
+Decide whether a single arriving trial is informative enough to label.
+
+```python
+should_query(
+    model,
+    x_new,
+    *,
+    strategy="entropy",
+    threshold=...,
+    num_posterior_samples=50,
+    rng_seed=0,
+) -> StreamingQueryDecision
+```
+
+**Parameters:**
+- `model` (`NimbusModel` or fitted Nimbus classifier): Model used to score the trial
+- `x_new` (`np.ndarray`): Single feature row with shape `(n_features,)` or `(1, n_features)`
+- `strategy` (`"entropy"`, `"margin"`, or `"least_confidence"`, default=`"entropy"`): Cheap informativeness strategy
+- `threshold` (float): Query cutoff
+- `num_posterior_samples` (int, default=`50`): Forwarded to `NimbusSoftmax` probability estimates
+- `rng_seed` (int, default=`0`): Deterministic seed for `NimbusSoftmax`
+
+**Returns:** `StreamingQueryDecision`
+- `should_query`: Whether the trial should be labeled
+- `score`: Raw informativeness score
+- `threshold`: Threshold used
+- `strategy`: Strategy used
+
+```python
+decision = should_query(
+    clf,
+    x_new,
+    strategy="entropy",
+    threshold=1.0,
+)
+
+if decision.should_query:
+    request_label(x_new)
+```
+
+<Warning>
+`should_query()` does not support `strategy="bald"`. Single-point BALD is too noisy; batch trials and call `suggest_next_trial(strategy="bald")` instead.
+</Warning>
+
+### `calibration_sufficient()`
+
+Decide whether calibration can stop based on a label-free criterion evaluated over the same unlabeled pool.
+
+```python
+calibration_sufficient(
+    model,
+    X_pool,
+    *,
+    criterion="posterior_stability",
+    previous=None,
+    threshold=...,
+    num_posterior_samples=64,
+    rng_seed=0,
+) -> CalibrationStatus
+```
+
+**Parameters:**
+- `model` (`NimbusModel` or fitted Nimbus classifier): Current model snapshot
+- `X_pool` (`np.ndarray`): Unlabeled feature rows with shape `(n_pool, n_features)`
+- `criterion` (`"posterior_stability"` or `"expected_info_gain"`, default=`"posterior_stability"`): Stopping signal
+- `previous` (`NimbusModel` or fitted Nimbus classifier, optional): Previous model snapshot, required for `posterior_stability`
+- `threshold` (float): Stop when the signal is below this value
+- `num_posterior_samples` (int, default=`64`): Posterior samples for `expected_info_gain`; forwarded to `NimbusSoftmax`
+- `rng_seed` (int, default=`0`): Deterministic seed
+
+**Returns:** `CalibrationStatus`
+- `is_sufficient`: `True` when the stopping signal is below `threshold`
+- `signal`: Mean total variation for `posterior_stability`, or mean BALD in bits for `expected_info_gain`
+- `threshold`: Threshold used
+- `criterion`: Criterion used
+- `details`: Criterion-specific diagnostics such as `max_tv`, `min_tv`, `max_bald`, or `min_bald`
+
+```python
+previous = clf.get_model()
+
+# ... collect labels and call clf.partial_fit(...)
+
+status = calibration_sufficient(
+    clf,
+    X_pool,
+    criterion="posterior_stability",
+    previous=previous,
+    threshold=0.02,
+)
+
+if status.is_sufficient:
+    stop_calibration()
+```
+
+`posterior_stability` works for every Nimbus head, including `NimbusSTS`. `expected_info_gain` uses BALD and is supported for `NimbusLDA`, `NimbusQDA`, and `NimbusSoftmax`.
+
+### Strategy Units
+
+| Quantity | Range | Used by |
+| --- | --- | --- |
+| `entropy` | `[0, log2(n_classes)]` bits | `suggest_next_trial()`, `should_query()` |
+| `bald` | `[0, log2(n_classes)]` bits | `suggest_next_trial()`, `calibration_sufficient(criterion="expected_info_gain")` |
+| `margin` | `[0, 1]` probability gap | `suggest_next_trial()`, `should_query()` |
+| `least_confidence` | `[0, 1 - 1/n_classes]` | `suggest_next_trial()`, `should_query()` |
+| `posterior_stability` | `[0, 1]` mean total variation | `calibration_sufficient()` |
 
 ## Type Hints
 

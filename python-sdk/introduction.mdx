@@ -7,7 +7,7 @@ icon: "python"
 
 # Python SDK
 
-The **nimbus-bci** Python library provides sklearn-compatible Bayesian classifiers for Brain-Computer Interface applications. Built on JAX and NumPyro, it delivers fast probabilistic inference with full uncertainty quantification, streaming support, and rich diagnostics.
+The **nimbus-bci** Python library provides sklearn-compatible Bayesian classifiers for Brain-Computer Interface applications. It delivers local probabilistic inference with uncertainty quantification, streaming support, and rich diagnostics. The optional `NimbusSoftmax` model uses JAX and is available with `pip install nimbus-bci[softmax]`.
 
 ## Start Here
 
@@ -31,6 +31,10 @@ The **nimbus-bci** Python library provides sklearn-compatible Bayesian classifie
 pip install nimbus-bci
 ```
 
+<Note>
+**New in `nimbus-bci` 0.4.1:** active-learning helpers for label-efficient calibration, including `suggest_next_trial()`, `should_query()`, and `calibration_sufficient()`. See [Active Learning](/python-sdk/active-learning).
+</Note>
+
 ## Key Features
 
 <CardGroup cols={2}>
@@ -48,6 +52,9 @@ pip install nimbus-bci
   </Card>
   <Card title="Online Learning" icon="graduation-cap">
     Update models incrementally with `partial_fit()` without retraining from scratch.
+  </Card>
+  <Card title="Active Learning" icon="target" href="/python-sdk/active-learning">
+    Rank unlabeled trials, request labels only when useful, and stop calibration when the posterior stabilizes.
   </Card>
   <Card title="Fully Local" icon="lock">
     No API keys required. All processing happens on your machine for maximum privacy.
@@ -104,7 +111,7 @@ Both SDKs implement the same Bayesian models but with different design philosoph
 | **Installation** | `pip install nimbus-bci` | `Pkg.add("NimbusSDK")` + API key |
 | **API Style** | sklearn-compatible classes | Functional + types |
 | **Integration** | sklearn pipelines, MNE-Python | RxInfer.jl ecosystem |
-| **Performance** | Fast (JAX/NumPyro) | Fastest (native Julia) |
+| **Performance** | Fast local Python implementation; optional JAX Softmax | Fastest (native Julia) |
 | **API Key** | Not required | Required |
 | **Use Case** | Production ML pipelines | Research, custom models |
 | **License** | Proprietary (free evaluation) | Commercial tiers |
@@ -140,7 +147,7 @@ EEG Data → MNE-Python → nimbus-bci → Your Application
 - **Local Processing**: All computation happens on your machine
 - **Privacy First**: Your EEG data never leaves your computer
 - **sklearn Compatible**: Works with existing ML workflows
-- **Fast Inference**: JAX-compiled for performance
+- **Fast Inference**: Efficient local inference, with optional JAX support for `NimbusSoftmax`
 - **Uncertainty Aware**: Full Bayesian posterior distributions
 
 ## Use Cases
@@ -178,6 +185,11 @@ The `nimbus-bci` package provides:
 - `predict_batch()` - Batch inference with diagnostics
 - `StreamingSession` - Real-time chunk processing
 
+**Active Learning:**
+- `suggest_next_trial()` - Rank unlabeled feature pools by informativeness
+- `should_query()` - Decide whether an arriving trial is worth labeling
+- `calibration_sufficient()` - Stop calibration when the posterior stabilizes
+
 **Metrics:**
 - `compute_entropy()` - Prediction uncertainty
 - `compute_calibration_metrics()` - ECE/MCE
@@ -205,6 +217,9 @@ The `nimbus-bci` package provides:
   </Card>
   <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
     Complete API documentation with examples
+  </Card>
+  <Card title="Active Learning" icon="target" href="/python-sdk/active-learning">
+    Reduce calibration time with label-efficient trial selection
   </Card>
   <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">
     Use nimbus-bci with MNE-Python

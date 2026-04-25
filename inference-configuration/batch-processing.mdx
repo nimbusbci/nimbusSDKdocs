@@ -346,7 +346,7 @@ for (pred, true_label, conf) in zip(results.predictions, labels, results.confide
     metrics = update_and_report!(tracker, pred, true_label, conf)
     
     # Print running metrics every 10 trials
-    if length(tracker.recent_correct) % 10 == 0
+    if length(tracker.predictions) % 10 == 0
         println("Running accuracy: $(round(metrics.accuracy * 100, digits=1))%")
     end
 end
@@ -358,7 +358,6 @@ println("\n=== Session Metrics ===")
 println("Accuracy: $(round(final_metrics.accuracy * 100, digits=1))%")
 println("ITR: $(round(final_metrics.information_transfer_rate, digits=1)) bits/min")
 println("Mean confidence: $(round(final_metrics.mean_confidence, digits=3))")
-println("Mean latency: $(round(final_metrics.mean_latency_ms, digits=1)) ms")
 ```
 
 ## Quality Assessment
@@ -434,10 +433,10 @@ using NimbusSDK
 
 # Train multiple models
 rxlda = train_model(NimbusLDA, train_data; iterations=50)
-rxgmm = train_model(NimbusQDA, train_data; iterations=50)
+qda_model = train_model(NimbusQDA, train_data; iterations=50)
 
 # Test both models
-models = [rxlda, rxgmm]
+models = [rxlda, qda_model]
 model_names = ["NimbusLDA", "NimbusQDA"]
 
 println("=== Model Comparison ===")

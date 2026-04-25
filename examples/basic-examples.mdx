@@ -224,8 +224,8 @@ clf_lda = NimbusLDA(mu_scale=3.0)
 clf_lda.fit(X_train, y_train)
 
 # Or train NimbusQDA model (more flexible, class-specific covariances)
-clf_gmm = NimbusQDA(mu_scale=3.0)
-clf_gmm.fit(X_train, y_train)
+clf_qda = NimbusQDA(mu_scale=3.0)
+clf_qda.fit(X_train, y_train)
 
 # Save trained model
 with open("my_motor_imagery_lda.pkl", "wb") as f:
@@ -276,12 +276,12 @@ rxlda_model = train_model(
 )
 
 # Or train NimbusQDA model (more flexible, class-specific covariances)
-rxgmm_model = train_model(
+qda_model = train_model(
     NimbusQDA,
     train_data;
     iterations = 50,
     showprogress = true,
-    name = "my_motor_imagery_gmm"
+    name = "my_motor_imagery_qda"
 )
 
 # Save trained model
@@ -306,7 +306,7 @@ Detect target vs non-target stimuli:
 <Tabs>
   <Tab title="Python">
 ```python
-from nimbus_bci import NimbusQDA  # GMM often better for P300
+from nimbus_bci import NimbusQDA  # QDA often works well for P300
 import numpy as np
 import mne
 
@@ -336,7 +336,7 @@ p300_window = (times >= 0.25) & (times <= 0.5)
 # Extract features: mean amplitude per channel in P300 window
 features = np.mean(data[:, ch_indices, :][:, :, p300_window], axis=2)
 
-# Train classifier (GMM better for P300's overlapping distributions)
+# Train classifier (QDA handles P300's overlapping distributions well)
 clf = NimbusQDA()
 clf.fit(features, labels)
 
@@ -1061,15 +1061,15 @@ clf_lda = NimbusLDA()
 clf_lda.fit(X_train, y_train)
 
 print("\nTraining NimbusQDA...")
-clf_gmm = NimbusQDA()
-clf_gmm.fit(X_train, y_train)
+clf_qda = NimbusQDA()
+clf_qda.fit(X_train, y_train)
 
 # Test both models
 print("\n" + "=" * 50)
 print("Model Comparison")
 print("=" * 50)
 
-for clf, name in [(clf_lda, "NimbusLDA"), (clf_gmm, "NimbusQDA")]:
+for clf, name in [(clf_lda, "NimbusLDA"), (clf_qda, "NimbusQDA")]:
     predictions = clf.predict(X_test)
     probabilities = clf.predict_proba(X_test)
     
@@ -1103,14 +1103,14 @@ println("Training NimbusLDA...")
 rxlda = train_model(NimbusLDA, train_data; iterations=50, showprogress=true)
 
 println("\nTraining NimbusQDA...")
-rxgmm = train_model(NimbusQDA, train_data; iterations=50, showprogress=true)
+qda_model = train_model(NimbusQDA, train_data; iterations=50, showprogress=true)
 
 # Test both models
 println("\n" * "="^50)
 println("Model Comparison")
 println("="^50)
 
-for (model, name) in [(rxlda, "NimbusLDA"), (rxgmm, "NimbusQDA")]
+for (model, name) in [(rxlda, "NimbusLDA"), (qda_model, "NimbusQDA")]
     results = predict_batch(model, test_data)
     accuracy = sum(results.predictions .== test_labels) / length(test_labels)
     mean_conf = mean(results.confidences)

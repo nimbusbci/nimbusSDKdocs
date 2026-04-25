@@ -70,7 +70,7 @@ for i, chunk in enumerate(eeg_stream):
     print(f"Chunk {i+1}:")
     print(f"  Prediction: class {result.prediction}")
     print(f"  Confidence: {result.confidence:.2%}")
-    print(f"  Entropy: {result.entropy:.2f} bits")
+    print(f"  Posterior: {result.posterior}")
 ```
 
 ### 4. Finalize Trial
@@ -82,7 +82,8 @@ final = session.finalize_trial(method="weighted_vote")
 
 print(f"\nFinal Prediction: class {final.prediction}")
 print(f"Final Confidence: {final.confidence:.2%}")
-print(f"Chunk predictions: {final.chunk_predictions}")
+print(f"Final Entropy: {final.entropy:.2f} bits")
+print(f"Chunks processed: {final.n_chunks}")
 ```
 
 ### 5. Reset for Next Trial
@@ -169,22 +170,22 @@ final = session.finalize_trial(method="majority_vote")
 
 Each chunk gets equal weight regardless of confidence.
 
-### Last Chunk
+### Max Confidence
 
-Use only the most recent chunk:
+Use the chunk with the highest confidence:
 
 ```python
-final = session.finalize_trial(method="last_chunk")
+final = session.finalize_trial(method="max_confidence")
 ```
 
-Useful when later chunks are more informative.
+Useful when one chunk is much cleaner or more informative than the rest.
 
-### Average Probabilities
+### Posterior Mean
 
 Average probability distributions:
 
 ```python
-final = session.finalize_trial(method="average_probs")
+final = session.finalize_trial(method="posterior_mean")
 ```
 
 Smooth predictions across all chunks.
@@ -217,14 +218,14 @@ metadata = BCIMetadata(
 )
 ```
 
-### RMS (Root Mean Square)
+### Variance And Standard Deviation
 
 For power-based features:
 
 ```python
 metadata = BCIMetadata(
     # ... other params ...
-    temporal_aggregation="rms"
+    temporal_aggregation="var"  # or "std"
 )
 ```
 
@@ -317,8 +318,9 @@ while True:
         # Get raw EEG chunk
         raw_chunk = acquire_eeg_chunk(duration=0.5)
         
-        # Apply CSP transform
-        csp_chunk = csp.transform(raw_chunk)
+        # Convert raw EEG into the same feature space used for training.
+        # This should return (n_features, chunk_size), matching metadata.
+        csp_chunk = extract_streaming_csp_chunk(raw_chunk, csp)
         
         # Process chunk
         result = session.process_chunk(csp_chunk)
@@ -352,7 +354,7 @@ clf.fit(erp_features, labels)  # 0=non-target, 1=target
 metadata = BCIMetadata(
     sampling_rate=250.0,
     paradigm="p300",
-    feature_type="erp",
+    feature_type="erp_amplitude",
     n_features=32,
     n_classes=2,
     chunk_size=50,  # 200ms chunks
@@ -395,14 +397,14 @@ for i in range(0, len(chunks), batch_size):
 Extract features offline when possible:
 
 ```python
-# Pre-compute CSP transform
-csp_transformer = fit_csp(calibration_data)
+# Pre-compute or load your feature extractor
+feature_extractor = fit_realtime_feature_extractor(calibration_data)
 
-# During streaming, just apply transform
+# During streaming, produce chunks shaped (n_features, chunk_size)
 while streaming:
     raw_chunk = acquire_eeg()
-    csp_chunk = csp_transformer.transform(raw_chunk)  # Fast
-    result = session.process_chunk(csp_chunk)
+    feature_chunk = feature_extractor.transform_chunk(raw_chunk)
+    result = session.process_chunk(feature_chunk)
 ```
 
 ### Optimize Chunk Size
@@ -411,10 +413,26 @@ Balance latency vs. accuracy:
 
 ```python
 # Smaller chunks = lower latency, less accurate
-metadata_fast = BCIMetadata(chunk_size=62)  # 250ms
+metadata_fast = BCIMetadata(
+    sampling_rate=250.0,
+    paradigm="motor_imagery",
+    feature_type="csp",
+    n_features=16,
+    n_classes=4,
+    chunk_size=62,  # 250ms
+    temporal_aggregation="logvar"
+)
 
 # Larger chunks = higher latency, more accurate
-metadata_accurate = BCIMetadata(chunk_size=250)  # 1000ms
+metadata_accurate = BCIMetadata(
+    sampling_rate=250.0,
+    paradigm="motor_imagery",
+    feature_type="csp",
+    n_features=16,
+    n_classes=4,
+    chunk_size=250,  # 1000ms
+    temporal_aggregation="logvar"
+)
 
 # Find sweet spot for your application
 ```
@@ -544,7 +562,7 @@ session.reset()
 
 ### Key Differences: STS vs Static Models
 
-| Feature | StreamingSessionSTS (NimbusSTS) | StreamingSession (LDA/GMM/Softmax) |
+| Feature | StreamingSessionSTS (NimbusSTS) | StreamingSession (LDA/QDA/Softmax) |
 |---------|----------------------------------|-------------------------------------|
 | **State Management** | ✅ Automatic state propagation | ❌ Stateless |
 | **Drift Adaptation** | ✅ Adapts to temporal changes | ❌ Fixed parameters |
@@ -595,8 +613,8 @@ for trial_data in online_trials:
     true_label = wait_for_feedback()
     
     # Update model with feedback (adapts to user)
-    # Aggregate chunks back to trial level
-    trial_features = aggregate_chunks(trial_data.chunks)
+    # Aggregate chunks back to trial-level features with your preprocessing pipeline
+    trial_features = aggregate_trial_features(trial_data.chunks)
     clf.partial_fit(trial_features.reshape(1, -1), [true_label])
     
     # Reset session for next trial

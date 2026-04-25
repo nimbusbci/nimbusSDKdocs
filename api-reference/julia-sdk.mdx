@@ -389,7 +389,7 @@ train_model(ModelType, train_data::BCIData; kwargs...) -> Model
 
 <Note>
 Hyperparameters for each model type are documented in more detail on the corresponding model pages:
-`/models/rxlda`, `/models/rxgmm`, and `/models/rxpolya`.
+`/models/rxlda`, `/models/rxgmm`, and `/models/nimbusprobit`.
 </Note>
 
 **Example (NimbusLDA):**
@@ -621,7 +621,7 @@ finalize_trial(
 
 **Parameters:**
 - `session::StreamingSession` - Active streaming session
-- `method::Symbol` - Aggregation method (`:weighted_vote`, `:max_confidence`, `:unanimous`)
+- `method::Symbol` - Aggregation method (`:weighted_vote`, `:max_confidence`, `:posterior_mean`, `:unanimous`)
 - `temporal_weighting::Bool` - Apply paradigm-specific temporal weights (default: true)
 
 **Returns:** `StreamingResult` with final prediction and diagnostics
@@ -807,7 +807,7 @@ aggregate_chunks(
 - `predictions::Vector{Int}` - Predictions from each chunk
 - `confidences::Vector{Float64}` - Confidences from each chunk
 - `n_classes::Int` - Number of classes
-- `method::Symbol` - Aggregation method (`:weighted_vote`, `:majority_vote`, `:max_confidence`)
+- `method::Symbol` - Aggregation method (`:weighted_vote`, `:max_confidence`, `:posterior_mean`, `:unanimous`)
 
 **Returns:** Named tuple with `prediction`, `confidence`, and `posterior`
 

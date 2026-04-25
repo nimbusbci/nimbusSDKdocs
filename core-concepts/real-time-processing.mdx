@@ -11,7 +11,7 @@ Real-time performance is critical for brain-computer interfaces. Users expect im
 
 <Note>
 **Implementation differences:**
-- **Python SDK**: Uses JAX/NumPyro for fast Bayesian inference
+- **Python SDK**: Uses optimized local Python/scientific-computing implementations, with optional JAX support for `NimbusSoftmax`
 - **Julia SDK**: Uses RxInfer.jl with reactive message passing
 
 Both achieve similar latencies (~10-25ms) with different technical approaches.
@@ -343,12 +343,12 @@ For optimal latency, deploy NimbusSDK locally:
   <Tab title="Python SDK">
 
 **Minimum:**
-- Python 3.9+
+- Python 3.11+
 - 4GB RAM
 - Modern CPU (Intel i5 or equivalent)
 
 **Recommended:**
-- Python 3.10+
+- Python 3.11+
 - 8GB RAM
 - Fast CPU (Intel i7 or equivalent)
 - SSD for data loading
@@ -389,13 +389,13 @@ true_labels = np.random.randint(0, 4, 50)
 confidences = np.random.uniform(0.5, 1.0, 50)
 
 for pred, label, conf in zip(predictions, true_labels, confidences):
-    metrics = tracker.update_and_report(pred, label, conf)
+    metrics = tracker.update(pred, label, conf)
 
 # Get comprehensive metrics
 full_metrics = tracker.get_metrics(n_classes=4, trial_duration=4.0)
 
 print(f"Accuracy: {full_metrics['accuracy'] * 100:.1f}%")
-print(f"ITR: {full_metrics['information_transfer_rate']:.1f} bits/min")
+print(f"ITR: {full_metrics['itr']:.1f} bits/min")
 print(f"Mean confidence: {full_metrics['mean_confidence']:.3f}")
 ```
   </Tab>
@@ -430,20 +430,24 @@ Identify trials with poor signal quality:
 from nimbus_bci import assess_trial_quality, should_reject_trial
 
 # Assess each trial's quality
-# Assume 'result' is from predict_proba or StreamingSession
+# Assume trial_features is the feature array for the current trial
 confidence = 0.65
+trial_features = X_test[0]
 
-quality = assess_trial_quality(confidence)
+quality = assess_trial_quality(
+    trial_features,
+    confidence,
+    confidence_threshold=0.7
+)
 
-if not quality["confidence_acceptable"]:
-    print(f"⚠️ Trial quality below threshold: {quality['overall_score']:.2f}")
-    print(f"Recommendation: {quality['recommendation']}")
+if not quality.is_valid:
+    print(f"Trial rejected: {quality.rejection_reason}")
 
 # Check if rejection is warranted
 if should_reject_trial(confidence, threshold=0.7):
-    print("⚠️  Low confidence trial - consider rejecting")
+    print("Low confidence trial - consider rejecting")
 else:
-    print("✓ Trial quality acceptable")
+    print("Trial quality acceptable")
 ```
   </Tab>
   <Tab title="Julia">

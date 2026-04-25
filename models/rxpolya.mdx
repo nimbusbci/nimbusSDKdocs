@@ -10,7 +10,7 @@ icon: "brain"
 **Python**: `NimbusSoftmax` | **Julia**: `NimbusProbit`  
 **Model family**: Non-Gaussian multinomial classification with uncertainty quantification
 
-Bayesian Softmax is a Bayesian multinomial classification model with uncertainty quantification. It uses **continuous transitions** to map features to a latent space for probabilistic classification, making it ideal for complex multinomial tasks.
+The Bayesian multinomial family provides non-Gaussian classification with uncertainty quantification. In Python, `NimbusSoftmax` uses Polya-Gamma variational inference. In Julia, `NimbusProbit` uses Bayesian multinomial probit regression.
 
 <Note>
 **Availability**
@@ -34,7 +34,7 @@ Bayesian Softmax is a Bayesian multinomial classification model with uncertainty
 
 ## Overview
 
-Bayesian Softmax provides a powerful alternative to traditional Gaussian classifiers:
+Bayesian multinomial models provide powerful alternatives to traditional Gaussian classifiers:
 ✅ **Full Bayesian inference** with posterior probability distributions<br/>
 ✅ **Uncertainty quantification** for each prediction<br/>
 ✅ **Continuous transition mapping** from features to latent space<br/>
@@ -47,6 +47,12 @@ Bayesian Softmax provides a powerful alternative to traditional Gaussian classif
 
 <Tabs>
   <Tab title="Python">
+Install the optional Softmax extra first:
+
+```bash
+pip install nimbus-bci[softmax]
+```
+
 ```python
 from nimbus_bci import NimbusSoftmax
 import numpy as np
@@ -96,65 +102,48 @@ results = predict_batch(model, test_data)
 
 ## Model Architecture
 
-### Mathematical Foundation (Bayesian Multinomial Logistic Regression)
+### Mathematical Foundation
 
-Bayesian Softmax implements Bayesian Multinomial Logistic Regression using continuous transitions and MultinomialPolya likelihood:
+The Python and Julia SDKs expose related Bayesian multinomial classifiers with different implementations:
 
-**Generative Model:**
+- **Python `NimbusSoftmax`**: Bayesian multinomial logistic regression with a reference-class softmax parameterization and Polya-Gamma variational inference.
+- **Julia `NimbusProbit`**: Bayesian multinomial probit model implemented with RxInfer.
+
+For Python `NimbusSoftmax`, the fitted model stores posterior Gaussian approximations for non-reference class weights:
 
 ```
-B ~ N(ξβ, Wβ⁻¹)           # Regression coefficients prior
-W ~ Wishart(ν, Λ)          # Precision matrix prior
-Ψᵢ ~ ContinuousTransition(xᵢ, B, W)  # Latent transformation
-yᵢ ~ MultinomialPolya(N, Ψᵢ)         # Observation model
+beta_k ~ Normal(beta_mean_k, beta_cov_k)
+logits = X_aug @ beta_mean.T
+p(y = k | x) = softmax(logits)_k
 ```
 
-Where:
-- `B ∈ ℝ^((K-1)×D)` = regression coefficient matrix
-- `W` = precision matrix in (K-1)-dimensional latent space
-- `xᵢ` = feature vector for observation i
-- `Ψᵢ` = latent (K-1)-dimensional representation
-- `N` = number of trials per observation (typically 1 for classification)
-
-**Key Feature**: The model works in (K-1) dimensions due to the sum-to-one constraint in multinomial distributions, with the K-th class serving as the reference category.
+The reference class has zero logits, and the remaining classes are modeled relative to it.
 
 ### Hyperparameters
 
-Bayesian Softmax supports configurable hyperparameters for optimal performance tuning:
+Both SDKs support configurable hyperparameters, but the names differ by implementation.
 
-**Available Hyperparameters:**
+**Python `NimbusSoftmax`:**
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `N` | Int | 1 | Number of trials per observation (typically 1 for classification) |
-| `ξβ` | Vector{Float64} | ones((K-1)×D) | Prior mean for regression coefficients B |
-| `Wβ` | Matrix{Float64} | 1e-5 × I | Prior precision for regression coefficients B |
-| `W_df` | Float64 | K + 5 | Wishart degrees of freedom for precision matrix W |
-| `W_scale` | Matrix{Float64} | I | Wishart scale matrix (K-1 × K-1) |
+| `w_loc` | float | 0.0 | Prior mean for feature weights |
+| `w_scale` | float | 1.0 | Prior scale for feature weights |
+| `b_loc` | float | 0.0 | Prior mean for bias terms |
+| `b_scale` | float | 1.0 | Prior scale for bias terms |
+| `learning_rate` | float | 0.2 | Damping factor for variational updates |
+| `num_steps` | int | 50 | Number of coordinate-ascent sweeps |
+| `num_posterior_samples` | int | 50 | Posterior samples used for prediction |
 
-**Parameter Effects:**
+**Julia `NimbusProbit`:**
 
-- **N**: Number of trials per observation
-  - Typically set to 1 for classification tasks
-  - Higher values model count data (less common in BCI)
-
-- **ξβ**: Prior mean for regression coefficients
-  - Default: ones((K-1)×D) provides mild regularization
-  - Can be customized if you have prior knowledge of coefficient values
-
-- **Wβ**: Prior precision for regression coefficients
-  - Lower values (1e-6) → Weaker prior, more data-driven
-  - Higher values (1e-4) → Stronger prior, more regularization
-  - Default (1e-5) provides balanced regularization
-
-- **W_df**: Wishart degrees of freedom
-  - Controls strength of precision matrix prior
-  - Higher values → Stronger regularization
-  - Default (K + 5) provides reasonable regularization
-
-- **W_scale**: Wishart scale matrix
-  - Shape of the prior precision distribution
-  - Default (identity matrix) assumes no prior covariance structure
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `N` | Int | 1 | Number of trials per observation |
+| `ξβ` | Vector{Float64} | ones((K-1)×D) | Prior mean for regression coefficients |
+| `Wβ` | Matrix{Float64} | 1e-5 × I | Prior precision for regression coefficients |
+| `W_df` | Float64 | K + 5 | Wishart degrees of freedom |
+| `W_scale` | Matrix{Float64} | I | Wishart scale matrix |
 
 <Note>
 **Hyperparameter configuration** allows you to optimize model behavior for your specific dataset characteristics (SNR, trial count, data quality).
@@ -175,9 +164,9 @@ struct NimbusProbit <: BCIModel
 end
 ```
 
-### RxInfer Implementation
+### Julia RxInfer Implementation
 
-The NimbusSoftmax model uses RxInfer.jl for variational Bayesian inference:
+The Julia `NimbusProbit` model uses RxInfer.jl for variational Bayesian inference:
 
 **Learning Phase:**
 ```julia
@@ -227,7 +216,7 @@ from nimbus_bci import NimbusSoftmax
 import pickle
 
 # Python SDK: Train locally
-clf = NimbusSoftmax(reg_strength=1.0)
+clf = NimbusSoftmax(w_scale=1.0)
 clf.fit(X_train, y_train)
 
 # Save and load
@@ -286,7 +275,8 @@ clf.fit(csp_features, labels)
 
 # Or train with custom hyperparameters
 clf_tuned = NimbusSoftmax(
-    reg_strength=1.0    # L2 regularization strength
+    w_scale=1.0,        # Prior scale for weights
+    num_steps=100       # More variational updates
 )
 clf_tuned.fit(csp_features, labels)
 
@@ -445,7 +435,7 @@ print(f"Accuracy: {accuracy * 100:.1f}%")
 
 # Calculate ITR
 from nimbus_bci.metrics import calculate_itr
-itr = calculate_itr(accuracy, n_classes=4, trial_time=4.0)
+itr = calculate_itr(accuracy, n_classes=4, trial_duration=4.0)
 print(f"ITR: {itr:.1f} bits/minute")
 ```
   </Tab>
@@ -541,8 +531,8 @@ Use weaker priors to let the data drive the model:
 ```python
 from nimbus_bci import NimbusSoftmax
 
-# Weaker regularization for clean data
-clf = NimbusSoftmax(reg_strength=0.1)  # Lower regularization
+# Weaker prior shrinkage for clean data
+clf = NimbusSoftmax(w_scale=2.0)
 clf.fit(X_train, y_train)
 ```
   </Tab>
@@ -575,8 +565,8 @@ Use stronger priors for stability:
 ```python
 from nimbus_bci import NimbusSoftmax
 
-# Stronger regularization for noisy data
-clf = NimbusSoftmax(reg_strength=10.0)  # Higher regularization
+# Stronger prior shrinkage for noisy data
+clf = NimbusSoftmax(w_scale=0.5)
 clf.fit(X_train, y_train)
 ```
   </Tab>
@@ -609,8 +599,8 @@ The defaults work well for most scenarios:
 ```python
 from nimbus_bci import NimbusSoftmax
 
-# Default regularization (balanced)
-clf = NimbusSoftmax(reg_strength=1.0)  # Default
+# Default prior scale (balanced)
+clf = NimbusSoftmax(w_scale=1.0)  # Default
 clf.fit(X_train, y_train)
 ```
   </Tab>
@@ -652,7 +642,8 @@ X_train, X_val, y_train, y_val = train_test_split(
 
 # Define search grid
 param_grid = {
-    'reg_strength': [0.1, 1.0, 10.0]
+    'w_scale': [0.5, 1.0, 2.0],
+    'num_steps': [50, 100]
 }
 
 # GridSearchCV
@@ -664,7 +655,8 @@ grid_search.fit(X_train, y_train)
 
 # Best parameters
 print("\nBest hyperparameters:")
-print(f"  reg_strength: {grid_search.best_params_['reg_strength']}")
+print(f"  w_scale: {grid_search.best_params_['w_scale']}")
+print(f"  num_steps: {grid_search.best_params_['num_steps']}")
 print(f"  Validation accuracy: {grid_search.best_score_ * 100:.1f}%")
 
 # Use best model
@@ -863,19 +855,24 @@ Bayesian Softmax typically provides comparable or slightly better accuracy than 
 ```python
 import numpy as np
 
-# Model coefficients
-print("Regression coefficients (weights):")
-print(f"  Shape: {clf.model_['coef'].shape}")
-print(f"  Coefficients:\n{clf.model_['coef']}")
+params = clf.model_.params
 
-print("\nIntercepts:")
-print(f"  Intercepts: {clf.model_['intercept']}")
+# Posterior parameters for non-reference classes
+print("Posterior weight means:")
+print(f"  Shape: {params['beta_mean'].shape}")
+print(f"  Means:\n{params['beta_mean']}")
+
+print("\nPosterior covariance Cholesky factors:")
+print(f"  Shape: {params['beta_cov_chol'].shape}")
+
+print("\nReference class:")
+print(f"  Class index: {params['ref_class']}")
 
 # Model info
 print("\nModel info:")
 print(f"  Features: {clf.n_features_in_}")
 print(f"  Classes: {clf.classes_}")
-print(f"  Regularization: {clf.reg_strength}")
+print(f"  Weight prior scale: {clf.w_scale}")
 
 # Class probabilities (from training)
 print("\nClass priors (estimated from training):")
@@ -921,15 +918,15 @@ println("  Classes: ", model.metadata.n_classes)
 from sklearn.model_selection import cross_val_score
 from nimbus_bci import NimbusSoftmax
 
-# Compare different regularization strengths
+# Compare different weight prior scales
 results = []
-for reg in [0.1, 1.0, 10.0]:
-    clf = NimbusSoftmax(reg_strength=reg)
+for w_scale in [0.5, 1.0, 2.0]:
+    clf = NimbusSoftmax(w_scale=w_scale)
     scores = cross_val_score(clf, X_train, y_train, cv=5)
     accuracy = np.mean(scores)
     
-    print(f"Regularization: {reg} → Accuracy: {accuracy * 100:.1f}%")
-    results.append((reg, clf, accuracy))
+    print(f"w_scale: {w_scale} -> Accuracy: {accuracy * 100:.1f}%")
+    results.append((w_scale, clf, accuracy))
 ```
   </Tab>
   <Tab title="Julia">
@@ -1011,7 +1008,7 @@ from nimbus_bci import NimbusSoftmax
 from sklearn.metrics import classification_report
 
 # Train on motor imagery data (4-class MI)
-clf = NimbusSoftmax(reg_strength=1.0)
+clf = NimbusSoftmax(w_scale=1.0)
 clf.fit(X_train, y_train)  # CSP features, 4 classes
 
 # Test
@@ -1057,7 +1054,7 @@ from nimbus_bci import NimbusSoftmax
 from sklearn.metrics import confusion_matrix
 
 # Train on P300 data (binary: 0=non-target, 1=target)
-clf = NimbusSoftmax(reg_strength=1.0)
+clf = NimbusSoftmax(w_scale=1.0)
 clf.fit(X_train, y_train)  # ERP features
 
 # Test
@@ -1109,8 +1106,8 @@ from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusSTS
 lda_clf = NimbusLDA()
 lda_clf.fit(X_train, y_train)
 
-gmm_clf = NimbusQDA()
-gmm_clf.fit(X_train, y_train)
+qda_clf = NimbusQDA()
+qda_clf.fit(X_train, y_train)
 
 softmax_clf = NimbusSoftmax()
 softmax_clf.fit(X_train, y_train)
@@ -1121,7 +1118,7 @@ sts_clf.fit(X_train, y_train)
 # Evaluate all models
 models = [
     ("NimbusLDA", lda_clf),
-    ("NimbusQDA", gmm_clf),
+    ("NimbusQDA", qda_clf),
     ("NimbusSoftmax", softmax_clf),
     ("NimbusSTS", sts_clf)
 ]
@@ -1148,13 +1145,13 @@ for name, clf in models:
 
 # Train all three Julia models
 rxlda_model = train_model(NimbusLDA, train_data)
-rxgmm_model = train_model(NimbusQDA, train_data)
+qda_model = train_model(NimbusQDA, train_data)
 rxpolya_model = train_model(NimbusProbit, train_data)
 
 # Evaluate all three
 models = [
     ("NimbusLDA", rxlda_model),
-    ("NimbusQDA", rxgmm_model),
+    ("NimbusQDA", qda_model),
     ("Bayesian Softmax", rxpolya_model)
 ]
 
@@ -1202,7 +1199,8 @@ end
 
 **Implementation:**
 - RxInfer.jl: https://rxinfer.com/
-- Source code: `/src/models/rxpolya/` in NimbusSDK.jl
+- Python source code: `nimbus_bci/models/nimbus_softmax/` in `nimbus-bci`
+- Julia source code: `src/models/nimbus_probit/` in NimbusSDKCore
 
 **Theory:**
 - Polson, N. G., Scott, J. G., & Windle, J. (2013). "Bayesian inference for logistic models using Pólya–Gamma latent variables"

@@ -222,7 +222,8 @@ data = BCIData(csp_features, metadata, labels)
 results = predict_batch(model, data)
 
 # 5. Analyze
-println("Accuracy: $(sum(results.predictions .== labels) / length(labels))")
+accuracy = sum(results.predictions .== labels) / length(labels)
+println("Accuracy: $accuracy")
 println("Mean confidence: $(mean(results.confidences))")
 println("ITR: $(calculate_ITR(accuracy, 4, 4.0)) bits/minute")
 ```
@@ -420,7 +421,8 @@ All measurements on standard CPU (no GPU required).
 ## Technology Stack
 
 **Python SDK:**
-- **Core**: Python 3.10+, NumPy, JAX, NumPyro
+- **Core**: Python 3.11+, NumPy, SciPy, scikit-learn
+- **Optional**: JAX for `NimbusSoftmax`
 - **Integration**: scikit-learn pipelines, MNE-Python
 - **Models**: NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusSTS
 

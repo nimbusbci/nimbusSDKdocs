@@ -69,6 +69,7 @@
         "pages": [
           "models/rxlda",
           "models/rxgmm",
+          "models/nimbusprobit",
           "models/rxpolya",
           "models/rxsts",
           "model-specification"
@@ -109,6 +110,7 @@
           "python-sdk/api-reference",
           "python-sdk/sklearn-integration",
           "python-sdk/streaming-inference",
+          "python-sdk/active-learning",
           "python-sdk/mne-integration"
         ]
       },

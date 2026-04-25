@@ -159,7 +159,7 @@ lda_model = load_model(NimbusLDA, "motor_imagery_4class_v1")
 # Use when: Speed is priority, classes are well-separated
 
 # NimbusQDA: More flexible, slightly slower
-gmm_model = load_model(NimbusQDA, "motor_imagery_4class_gmm_v1")
+qda_model = load_model(NimbusQDA, "motor_imagery_4class_qda_v1")
 # Typical latency: 15-25ms
 # Use when: Need flexibility for overlapping classes
 
@@ -185,21 +185,21 @@ final_result = finalize_trial(session; method=:weighted_vote)
 - Advantage: Balances all chunks by confidence
 - Typical accuracy: Best overall performance
 
-### Majority Vote
+### Posterior Mean
 ```julia
-# Each chunk has equal weight
-final_result = finalize_trial(session; method=:majority_vote)
+# Average chunk posteriors
+final_result = finalize_trial(session; method=:posterior_mean)
 ```
-- Best for: When all chunks have similar quality
-- Advantage: Simple, robust to outliers
-- Typical accuracy: Good with consistent signal
+- Best for: Preserving probabilistic evidence across chunks
+- Advantage: Uses the full posterior distribution from each chunk
+- Typical accuracy: Good when posteriors are well-calibrated
 
-### Latest Chunk Only
+### Max Confidence
 ```julia
-# Use only the most recent chunk
-final_result = finalize_trial(session; method=:latest)
+# Use the most confident chunk
+final_result = finalize_trial(session; method=:max_confidence)
 ```
-- Best for: Ultra-responsive applications
+- Best for: When one chunk is clearly more reliable
 - Advantage: Fastest response to state changes
 - Typical accuracy: Lower, but most reactive
 

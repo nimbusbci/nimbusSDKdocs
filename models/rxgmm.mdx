@@ -150,21 +150,21 @@ end
 
 **Learning Phase:**
 ```julia
-@model function RxGMM_learning_model(y, labels, n_features, n_classes)
+@model function NimbusQDA_learning_model(y, labels, n_features, n_classes, dof_offset, mean_prior_precision)
     # Priors on class means
     for k in 1:n_classes
-        m[k] ~ MvNormal(0, 10*I)
+        m[k] ~ MvNormal(mean=zeros(n_features), precision=mean_prior_precision * I)
     end
     
     # Priors on class-specific precisions
     for k in 1:n_classes
-        W[k] ~ Wishart(n_features + 5, I)  # Each class has its own W
+        W[k] ~ Wishart(n_features + dof_offset, I)  # Each class has its own W
     end
     
     # Likelihood
     for i in eachindex(y)
         k = labels[i]
-        y[i] ~ MvNormal(m[k], inv(W[k]))  # Class-specific precision
+        y[i] ~ MvNormal(mean=m[k], precision=W[k])  # Class-specific precision
     end
 end
 ```
@@ -188,10 +188,10 @@ clf = NimbusQDA(mu_scale=3.0)
 clf.fit(X_train, y_train)
 
 # Save and load
-with open("my_p300_gmm.pkl", "wb") as f:
+with open("my_p300_qda.pkl", "wb") as f:
     pickle.dump(clf, f)
 
-with open("my_p300_gmm.pkl", "rb") as f:
+with open("my_p300_qda.pkl", "rb") as f:
     clf = pickle.load(f)
 
 print(f"Model info: {clf.classes_} classes, {clf.n_features_in_} features")
@@ -205,7 +205,7 @@ using NimbusSDK
 NimbusSDK.install_core("nbci_live_your_key")
 
 # Load from Nimbus model zoo
-model = load_model(NimbusQDA, "p300_gmm_v1")
+model = load_model(NimbusQDA, "p300_qda_v1")
 
 println("Model loaded:")
 println("  Features: $(get_n_features(model))")
@@ -221,7 +221,6 @@ println("  Paradigm: $(get_paradigm(model))")
   <Tab title="Python">
 ```python
 from nimbus_bci import NimbusQDA
-from nimbus_bci.compat import from_mne_epochs
 import mne
 import pickle
 
@@ -233,8 +232,12 @@ events = mne.find_events(raw)
 event_id = {'target': 1, 'non-target': 2}
 epochs = mne.Epochs(raw, events, event_id, tmin=-0.2, tmax=0.8, preload=True)
 
-# Extract features
-X, y = from_mne_epochs(epochs)
+# Extract ERP features (mean amplitude in the P300 window)
+data = epochs.get_data()  # (n_epochs, n_channels, n_times)
+times = epochs.times
+p300_window = (times >= 0.25) & (times <= 0.5)
+X = data[:, :, p300_window].mean(axis=2)
+y = epochs.events[:, 2]
 
 # Train NimbusQDA with default hyperparameters
 clf = NimbusQDA()
@@ -243,12 +246,12 @@ clf.fit(X, y)
 # Or train with custom hyperparameters
 clf_tuned = NimbusQDA(
     mu_scale=3.0,        # Prior strength
-    sigma_scale=1.0      # Covariance regularization
+    class_prior_alpha=1.0
 )
 clf_tuned.fit(X, y)
 
 # Save
-with open("my_p300_gmm.pkl", "wb") as f:
+with open("my_p300_qda.pkl", "wb") as f:
     pickle.dump(clf_tuned, f)
 
 print(f"Training accuracy: {clf_tuned.score(X, y):.1%}")
@@ -281,7 +284,7 @@ model = train_model(
     train_data;
     iterations = 50,        # Inference iterations
     showprogress = true,    # Show progress bar
-    name = "my_p300_gmm",
+    name = "my_p300_qda",
     description = "P300 binary classifier with NimbusQDA"
 )
 
@@ -291,14 +294,14 @@ model = train_model(
     train_data;
     iterations = 50,
     showprogress = true,
-    name = "my_p300_gmm_tuned",
+    name = "my_p300_qda_tuned",
     description = "P300 classifier with tuned hyperparameters",
     dof_offset = 2,                    # DOF offset (default: 2)
     mean_prior_precision = 0.01        # Prior precision (default: 0.01)
 )
 
 # Save for later use
-save_model(model, "my_p300_gmm.jld2")
+save_model(model, "my_p300_qda.jld2")
 ```
   </Tab>
 </Tabs>
@@ -476,7 +479,7 @@ from nimbus_bci import NimbusQDA
 # Lower regularization for clean data
 clf = NimbusQDA(
     mu_scale=1.0,      # Weaker prior
-    sigma_scale=0.1    # Less covariance regularization
+    class_prior_alpha=0.5
 )
 clf.fit(X_train, y_train)
 ```
@@ -502,7 +505,7 @@ model = train_model(
 
 #### For Low SNR / Noisy Data / Few Trials
 
-Use higher regularization for stability (especially important for GMM with class-specific covariances):
+Use higher regularization for stability (especially important for QDA with class-specific covariances):
 
 <Tabs>
   <Tab title="Python">
@@ -512,7 +515,7 @@ from nimbus_bci import NimbusQDA
 # Higher regularization for noisy data
 clf = NimbusQDA(
     mu_scale=5.0,      # Stronger prior
-    sigma_scale=10.0   # More covariance regularization
+    class_prior_alpha=2.0
 )
 clf.fit(X_train, y_train)
 ```
@@ -562,7 +565,7 @@ model = train_model(
 For P300 paradigms where target/non-target classes have different variances:
 
 ```julia
-# P300 often benefits from GMM's class-specific covariances
+# P300 often benefits from QDA's class-specific covariances
 # Use moderate regularization to avoid overfitting
 model = train_model(
     NimbusQDA,
@@ -766,27 +769,28 @@ Bayesian QDA typically provides 2-5% higher accuracy than Bayesian LDA when clas
 ```python
 import numpy as np
 
-# Class means
-print("Class means:")
-for k, class_label in enumerate(clf.classes_):
-    print(f"  Class {class_label}: {clf.model_['means'][k]}")
+params = clf.model_.params
 
-# Class-specific covariance matrices
-print("\nClass-specific covariance matrices:")
+# Posterior class means
+print("Posterior class means:")
 for k, class_label in enumerate(clf.classes_):
-    print(f"  Class {class_label} (first 3x3):")
-    print(clf.model_['covariances'][k][:3, :3])
+    print(f"  Class {class_label}: {params['mu'][k]}")
 
-# Compare covariances across classes
-print("\nCovariance structure comparison:")
+# Class-specific Normal-Wishart posterior parameters
+print("\nClass-specific precision posterior parameters:")
 for k, class_label in enumerate(clf.classes_):
-    cov_k = clf.model_['covariances'][k]
-    print(f"  Class {class_label} variance (diagonal): {np.diag(cov_k)}")
+    print(f"  Class {class_label}: nu={params['nu'][k]}, psi shape={params['psi'][k].shape}")
+
+# Compare posterior scale diagonals across classes
+print("\nPosterior scale diagonal comparison:")
+for k, class_label in enumerate(clf.classes_):
+    print(f"  Class {class_label}: {np.diag(params['psi'][k])}")
 
 # Class priors
 print("\nClass priors:")
+priors = np.exp(params["log_priors"])
 for k, class_label in enumerate(clf.classes_):
-    print(f"  Class {class_label}: {clf.model_['priors'][k]:.3f}")
+    print(f"  Class {class_label}: {priors[k]:.3f}")
 ```
   </Tab>
   <Tab title="Julia">
@@ -926,12 +930,12 @@ rxlda_acc = sum(rxlda_results.predictions .== test_labels) / length(test_labels)
 # If accuracy insufficient, try Bayesian QDA
 if rxlda_acc < 0.75
     println("Bayesian LDA accuracy low ($(round(rxlda_acc*100, digits=1))%), trying Bayesian QDA...")
-    rxgmm_model = train_model(NimbusQDA, train_data)
-    rxgmm_results = predict_batch(rxgmm_model, test_data)
-    rxgmm_acc = sum(rxgmm_results.predictions .== test_labels) / length(test_labels)
+    qda_model = train_model(NimbusQDA, train_data)
+    qda_results = predict_batch(qda_model, test_data)
+    qda_acc = sum(qda_results.predictions .== test_labels) / length(test_labels)
     
-    println("Bayesian QDA accuracy: $(round(rxgmm_acc*100, digits=1))%")
-    println("Improvement: +$(round((rxgmm_acc-rxlda_acc)*100, digits=1))%")
+    println("Bayesian QDA accuracy: $(round(qda_acc*100, digits=1))%")
+    println("Improvement: +$(round((qda_acc-rxlda_acc)*100, digits=1))%")
 end
 ```
 
@@ -941,7 +945,7 @@ end
   <Card title="Bayesian LDA (NimbusLDA)" icon="brain" href="/models/rxlda">
     Faster model with shared covariance
   </Card>
-  <Card title="NimbusProbit" icon="brain" href="/models/rxpolya">
+  <Card title="NimbusProbit" icon="brain" href="/models/nimbusprobit">
     Most flexible multinomial classifier for complex decision boundaries
   </Card>
   <Card title="Bayesian STS (NimbusSTS)" icon="wave-pulse" href="/models/rxsts">
@@ -959,11 +963,10 @@ end
 
 **Implementation:**
 - RxInfer.jl: https://rxinfer.com/
-- Source code: `/src/models/rxgmm/` in NimbusSDK.jl
+- Source code: `NimbusQDA` model implementation in NimbusSDK.jl
 
 **Theory:**
-- McLachlan, G. J., & Peel, D. (2000). "Finite Mixture Models"
-- Bishop, C. M. (2006). "Pattern Recognition and Machine Learning" (Chapter 9)
+- Bishop, C. M. (2006). "Pattern Recognition and Machine Learning" (Quadratic discriminant analysis and Gaussian classifiers)
 - Heteroscedastic Gaussian Classifier (HGC) with class-specific covariances
 
 **BCI Applications:**

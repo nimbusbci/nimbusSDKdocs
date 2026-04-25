@@ -215,9 +215,9 @@ finalize_trial(session::StreamingSession; method::Symbol=:weighted_vote) -> Stre
 
 **Aggregation Methods:**
 - `:weighted_vote`: Weight predictions by confidence (recommended)
-- `:majority_vote`: Simple majority vote across chunks
-- `:last_chunk`: Use only the last chunk's prediction
 - `:max_confidence`: Use chunk with highest confidence
+- `:posterior_mean`: Average chunk posteriors
+- `:unanimous`: Require all chunks to agree, falling back to weighted vote on disagreement
 
 **Parameters:**
 - `session`: Streaming session with processed chunks
@@ -251,15 +251,15 @@ final = finalize_trial(session; method=:weighted_vote)
 
 **Best for:** Most applications, especially with variable confidence across chunks
 
-### Majority Vote
+### Posterior Mean
 
-Simple democratic vote across chunks:
+Average chunk-level posterior distributions:
 
 ```julia
-final = finalize_trial(session; method=:majority_vote)
+final = finalize_trial(session; method=:posterior_mean)
 ```
 
-**Best for:** Consistent predictions across chunks
+**Best for:** Preserving full posterior evidence across chunks
 
 ### Max Confidence
 
@@ -271,15 +271,15 @@ final = finalize_trial(session; method=:max_confidence)
 
 **Best for:** When one chunk is clearly more reliable
 
-### Last Chunk
+### Unanimous
 
-Use only the most recent chunk:
+Require all chunks to agree, with fallback to weighted voting if they disagree:
 
 ```julia
-final = finalize_trial(session; method=:last_chunk)
+final = finalize_trial(session; method=:unanimous)
 ```
 
-**Best for:** Real-time systems where latest information is most relevant
+**Best for:** Conservative decisions when chunk-level agreement matters
 
 ## Quality Assessment
 

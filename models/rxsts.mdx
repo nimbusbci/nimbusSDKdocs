@@ -648,7 +648,7 @@ All measurements on standard CPU (no GPU required).
 
 | Scenario | Typical Accuracy | Comparison to Static Models |
 |----------|------------------|----------------------------|
-| **Stationary data (short sessions)** | 70-85% | Similar to NimbusLDA/GMM |
+| **Stationary data (short sessions)** | 70-85% | Similar to NimbusLDA/NimbusQDA |
 | **Non-stationary data (long sessions)** | 75-90% | **+5-15% vs static models** |
 | **Cross-day with state transfer** | 65-80% | **+10-20% vs training from scratch** |
 | **Online adaptation** | Improves over time | Adapts to user state changes |
@@ -770,7 +770,7 @@ print(f"Process noise covariance:\n{Q}")
 
 ## Comparison: NimbusSTS vs Static Models
 
-| Aspect | NimbusSTS (Stateful) | NimbusLDA/GMM/Softmax (Stateless) |
+| Aspect | NimbusSTS (Stateful) | NimbusLDA/NimbusQDA/NimbusSoftmax (Stateless) |
 |--------|----------------------|-----------------------------------|
 | **Temporal Modeling** | ✅ Explicit state dynamics | ❌ No temporal modeling |
 | **Non-Stationarity** | ✅ Adapts to drift | ❌ Degrades over time |

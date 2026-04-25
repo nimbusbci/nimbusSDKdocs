@@ -247,47 +247,47 @@ final_result = finalize_trial(session; method=:weighted_vote)
 
 High-confidence chunks contribute more to the final decision. Best for most applications.
 
-### Majority Vote
+### Posterior Mean
 
-Simple majority across chunks:
+Average posterior distributions across chunks:
 
 <Tabs>
   <Tab title="Python">
 ```python
-# Aggregate with majority voting
-final_result = session.finalize_trial(method="majority_vote")
+# Aggregate with posterior averaging
+final_result = session.finalize_trial(method="posterior_mean")
 ```
   </Tab>
   <Tab title="Julia">
 ```julia
-# Aggregate with majority voting
-final_result = finalize_trial(session; method=:majority_vote)
+# Aggregate with posterior averaging
+final_result = finalize_trial(session; method=:posterior_mean)
 ```
   </Tab>
 </Tabs>
 
-Each chunk has equal weight. Use when all chunks have similar quality.
+Use when you want to preserve full posterior evidence across chunks.
 
-### Latest Chunk
+### Max Confidence
 
-Use only the most recent chunk:
+Use the chunk with highest confidence:
 
 <Tabs>
   <Tab title="Python">
 ```python
-# Use only latest chunk
-final_result = session.finalize_trial(method="latest")
+# Use most confident chunk
+final_result = session.finalize_trial(method="max_confidence")
 ```
   </Tab>
   <Tab title="Julia">
 ```julia
-# Use only latest chunk
-final_result = finalize_trial(session; method=:latest)
+# Use most confident chunk
+final_result = finalize_trial(session; method=:max_confidence)
 ```
 </Tab>
 </Tabs>
 
-Fastest response, but ignores trial history. Use for ultra-responsive applications.
+Use when one chunk is clearly more reliable than the rest.
 
 ## Real-time BCI Example
 
@@ -452,7 +452,8 @@ end
 ```julia
 # Adjust thresholds based on performance
 base_threshold = 0.7
-current_accuracy = tracker.accuracy
+current_metrics = get_metrics(tracker, n_classes=4, trial_duration=4.0)
+current_accuracy = current_metrics.accuracy
 
 if current_accuracy > 0.85
     # User performing well - can lower threshold for faster response

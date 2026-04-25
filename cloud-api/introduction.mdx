@@ -40,11 +40,12 @@ https://api.nimbusbci.com
 
 ## Authentication
 
-All API requests require authentication via API key. Include your API key in requests either as:
+All API requests require authentication via API key. Prefer the `X-API-Key` header for server-to-server calls:
 
-- JSON body parameter: `"api_key": "nbci_live_..."`
-- Query parameter: `?api_key=nbci_live_...`
 - Header: `X-API-Key: nbci_live_...`
+- JSON body parameter: `"api_key": "nbci_live_..."` for POST endpoints that accept a request body
+
+Some GET endpoints also accept `?api_key=nbci_live_...` for compatibility. Avoid query-string keys in production because URLs are commonly captured in logs, browser history, proxies, and referrer headers.
 
 ### API Key Format
 

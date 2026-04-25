@@ -35,7 +35,6 @@ pip install nimbus-bci[mne]
 This installs:
 - `nimbus-bci` - Bayesian classifiers
 - `mne` ≥ 1.6 - EEG preprocessing
-- `scipy` ≥ 1.12 - Signal processing
 
 ## Basic Workflow
 
@@ -126,7 +125,7 @@ epochs = mne.Epochs(
 )
 
 # 5. Feature extraction
-csp_features, csp = extract_csp_features(epochs, n_components=8, log=True)
+csp_features, csp = extract_csp_features(epochs, n_components=8)
 labels = epochs.events[:, 2]
 
 # 6. Train/test split
@@ -161,8 +160,7 @@ from nimbus_bci.compat import extract_csp_features
 # Extract CSP features
 features, csp = extract_csp_features(
     epochs,
-    n_components=8,  # Number of CSP components
-    log=True         # Apply log transform
+    n_components=8  # Number of CSP components
 )
 ```
 
@@ -221,10 +219,10 @@ bands = {
 }
 
 # Extract bandpower features
-features = extract_bandpower_features(
+features, band_names = extract_bandpower_features(
     epochs,
     bands=bands,
-    method='welch'  # or 'multitaper'
+    log_transform=True
 )
 
 # Train classifier
@@ -233,18 +231,12 @@ clf = NimbusQDA()
 clf.fit(features, epochs.events[:, 2])
 ```
 
-### Welch vs Multitaper
+### Output Shape
 
 ```python
-# Welch method (faster)
-features_welch = extract_bandpower_features(
-    epochs, bands, method='welch'
-)
-
-# Multitaper method (more accurate)
-features_multitaper = extract_bandpower_features(
-    epochs, bands, method='multitaper'
-)
+features, band_names = extract_bandpower_features(epochs, bands)
+print(features.shape)   # (n_epochs, n_channels * n_bands)
+print(band_names)       # Names from the bands dict
 ```
 
 ## P300 ERP Features
@@ -307,9 +299,10 @@ data = from_mne_epochs(
     feature_type="raw"  # or "csp", "bandpower"
 )
 
-# Use with batch inference
+# Use with batch inference only when the model was trained with matching
+# raw-channel features and metadata.n_features.
 from nimbus_bci import predict_batch
-result = predict_batch(clf.model_, data)
+# result = predict_batch(raw_feature_model, data)
 ```
 
 ### BCIData to MNE Epochs
@@ -330,12 +323,13 @@ Create end-to-end pipeline:
 
 ```python
 from nimbus_bci.compat import create_bci_pipeline
+from nimbus_bci import NimbusLDA
 
 # Create complete pipeline
 pipeline = create_bci_pipeline(
-    classifier="lda",      # or "gmm", "softmax"
-    n_csp_components=8,
-    bands=(8, 30)          # Frequency band
+    NimbusLDA,
+    feature_extraction="csp",
+    n_csp_components=8
 )
 
 # Load and preprocess with MNE
@@ -411,11 +405,12 @@ while True:
     # Apply same preprocessing
     raw_mne.filter(8, 30)
     
-    # Apply CSP transform
-    csp_chunk = csp.transform(raw_mne.get_data().T[np.newaxis, :, :])[0]
+    # Convert raw EEG into the same feature space used for training.
+    # This should return (n_features, chunk_size), matching metadata.
+    feature_chunk = extract_streaming_csp_chunk(raw_mne.get_data(), csp)
     
     # Process chunk
-    result = session.process_chunk(csp_chunk.T)
+    result = session.process_chunk(feature_chunk)
     print(f"Prediction: {result.prediction} ({result.confidence:.2%})")
 ```
 
@@ -602,14 +597,24 @@ Check data quality before training:
 from nimbus_bci import diagnose_preprocessing
 
 # Diagnose features
+from nimbus_bci.data import BCIData, BCIMetadata
+
+metadata = BCIMetadata(
+    sampling_rate=250.0,
+    paradigm="motor_imagery",
+    feature_type="csp",
+    n_features=features.shape[1],
+    n_classes=len(set(labels))
+)
+bci_data = BCIData(features.T[:, None, :], metadata, labels)
+
 report = diagnose_preprocessing(
-    features,
-    labels,
-    sampling_rate=250.0
+    bci_data
 )
 
 print(f"Quality score: {report.quality_score}")
-print(f"Issues: {report.issues}")
+print(f"Errors: {report.errors}")
+print(f"Warnings: {report.warnings}")
 ```
 
 ## Next Read
