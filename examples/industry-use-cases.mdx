@@ -1,952 +1,137 @@
 ---
 title: "Industry Use Cases"
-description: "Real-world BCI use cases across healthcare, assistive tech, neurofeedback, and research using Nimbus Bayesian models in Python and Julia."
-keywords: ["industry use cases", "BCI applications", "assistive technology", "neurofeedback", "research", "real-world BCI", "BCI use cases", "medical BCI", "BCI industry", "applications"]
+description: "Real-world BCI use-case patterns across healthcare, assistive technology, research, and productivity using Nimbus Bayesian models."
+keywords: ["industry use cases", "BCI applications", "assistive technology", "neurofeedback", "research", "medical BCI", "real-world BCI"]
 icon: "briefcase"
 ---
 
 # Industry Use Cases
 
-This section showcases realistic BCI applications powered by NimbusSDK's **NimbusLDA** and **NimbusQDA** models across healthcare, assistive technology, research, and productivity domains.
-
-## Healthcare & Medical Devices
-
-### Motor Imagery Rehabilitation System
-
-**Challenge**: Help stroke patients regain motor function through neurofeedback-guided rehabilitation.
-
-**Solution**: Real-time motor imagery detection using NimbusLDA for 4-class motor imagery (left hand, right hand, feet, tongue).
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA, StreamingSession
-from nimbus_bci.data import BCIMetadata
-import numpy as np
-from dataclasses import dataclass, field
-from typing import List, Dict
-from datetime import date
-
-# Rehabilitation session manager
-@dataclass
-class RehabilitationSession:
-    model: NimbusLDA
-    patient_id: str
-    baseline_accuracy: float
-    session_history: List[Dict] = field(default_factory=list)
-
-def create_rehab_session(patient_id: str) -> RehabilitationSession:
-    # Train or load motor imagery model
-    clf = NimbusLDA()
-    # Load calibration data and fit
-    X_calib = np.random.randn(100, 16)  # Replace with real calibration data
-    y_calib = np.random.randint(0, 4, 100)
-    clf.fit(X_calib, y_calib)
-    
-    print(f"Running baseline assessment for patient {patient_id}...")
-    baseline_acc = 0.65  # run_assessment_trial()
-    
-    return RehabilitationSession(clf, patient_id, baseline_acc, [])
-
-def run_therapy_session(session: RehabilitationSession, session_number: int) -> Dict:
-    # Configure streaming for real-time feedback
-    metadata = BCIMetadata(
-        sampling_rate=250.0,
-        paradigm="motor_imagery",
-        feature_type="csp",
-        n_features=16,
-        n_classes=4,
-        chunk_size=250  # 1-second chunks for responsive feedback
-    )
-    
-    streaming_session = StreamingSession(session.model.model_, metadata)
-    
-    # Track performance
-    successes = 0
-    total_trials = 20
-    confidences = []
-    
-    for trial in range(1, total_trials + 1):
-        print(f"\n--- Trial {trial}/{total_trials} ---")
-        
-        # Patient performs motor imagery task (4 seconds)
-        cued_task_label = np.random.randint(0, 4)
-        task_names = ["Left Hand", "Right Hand", "Feet", "Tongue"]
-        print(f"Cue: {task_names[cued_task_label]}")
-        
-        # Collect 4 chunks (4 seconds total)
-        for chunk_idx in range(4):
-            # In real application: acquire from EEG device
-            chunk = np.random.randn(16, 250)  # acquire_eeg_chunk()
-            
-            # Real-time processing
-            result = streaming_session.process_chunk(chunk)
-            
-            # Provide immediate visual feedback
-            if result.confidence > 0.7:
-                # display_positive_feedback(result.prediction)
-                pass
-        
-        # Finalize trial
-        final_result = streaming_session.finalize_trial(method="weighted_vote")
-        confidences.append(final_result.confidence)
-        
-        # Check success
-        if final_result.prediction == cued_task_label:
-            successes += 1
-            print(f"✓ Correct! (Confidence: {final_result.confidence:.3f})")
-            # provide_success_feedback()
-        else:
-            print(f"✗ Incorrect (Confidence: {final_result.confidence:.3f})")
-            # provide_encouragement()
-        
-        streaming_session.reset()
-    
-    # Session results
-    accuracy = successes / total_trials
-    mean_confidence = np.mean(confidences)
-    improvement = accuracy - session.baseline_accuracy
-    
-    session_data = {
-        "session_number": session_number,
-        "accuracy": accuracy,
-        "mean_confidence": mean_confidence,
-        "improvement": improvement,
-        "date": date.today().isoformat()
-    }
-    
-    session.session_history.append(session_data)
-    
-    print(f"\n=== Session {session_number} Complete ===")
-    print(f"Accuracy: {accuracy * 100:.1f}%")
-    print(f"Mean Confidence: {mean_confidence:.3f}")
-    print(f"Improvement vs Baseline: {improvement * 100:.1f}%")
-    
-    return session_data
-
-# Clinical deployment
-patient_session = create_rehab_session("P001")
-
-# Daily therapy sessions (recommended: 3-5 per week)
-for session_num in range(1, 11):
-    results = run_therapy_session(patient_session, session_num)
-    
-    # Track progress in clinical records
-    # log_to_patient_record(patient_session.patient_id, results)
-    
-    # Check for significant improvement
-    if results["improvement"] > 0.3:
-        print("\n🎉 Significant improvement detected!")
-        print("Consider advancing to next rehabilitation stage")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-using Statistics
-
-# Rehabilitation session manager
-mutable struct RehabilitationSession
-    model::NimbusLDA
-    patient_id::String
-    baseline_accuracy::Float64
-    session_history::Vector{Dict}
-end
-
-function create_rehab_session(patient_id::String)
-    # Load motor imagery model
-    model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-    
-    # Initial assessment
-    println("Running baseline assessment for patient $patient_id...")
-    baseline_acc = run_assessment_trial()
-    
-    return RehabilitationSession(model, patient_id, baseline_acc, [])
-end
-
-function run_therapy_session(session::RehabilitationSession, session_number::Int)
-    # Configure streaming for real-time feedback
-    metadata = BCIMetadata(
-        sampling_rate = 250.0,
-        paradigm = :motor_imagery,
-        feature_type = :csp,
-        n_features = 16,
-        n_classes = 4,
-        chunk_size = 250  # 1-second chunks for responsive feedback
-    )
-    
-    streaming_session = init_streaming(session.model, metadata)
-    
-    # Track performance
-    successes = 0
-    total_trials = 20
-    confidences = Float64[]
-    
-    for trial in 1:total_trials
-        println("\n--- Trial $trial/$(total_trials) ---")
-        
-        # Patient performs motor imagery task (4 seconds)
-        # cued_task = ["left_hand", "right_hand", "feet", "tongue"][rand(1:4)]
-        cued_task_label = rand(1:4)
-        println("Cue: $(["Left Hand", "Right Hand", "Feet", "Tongue"][cued_task_label])")
-        
-        # Collect 4 chunks (4 seconds total)
-        chunk_predictions = Int[]
-        chunk_confidences = Float64[]
-        
-        for chunk_idx in 1:4
-            # In real application: acquire from EEG device
-            chunk = acquire_eeg_chunk()  # Simulated
-            
-            # Real-time processing
-            result = process_chunk(streaming_session, chunk)
-            push!(chunk_predictions, result.prediction)
-            push!(chunk_confidences, result.confidence)
-            
-            # Provide immediate visual feedback
-            if result.confidence > 0.7
-                display_positive_feedback(result.prediction)
-            end
-        end
-        
-        # Finalize trial
-        final_result = finalize_trial(streaming_session; method=:weighted_vote)
-        push!(confidences, final_result.confidence)
-        
-        # Check success
-        if final_result.prediction == cued_task_label
-            successes += 1
-            println("✓ Correct! (Confidence: $(round(final_result.confidence, digits=3)))")
-            provide_success_feedback()
-        else
-            println("✗ Incorrect (Confidence: $(round(final_result.confidence, digits=3)))")
-            provide_encouragement()
-        end
-    end
-    
-    # Session results
-    accuracy = successes / total_trials
-    mean_confidence = mean(confidences)
-    improvement = accuracy - session.baseline_accuracy
-    
-    session_data = Dict(
-        "session_number" => session_number,
-        "accuracy" => accuracy,
-        "mean_confidence" => mean_confidence,
-        "improvement" => improvement,
-        "date" => today()
-    )
-    
-    push!(session.session_history, session_data)
-    
-    println("\n=== Session $session_number Complete ===")
-    println("Accuracy: $(round(accuracy * 100, digits=1))%")
-    println("Mean Confidence: $(round(mean_confidence, digits=3))")
-    println("Improvement vs Baseline: $(round(improvement * 100, digits=1))%")
-    
-    return session_data
-end
-
-# Clinical deployment
-patient_session = create_rehab_session("P001")
-
-# Daily therapy sessions (recommended: 3-5 per week)
-for session_num in 1:10
-    results = run_therapy_session(patient_session, session_num)
-    
-    # Track progress in clinical records
-    log_to_patient_record(patient_session.patient_id, results)
-    
-    # Check for significant improvement
-    if results["improvement"] > 0.3
-        println("\n🎉 Significant improvement detected!")
-        println("Consider advancing to next rehabilitation stage")
-    end
-    
-    # Recommended: 1-2 day break between sessions
-end
-```
-  </Tab>
-</Tabs>
-
-<Card title="Clinical Results" icon="heart-pulse">
-  **Application**: Motor imagery neurofeedback for stroke rehabilitation  
-  **Model**: NimbusLDA 4-class motor imagery  
-  **Latency**: 15-20ms per chunk (real-time feedback)  
-  **Typical Accuracy**: 65-85% after calibration  
-  **Sessions**: 20-30 sessions for measurable improvement  
-</Card>
-
-### P300-Based Communication for Locked-In Syndrome
-
-**Challenge**: Enable communication for patients with locked-in syndrome who cannot speak or move.
-
-**Solution**: P300 speller using NimbusQDA for binary target/non-target detection.
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusQDA
-import numpy as np
-from dataclasses import dataclass
-
-# P300 Speller Implementation
-@dataclass
-class P300Speller:
-    model: NimbusQDA
-    character_matrix: np.ndarray
-    intensification_count: int
-
-def create_p300_speller() -> P300Speller:
-    # Train P300 detection model (binary classification)
-    clf = NimbusQDA(n_components=2)
-    # Load calibration data and fit
-    X_calib = np.random.randn(100, 16)  # Replace with real P300 calibration
-    y_calib = np.random.randint(0, 2, 100)  # 0=non-target, 1=target
-    clf.fit(X_calib, y_calib)
-    
-    # Standard 6x6 character matrix
-    char_matrix = np.array([
-        ['A', 'B', 'C', 'D', 'E', 'F'],
-        ['G', 'H', 'I', 'J', 'K', 'L'],
-        ['M', 'N', 'O', 'P', 'Q', 'R'],
-        ['S', 'T', 'U', 'V', 'W', 'X'],
-        ['Y', 'Z', '1', '2', '3', '4'],
-        ['5', '6', '7', '8', '9', '0']
-    ])
-    
-    return P300Speller(clf, char_matrix, 10)  # 10 repetitions per row/col
-
-def spell_character(speller: P300Speller) -> dict:
-    print("Focus on the target character...")
-    
-    # Storage for row/column scores
-    row_scores = np.zeros(6)
-    col_scores = np.zeros(6)
-    
-    # Present intensifications
-    for rep in range(speller.intensification_count):
-        # Flash each row
-        for row in range(6):
-            # flash_row(row)
-            eeg_response = np.random.randn(16)  # record_p300_epoch()
-            
-            # Detect P300
-            result = detect_p300(speller.model, eeg_response)
-            
-            if result["prediction"] == 1:  # Target detected
-                row_scores[row] += result["confidence"]
-        
-        # Flash each column
-        for col in range(6):
-            # flash_column(col)
-            eeg_response = np.random.randn(16)  # record_p300_epoch()
-            
-            # Detect P300
-            result = detect_p300(speller.model, eeg_response)
-            
-            if result["prediction"] == 1:  # Target detected
-                col_scores[col] += result["confidence"]
-    
-    # Identify target character
-    target_row = np.argmax(row_scores)
-    target_col = np.argmax(col_scores)
-    selected_char = speller.character_matrix[target_row, target_col]
-    
-    # Calculate confidence
-    overall_confidence = (row_scores[target_row] + col_scores[target_col]) / \
-                        (2 * speller.intensification_count)
-    
-    print(f"Selected: {selected_char} (Confidence: {overall_confidence:.3f})")
-    
-    return {"character": selected_char, "confidence": overall_confidence}
-
-def detect_p300(model: NimbusQDA, eeg_epoch: np.ndarray) -> dict:
-    # Reshape to (1, n_features) for single trial
-    features = eeg_epoch.reshape(1, -1)
-    
-    # Run inference
-    prediction = model.predict(features)[0]
-    probabilities = model.predict_proba(features)[0]
-    confidence = probabilities[prediction]
-    
-    return {"prediction": prediction, "confidence": confidence}
-
-# Clinical deployment
-speller = create_p300_speller()
-
-print("P300 Speller Ready")
-print("Patient can now spell messages...")
-
-# Spell a message
-message = []
-for i in range(10):  # Spell 10 characters
-    result = spell_character(speller)
-    
-    if result["confidence"] > 0.75:
-        message.append(result["character"])
-        print(f"Message so far: {''.join(message)}")
-    else:
-        print("Low confidence - retry")
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-
-# P300 Speller Implementation
-struct P300Speller
-    model::NimbusQDA
-    character_matrix::Matrix{Char}
-    intensification_count::Int
-end
-
-function create_p300_speller()
-    # Load P300 detection model
-    model = load_model(NimbusQDA, "p300_binary_v1")
-    
-    # Standard 6x6 character matrix
-    char_matrix = [
-        'A' 'B' 'C' 'D' 'E' 'F';
-        'G' 'H' 'I' 'J' 'K' 'L';
-        'M' 'N' 'O' 'P' 'Q' 'R';
-        'S' 'T' 'U' 'V' 'W' 'X';
-        'Y' 'Z' '1' '2' '3' '4';
-        '5' '6' '7' '8' '9' '0'
-    ]
-    
-    return P300Speller(model, char_matrix, 10)  # 10 repetitions per row/col
-end
-
-function spell_character(speller::P300Speller)
-    println("Focus on the target character...")
-    
-    # Storage for row/column scores
-    row_scores = zeros(6)
-    col_scores = zeros(6)
-    
-    # Present intensifications
-    for rep in 1:speller.intensification_count
-        # Flash each row
-        for row in 1:6
-            flash_row(row)
-            eeg_response = record_p300_epoch()  # 0.8s post-stimulus
-            
-            # Detect P300
-            result = detect_p300(speller.model, eeg_response)
-            
-            if result.prediction == 1  # Target detected
-                row_scores[row] += result.confidence
-            end
-        end
-        
-        # Flash each column
-        for col in 1:6
-            flash_column(col)
-            eeg_response = record_p300_epoch()
-            
-            # Detect P300
-            result = detect_p300(speller.model, eeg_response)
-            
-            if result.prediction == 1  # Target detected
-                col_scores[col] += result.confidence
-            end
-        end
-    end
-    
-    # Identify target character
-    target_row = argmax(row_scores)
-    target_col = argmax(col_scores)
-    selected_char = speller.character_matrix[target_row, target_col]
-    
-    # Calculate confidence
-    overall_confidence = (row_scores[target_row] + col_scores[target_col]) / 
-                        (2 * speller.intensification_count)
-    
-    println("Selected: $selected_char (Confidence: $(round(overall_confidence, digits=3)))")
-    
-    return (character=selected_char, confidence=overall_confidence)
-end
-
-function detect_p300(model::NimbusQDA, eeg_epoch::Matrix{Float64})
-    # Prepare BCIData
-    metadata = BCIMetadata(
-        sampling_rate = 250.0,
-        paradigm = :p300,
-        feature_type = :erp,
-        n_features = size(eeg_epoch, 1),
-        n_classes = 2
-    )
-    
-    data = BCIData(reshape(eeg_epoch, size(eeg_epoch, 1), size(eeg_epoch, 2), 1), metadata)
-    
-    # Run inference
-    results = predict_batch(model, data)
-    
-    return (prediction=results.predictions[1], confidence=results.confidences[1])
-end
-
-# Clinical deployment
-speller = create_p300_speller()
-
-println("P300 Speller Ready")
-println("Patient can now spell messages...")
-
-# Spell a message
-message = Char[]
-for i in 1:10  # Spell 10 characters
-    result = spell_character(speller)
-    
-    if result.confidence > 0.75
-        push!(message, result.character)
-        println("Message so far: $(String(message))")
-    else
-        println("Low confidence - retry")
-    end
-end
-```
-  </Tab>
-</Tabs>
-
-<Card title="Communication Application" icon="comments">
-  **Application**: P300 speller for locked-in syndrome  
-  **Model**: NimbusQDA binary P300 detection  
-  **Speed**: 5-10 characters per minute  
-  **Accuracy**: 85-95% with 10 repetitions  
-  **ITR**: 10-15 bits/minute  
-</Card>
-
-## Assistive Technology
-
-### Wheelchair Control System
-
-**Challenge**: Enable paralyzed users to control motorized wheelchairs using motor imagery.
-
-**Solution**: 4-class motor imagery BCI with safety-critical confidence thresholds.
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA, StreamingSession
-from nimbus_bci.data import BCIMetadata
-import numpy as np
-from dataclasses import dataclass
-from typing import Dict
-
-# Safety-critical wheelchair controller
-@dataclass
-class WheelchairBCI:
-    model: NimbusLDA
-    safety_threshold: float
-    command_mapping: Dict[int, str]
-
-def create_wheelchair_controller() -> WheelchairBCI:
-    # Train or load motor imagery model
-    clf = NimbusLDA()
-    X_calib = np.random.randn(100, 16)
-    y_calib = np.random.randint(0, 4, 100)
-    clf.fit(X_calib, y_calib)
-    
-    # Map motor imagery classes to wheelchair commands
-    command_map = {
-        0: "forward",
-        1: "backward",
-        2: "left",
-        3: "right"
-    }
-    
-    return WheelchairBCI(clf, 0.85, command_map)  # High threshold for safety
-
-def control_wheelchair(controller: WheelchairBCI):
-    # Configure for safety-critical operation
-    metadata = BCIMetadata(
-        sampling_rate=250.0,
-        paradigm="motor_imagery",
-        feature_type="csp",
-        n_features=16,
-        n_classes=4,
-        chunk_size=500  # 2-second chunks for high confidence
-    )
-    
-    session = StreamingSession(controller.model.model_, metadata)
-    
-    print("Wheelchair BCI Active")
-    print(f"Safety threshold: {controller.safety_threshold}")
-    
-    # Control loop (simplified for demo)
-    for i in range(20):  # In real app: while is_active()
-        # Collect longer trial for safety (2 seconds)
-        chunk = np.random.randn(16, 500)  # acquire_wheelchair_trial()
-        
-        result = session.process_chunk(chunk)
-        
-        # Safety-critical decision making
-        if result.confidence >= controller.safety_threshold:
-            command = controller.command_mapping[result.prediction]
-            
-            print(f"✓ Command: {command} (Confidence: {result.confidence:.3f})")
-            # execute_wheelchair_command(command)
-        else:
-            print(f"⚠️  Low confidence ({result.confidence:.3f}) - no action")
-            # execute_wheelchair_command("stop")
-        
-        session.reset()
-        
-        # Safety override: always allow emergency stop
-        # if emergency_button_pressed():
-        #     execute_wheelchair_command("emergency_stop")
-        #     break
-
-# Deployment
-wheelchair_bci = create_wheelchair_controller()
-control_wheelchair(wheelchair_bci)
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-
-# Safety-critical wheelchair controller
-struct WheelchairBCI
-    model::NimbusLDA
-    safety_threshold::Float64
-    command_mapping::Dict{Int, Symbol}
-end
-
-function create_wheelchair_controller()
-    model = load_model(NimbusLDA, "motor_imagery_4class_v1")
-    
-    # Map motor imagery classes to wheelchair commands
-    command_map = Dict(
-        1 => :forward,
-        2 => :backward,
-        3 => :left,
-        4 => :right
-    )
-    
-    return WheelchairBCI(model, 0.85, command_map)  # High threshold for safety
-end
-
-function control_wheelchair(controller::WheelchairBCI)
-    # Configure for safety-critical operation
-    metadata = BCIMetadata(
-        sampling_rate = 250.0,
-        paradigm = :motor_imagery,
-        feature_type = :csp,
-        n_features = 16,
-        n_classes = 4,
-        chunk_size = 500  # 2-second chunks for high confidence
-    )
-    
-    session = init_streaming(controller.model, metadata)
-    
-    println("Wheelchair BCI Active")
-    println("Safety threshold: $(controller.safety_threshold)")
-    
-    # Control loop
-    while is_active()
-        # Collect longer trial for safety (2 seconds)
-        chunk = acquire_wheelchair_trial()
-        
-        result = process_chunk(session, chunk)
-        
-        # Safety-critical decision making
-        if result.confidence >= controller.safety_threshold
-            command = controller.command_mapping[result.prediction]
-            
-            println("✓ Command: $command (Confidence: $(round(result.confidence, digits=3)))")
-            execute_wheelchair_command(command)
-        else
-            println("⚠️  Low confidence ($(round(result.confidence, digits=3))) - no action")
-            # Stop wheelchair or maintain current command
-            execute_wheelchair_command(:stop)
-        end
-        
-        # Safety override: always allow emergency stop
-        if emergency_button_pressed()
-            execute_wheelchair_command(:emergency_stop)
-            break
-        end
-    end
-end
-
-# Deployment
-wheelchair_bci = create_wheelchair_controller()
-control_wheelchair(wheelchair_bci)
-```
-  </Tab>
-</Tabs>
-
-<Card title="Assistive Technology" icon="wheelchair">
-  **Application**: Motor imagery wheelchair control  
-  **Model**: NimbusLDA 4-class motor imagery  
-  **Safety**: 85% confidence threshold + emergency stop  
-  **Latency**: 20-25ms inference + 2s decision window  
-  **Reliability**: Mission-critical with fail-safe defaults  
-</Card>
-
-## Research & Neuroscience
-
-### Brain-Computer Interface Research Platform
-
-**Challenge**: Provide researchers with flexible, accurate BCI models for experiments.
-
-**Solution**: NimbusSDK's NimbusLDA/NimbusQDA models with custom training for research protocols.
-
-<Tabs>
-  <Tab title="Python">
-```python
-from nimbus_bci import NimbusLDA, NimbusQDA
-import numpy as np
-from typing import List, Dict
-
-# Research experiment manager
-def run_bci_experiment(paradigm: str, n_subjects: int) -> List[Dict]:
-    results = []
-    
-    for subject_id in range(1, n_subjects + 1):
-        print("\n" + "="*60)
-        print(f"Subject {subject_id} / {n_subjects}")
-        print("="*60)
-        
-        # 1. Collect calibration data
-        print("Phase 1: Calibration (50 trials)")
-        X_calib = np.random.randn(50, 16)  # collect_calibration_data()
-        y_calib = np.random.randint(0, 4, 50)
-        
-        # 2. Train subject-specific model
-        print("Phase 2: Model Training")
-        if paradigm == "motor_imagery":
-            clf = NimbusLDA()
-            clf.fit(X_calib, y_calib)
-        elif paradigm == "p300":
-            clf = NimbusQDA(n_components=2)
-            clf.fit(X_calib, y_calib)
-        
-        # 3. Evaluate on test set
-        print("Phase 3: Evaluation (100 trials)")
-        X_test = np.random.randn(100, 16)  # collect_test_data()
-        y_test = np.random.randint(0, 4, 100)
-        
-        predictions = clf.predict(X_test)
-        probabilities = clf.predict_proba(X_test)
-        confidences = np.max(probabilities, axis=1)
-        
-        # 4. Calculate metrics
-        accuracy = np.mean(predictions == y_test)
-        n_classes = len(np.unique(y_test))
-        itr = calculate_ITR(accuracy, n_classes, 4.0)
-        mean_conf = np.mean(confidences)
-        
-        subject_results = {
-            "subject_id": subject_id,
-            "paradigm": paradigm,
-            "accuracy": accuracy,
-            "itr": itr,
-            "mean_confidence": mean_conf,
-            "calibration_trials": 50,
-            "test_trials": 100
-        }
-        
-        results.append(subject_results)
-        
-        print(f"\nSubject {subject_id} Results:")
-        print(f"  Accuracy: {accuracy * 100:.1f}%")
-        print(f"  ITR: {itr:.1f} bits/min")
-        print(f"  Mean Confidence: {mean_conf:.3f}")
-    
-    # Aggregate results
-    print("\n" + "="*60)
-    print(f"Aggregate Results (N={n_subjects})")
-    print("="*60)
-    
-    accuracies = [r["accuracy"] for r in results]
-    itrs = [r["itr"] for r in results]
-    
-    print(f"Accuracy: {np.mean(accuracies) * 100:.1f}% ± {np.std(accuracies) * 100:.1f}%")
-    print(f"ITR: {np.mean(itrs):.1f} ± {np.std(itrs):.1f} bits/min")
-    
-    return results
-
-def calculate_ITR(accuracy: float, n_classes: int, trial_duration: float) -> float:
-    """Calculate Information Transfer Rate in bits/min"""
-    if accuracy <= 1.0 / n_classes:
-        return 0.0
-    bits_per_trial = np.log2(n_classes) + accuracy * np.log2(accuracy) + \
-                     (1 - accuracy) * np.log2((1 - accuracy) / (n_classes - 1))
-    trials_per_min = 60.0 / trial_duration
-    return bits_per_trial * trials_per_min
-
-# Run motor imagery study
-motor_results = run_bci_experiment("motor_imagery", 10)
-
-# Run P300 study
-p300_results = run_bci_experiment("p300", 10)
-```
-  </Tab>
-  <Tab title="Julia">
-```julia
-using NimbusSDK
-using Statistics
-
-# Research experiment manager
-function run_bci_experiment(paradigm::Symbol, n_subjects::Int)
-    results = []
-    
-    for subject_id in 1:n_subjects
-        println("\n" * "="^60)
-        println("Subject $subject_id / $n_subjects")
-        println("="^60)
-        
-        # 1. Collect calibration data
-        println("Phase 1: Calibration (50 trials)")
-        calib_data = collect_calibration_data(paradigm, 50)
-        
-        # 2. Train subject-specific model
-        println("Phase 2: Model Training")
-        if paradigm == :motor_imagery
-            model = train_model(NimbusLDA, calib_data; iterations=50)
-        elseif paradigm == :p300
-            model = train_model(NimbusQDA, calib_data; iterations=50)
-        end
-        
-        # 3. Evaluate on test set
-        println("Phase 3: Evaluation (100 trials)")
-        test_data = collect_test_data(paradigm, 100)
-        test_results = predict_batch(model, test_data)
-        
-        # 4. Calculate metrics
-        accuracy = sum(test_results.predictions .== test_data.labels) / 
-                  length(test_results.predictions)
-        itr = calculate_ITR(accuracy, test_data.metadata.n_classes, 4.0)
-        mean_conf = mean(test_results.confidences)
-        
-        subject_results = Dict(
-            "subject_id" => subject_id,
-            "paradigm" => paradigm,
-            "accuracy" => accuracy,
-            "itr" => itr,
-            "mean_confidence" => mean_conf,
-            "calibration_trials" => 50,
-            "test_trials" => 100
-        )
-        
-        push!(results, subject_results)
-        
-        println("\nSubject $subject_id Results:")
-        println("  Accuracy: $(round(accuracy * 100, digits=1))%")
-        println("  ITR: $(round(itr, digits=1)) bits/min")
-        println("  Mean Confidence: $(round(mean_conf, digits=3))")
-    end
-    
-    # Aggregate results
-    println("\n" * "="^60)
-    println("Aggregate Results (N=$n_subjects)")
-    println("="^60)
-    
-    accuracies = [r["accuracy"] for r in results]
-    itrs = [r["itr"] for r in results]
-    
-    println("Accuracy: $(round(mean(accuracies) * 100, digits=1))% ± $(round(std(accuracies) * 100, digits=1))%")
-    println("ITR: $(round(mean(itrs), digits=1)) ± $(round(std(itrs), digits=1)) bits/min")
-    
-    return results
-end
-
-# Run motor imagery study
-motor_results = run_bci_experiment(:motor_imagery, 10)
-
-# Run P300 study
-p300_results = run_bci_experiment(:p300, 10)
-```
-  </Tab>
-</Tabs>
-
-<Card title="Research Applications" icon="flask-conical">
-  **Use Cases**: Cognitive neuroscience, BCI algorithms, clinical trials  
-  **Models**: NimbusLDA, NimbusQDA, `NimbusSoftmax` (Python), and `NimbusProbit` (Julia) with custom training<br/>
-  **Flexibility**: Subject-specific calibration and adaptation  
-  **Metrics**: Accuracy, ITR, confidence, confusion matrices  
-  **Publication**: Transparent probabilistic models for peer review  
-</Card>
-
-## Market Impact & Adoption
-
-<CardGroup cols={2}>
-  <Card title="Healthcare BCI" icon="heart-pulse">
-    **$2.3B by 2027**
-    
-    Stroke rehabilitation, locked-in communication, seizure detection
-  </Card>
-  
-  <Card title="Assistive Technology" icon="wheelchair">
-    **$1.8B by 2026**
-    
-    Wheelchair control, prosthetic control, environmental control
-  </Card>
-  
-  <Card title="Research & Clinical" icon="flask-conical">
-    **$800M by 2026**
-    
-    University research, pharmaceutical trials, diagnostic tools
-  </Card>
-  
-  <Card title="Gaming & Consumer" icon="gamepad">
-    **$3.7B by 2030**
-    
-    Next-generation gaming, meditation apps, productivity tools
-  </Card>
-</CardGroup>
-
-## Regulatory Considerations
-
-### Medical Device Pathway
-
-For medical BCI applications, NimbusSDK provides:
-
-- **Transparent Models**: White-box probabilistic models (NimbusLDA/NimbusQDA) for regulatory review
-- **Validation**: Standardized testing procedures and performance metrics
-- **Uncertainty Quantification**: Explicit confidence measures for safety-critical decisions
-- **Traceability**: Complete inference history and decision logs
-
-### Data Privacy & Security
-
-- **Edge Processing**: All NimbusSDK inference runs locally - neural data never leaves device
-- **HIPAA Ready**: No cloud transmission of patient data
-- **GDPR Compliant**: Privacy-by-design architecture
-- **Secure Storage**: Encrypted model storage and credential caching
-
-## Success Stories
-
-### Academic Research
-
-- **10+ peer-reviewed publications** using NimbusSDK for BCI research
-- **5 PhD dissertations** featuring NimbusLDA/NimbusQDA models
-- **Reproducible results** through standardized probabilistic models
-
-### Clinical Pilots
-
-- **Stroke rehabilitation pilot** (N=15): 35% improvement vs. traditional therapy
-- **P300 speller trial** (N=8): 92% accuracy with 10 repetitions
-- **Motor imagery study** (N=20): 78% average accuracy across subjects
-
-## Implementation Resources
+This page maps common BCI product scenarios to Nimbus model and workflow choices. It is intentionally pattern-focused; use [Basic Examples](/examples/basic-examples) and [Advanced Applications](/examples/advanced-applications) for implementation recipes.
+
+## Healthcare And Rehabilitation
+
+**Scenario:** motor imagery rehabilitation after stroke or injury.
+
+Recommended pattern:
+
+- Use CSP features from motor imagery sessions.
+- Start with `NimbusLDA` for fast baseline feedback.
+- Use confidence thresholds to decide whether feedback should be shown.
+- Track session-level accuracy, confidence, fatigue indicators, and rejection rate.
+- Keep a clinician-visible audit trail for model version, calibration data, and session metrics.
+
+Key docs:
+
+- [Real-Time BCI Setup](/inference-configuration/real-time-setup)
+- [Error Handling](/inference-configuration/error-handling)
+- [Bayesian LDA](/models/rxlda)
+
+## Assistive Communication
+
+**Scenario:** P300 or event-related communication interfaces.
+
+Recommended pattern:
+
+- Use ERP amplitude features in a consistent post-stimulus window.
+- Prefer `NimbusQDA` when target and non-target distributions overlap.
+- Use posterior confidence to decide between accept, confirm, or repeat.
+- Log rejected selections separately from incorrect selections.
+
+Key docs:
+
+- [Basic Examples: P300 Detection](/examples/basic-examples#p300-detection)
+- [Bayesian QDA](/models/rxgmm)
+- [Feature Normalization](/inference-configuration/feature-normalization)
+
+## Wheelchair Or Device Control
+
+**Scenario:** safety-critical control from motor imagery or hybrid BCI commands.
+
+Recommended pattern:
+
+- Separate classifier output from command execution.
+- Require higher confidence for movement than for UI navigation.
+- Add a confirmation state for ambiguous commands.
+- Stop the control loop after repeated low-quality chunks.
+- Monitor latency budget end to end: acquisition, preprocessing, inference, and action.
+
+Key docs:
+
+- [Streaming Inference Configuration](/inference-configuration/streaming-inference)
+- [Julia Streaming Inference](/julia-sdk/streaming-inference)
+- [Python Streaming Inference](/python-sdk/streaming-inference)
+
+## Neurofeedback And Training
+
+**Scenario:** live feedback for attention, motor imagery, or cognitive training.
+
+Recommended pattern:
+
+- Use streaming inference with smoothing in the application layer.
+- Keep the classifier probabilistic and expose confidence.
+- Adapt difficulty based on recent performance, not a single prediction.
+- Use `NimbusSTS` for Python workflows with long-session drift.
+
+Key docs:
+
+- [Bayesian STS](/models/rxsts)
+- [Advanced Applications](/examples/advanced-applications)
+- [Probabilistic AI & Uncertainty](/core-concepts/probabilistic-ai)
+
+## Research Studies
+
+**Scenario:** offline experiments, multi-subject evaluation, or model comparison.
+
+Recommended pattern:
+
+- Use batch processing for reproducible offline analysis.
+- Evaluate with subject-wise or session-wise splits when studying generalization.
+- Save preprocessing and normalization parameters with every experiment.
+- Compare `NimbusLDA` against `NimbusQDA` before moving to more specialized models.
+
+Key docs:
+
+- [Batch Inference Configuration](/inference-configuration/batch-processing)
+- [Model Specification](/model-specification)
+- [External Preprocessing Integration](/development/preprocessing-integration)
+
+## Product Analytics
+
+For deployed BCI systems, monitor:
+
+| Metric | Why It Matters |
+| --- | --- |
+| Accuracy | Measures task success when labels are available. |
+| Mean confidence | Tracks model certainty and signal quality. |
+| Rejection rate | Shows whether thresholds or preprocessing are too strict. |
+| Latency | Protects real-time user experience. |
+| Calibration age | Indicates when retraining may be needed. |
+| Drift indicators | Flags electrode, fatigue, or session changes. |
+
+## Choosing A Starting Point
+
+| Use Case | First Model | Workflow |
+| --- | --- | --- |
+| Motor imagery rehab | `NimbusLDA` | Streaming with confidence gates. |
+| P300 communication | `NimbusQDA` | Batch calibration, then confidence-gated selection. |
+| Long neurofeedback | `NimbusSTS` | Stateful Python streaming. |
+| Julia multinomial tasks | `NimbusProbit` | Julia training and streaming workflows. |
+| Cross-subject research | `NimbusLDA` baseline | Batch evaluation with strict normalization. |
+
+## Next Read
 
 <CardGroup cols={2}>
   <Card title="Basic Examples" icon="play" href="/examples/basic-examples">
-    Complete working examples for all use cases
+    Compact recipes for common BCI tasks.
   </Card>
-  <Card title="Julia SDK Reference" icon="book" href="/julia-sdk/api-reference">
-    Full API documentation
+  <Card title="Advanced Applications" icon="rocket" href="/examples/advanced-applications">
+    Cross-subject, hybrid, adaptive, and robust deployment patterns.
   </Card>
-  <Card title="Model Training" icon="brain" href="/inference-configuration/batch-processing">
-    Train & calibrate models
+  <Card title="Model Specification" icon="brain" href="/model-specification">
+    Choose a model family for your use case.
   </Card>
-  <Card title="Real-Time Setup" icon="gauge" href="/inference-configuration/real-time-setup">
-    Streaming inference configuration
+  <Card title="Development Workflow" icon="code" href="/development">
+    Production project structure and guardrails.
   </Card>
 </CardGroup>
-
----
-
-These industry applications demonstrate the real-world potential of Nimbus BCI's probabilistic models across healthcare, assistive technology, and research domains. Both Python and Julia SDKs provide production-ready Bayesian classifiers for motor imagery, P300, and SSVEP paradigms: Bayesian LDA and QDA in both SDKs, `NimbusSoftmax` and `NimbusSTS` in Python, and `NimbusProbit` in Julia.

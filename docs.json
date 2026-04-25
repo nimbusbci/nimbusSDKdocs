@@ -59,7 +59,6 @@
         "group": "Core Concepts",
         "pages": [
           "core-concepts/probabilistic-ai",
-          "core-concepts/real-time-processing",
           "core-concepts/message-passing"
         ]
       },
@@ -154,6 +153,10 @@
     {
       "source": "/core-concepts/uncertainty-handling",
       "destination": "/core-concepts/probabilistic-ai"
+    },
+    {
+      "source": "/core-concepts/real-time-processing",
+      "destination": "/inference-configuration/real-time-setup"
     }
   ],
   "anchors": [
