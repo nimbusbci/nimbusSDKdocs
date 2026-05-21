@@ -15,13 +15,56 @@ This page compares common BCI processing approaches and explains where Bayesian 
 
 The table below compares **classical / frequentist** approaches with **Bayesian inference on NimbusSDK**. Nimbus ships Bayesian versions of LDA and QDA (`NimbusLDA`, `NimbusQDA`); the contrast is about inference philosophy and BCI workflow support, not the Gaussian model family itself.
 
-| Criterion | LDA | SVM | DL | Nimbus |
-| --- | --- | --- | --- | --- |
-| Real-time | High | Medium | Low | **High** |
-| Adaptability | Low | Medium | Medium | **High** |
-| Robustness | Low | Medium | Medium | **High** |
-| Interpretability | High | Med–low | Very low | **Very high** |
-| Online update | Low | Low | Low | **~10× faster** |
+<div className="nimbus-comparison-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Criterion</th>
+        <th>LDA</th>
+        <th>SVM</th>
+        <th>DL</th>
+        <th>Nimbus</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Real-time</td>
+        <td>High</td>
+        <td>Medium</td>
+        <td>Low</td>
+        <td><strong>High</strong></td>
+      </tr>
+      <tr>
+        <td>Adaptability</td>
+        <td>Low</td>
+        <td>Medium</td>
+        <td>Medium</td>
+        <td><strong>High</strong></td>
+      </tr>
+      <tr>
+        <td>Robustness</td>
+        <td>Low</td>
+        <td>Medium</td>
+        <td>Medium</td>
+        <td><strong>High</strong></td>
+      </tr>
+      <tr>
+        <td>Interpretability</td>
+        <td>High</td>
+        <td>Med–low</td>
+        <td>Very low</td>
+        <td><strong>Very high</strong></td>
+      </tr>
+      <tr>
+        <td>Online update</td>
+        <td>Low</td>
+        <td>Low</td>
+        <td>Low</td>
+        <td><strong>~10× faster</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 DL = deep learning. Expand any row for details:
 

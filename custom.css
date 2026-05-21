@@ -67,3 +67,32 @@ advanced-footer svg {
   width: 0.875rem !important;
   height: 0.875rem !important;
 }
+
+/* Highlight Nimbus column in BCI method comparison tables */
+.nimbus-comparison-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.nimbus-comparison-table th,
+.nimbus-comparison-table td {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nimbus-comparison-table th:last-child,
+.nimbus-comparison-table td:last-child {
+  background: rgba(184, 134, 11, 0.18);
+  color: #ffd700;
+  border-left: 2px solid rgba(255, 215, 0, 0.35);
+}
+
+.nimbus-comparison-table thead th:last-child {
+  background: rgba(184, 134, 11, 0.42);
+  color: #ffff66;
+  font-weight: 700;
+}
+
+.nimbus-comparison-table td:last-child strong {
+  color: #ffff66;
+}
