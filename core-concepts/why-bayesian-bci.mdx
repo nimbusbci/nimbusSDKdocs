@@ -28,78 +28,45 @@ The table below compares **classical / frequentist** approaches with **Bayesian 
     </thead>
     <tbody>
       <tr>
-        <td>Real-time</td>
-        <td>High</td>
-        <td>Medium</td>
-        <td>Low</td>
-        <td><strong>High</strong></td>
+        <td>Real-time performance</td>
+        <td><strong>High</strong> — very fast on simple linear problems</td>
+        <td><strong>Medium</strong> — slower with complex kernels</td>
+        <td><strong>Low</strong> — often GPU-bound; many pipelines stay offline</td>
+        <td><strong>High (reactive)</strong> — streaming APIs and incremental updates; 10–25 ms per trial</td>
       </tr>
       <tr>
         <td>Adaptability</td>
-        <td>Low</td>
-        <td>Medium</td>
-        <td>Medium</td>
-        <td><strong>High</strong></td>
+        <td><strong>Low</strong> — static model; full retrain for new data</td>
+        <td><strong>Medium</strong> — adaptation is possible but awkward</td>
+        <td><strong>Medium</strong> — needs large new datasets and retraining</td>
+        <td><strong>High (by design)</strong> — <code>partial_fit()</code> on every head; <code>NimbusSTS</code> for drift</td>
       </tr>
       <tr>
-        <td>Robustness</td>
-        <td>Low</td>
-        <td>Medium</td>
-        <td>Medium</td>
-        <td><strong>High</strong></td>
+        <td>Robustness (to noise)</td>
+        <td><strong>Low</strong> — sensitive to outliers and noisy covariances</td>
+        <td><strong>Medium</strong> — more robust than LDA, still point-estimate</td>
+        <td><strong>Medium</strong> — can learn noise patterns but needs vast data</td>
+        <td><strong>High (explicit modeling)</strong> — Student's t posterior predictive and uncertainty-aware rejection</td>
       </tr>
       <tr>
         <td>Interpretability</td>
-        <td>High</td>
-        <td>Med-low</td>
-        <td>Very low</td>
-        <td><strong>Very high</strong></td>
+        <td><strong>High</strong> — linear boundaries and clear feature geometry</td>
+        <td><strong>Medium–low</strong> — opaque with non-linear kernels</td>
+        <td><strong>Very low</strong> — black-box decisions</td>
+        <td><strong>Very high</strong> — full posteriors, factor graphs, entropy, and calibration diagnostics</td>
       </tr>
       <tr>
         <td>Online update</td>
-        <td>Low</td>
-        <td>Low</td>
-        <td>Low</td>
-        <td><strong>~10×</strong></td>
+        <td><strong>Low</strong> — refit each round (~835 µs sklearn LDA)</td>
+        <td><strong>Low</strong> — no native <code>partial_fit</code></td>
+        <td><strong>Low</strong> — retrain or fine-tune; not microsecond-scale</td>
+        <td><strong>~10× faster</strong> — conjugate <code>partial_fit()</code> (~87 µs vs. sklearn refit)</td>
       </tr>
     </tbody>
   </table>
 </div>
 
-DL = deep learning. **~10×** = ~10× faster online updates vs. sklearn refit. Expand any row for details:
-
-<AccordionGroup>
-  <Accordion title="Real-time performance" icon="bolt">
-    - **LDA** — Very fast on simple linear problems.
-    - **SVM** — Slower inference, especially with complex kernels.
-    - **Deep learning** — Often GPU-bound; many pipelines stay offline.
-    - **Nimbus** — Streaming APIs and incremental updates; 10–25 ms per trial on static heads.
-  </Accordion>
-  <Accordion title="Adaptability" icon="refresh-cw">
-    - **LDA** — Static model; full retrain for new data.
-    - **SVM** — Adaptation is possible but awkward.
-    - **Deep learning** — Needs large new datasets and retraining.
-    - **Nimbus** — `partial_fit()` on every head; `NimbusSTS` for session drift.
-  </Accordion>
-  <Accordion title="Robustness (to noise)" icon="shield">
-    - **LDA** — Sensitive to outliers and noisy covariances.
-    - **SVM** — More robust than LDA, still point-estimate.
-    - **Deep learning** — Can learn noise patterns but needs vast data.
-    - **Nimbus** — Student's t posterior predictive, priors, and uncertainty-aware rejection.
-  </Accordion>
-  <Accordion title="Interpretability" icon="eye">
-    - **LDA** — Linear boundaries and clear feature geometry.
-    - **SVM** — Opaque with non-linear kernels.
-    - **Deep learning** — Black-box decisions.
-    - **Nimbus** — Full posteriors, factor graphs, entropy, and calibration diagnostics.
-  </Accordion>
-  <Accordion title="Online update speed (~10×)" icon="zap">
-    - **LDA (sklearn)** — Refit each round: ~835 µs median (~827 µs mean).
-    - **SVM** — No native `partial_fit`; refit or custom adaptation each round.
-    - **Deep learning** — Retrain or fine-tune; not suited to microsecond-scale online loops.
-    - **Nimbus** — Conjugate `partial_fit()`: ~87 µs median (~83 µs mean). **~9.7× faster than sklearn refit on average** (~7.5×–10.2× per subject, BNCI 2014-004).
-  </Accordion>
-</AccordionGroup>
+DL = deep learning.
 
 <Note>
 Classical LDA and `NimbusLDA` share the same Gaussian model family. The difference is inference: plug-in MLE probabilities vs. multivariate Student's t posterior predictives, conjugate online updates, and BCI-native reports. See [Probabilistic AI & Uncertainty](/core-concepts/probabilistic-ai) for how those outputs drive rejection and control.
