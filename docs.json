@@ -58,6 +58,7 @@
       {
         "group": "Core Concepts",
         "pages": [
+          "core-concepts/why-bayesian-bci",
           "core-concepts/probabilistic-ai",
           "core-concepts/message-passing"
         ]

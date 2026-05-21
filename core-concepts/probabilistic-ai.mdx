@@ -22,6 +22,8 @@ Brain-computer interfaces operate in an uncertain environment. Neural signals ar
 Traditional deterministic BCI systems assume clean, consistent signals. When these assumptions break down, the systems fail catastrophically with no indication of confidence or reliability.
 </Warning>
 
+For a structured comparison of classical LDA, SVM, and deep learning against Bayesian inference on NimbusSDK — including benchmarked ~10× faster online updates vs. scikit-learn refit — see [Why Bayesian BCI Inference](/core-concepts/why-bayesian-bci).
+
 ## Bayesian Inference For BCI
 
 Both SDKs use Bayesian inference to model uncertainty explicitly with production-ready models: Bayesian LDA, Bayesian QDA, Bayesian Softmax, and Bayesian STS (Python SDK).
@@ -176,6 +178,9 @@ The mathematical details are handled by SDK APIs. Use model pages for algorithm-
 ## Next Read
 
 <CardGroup cols={2}>
+  <Card title="Why Bayesian BCI Inference" icon="scale" href="/core-concepts/why-bayesian-bci">
+    Classical vs. Bayesian BCI methods and online-update benchmarks.
+  </Card>
   <Card title="Model Selection" icon="brain" href="/model-specification">
     Compare available probabilistic models.
   </Card>
