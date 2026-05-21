@@ -1,4 +1,7 @@
 User-agent: *
-Allow: /
+Disallow: /cdn-cgi/
+Allow: /_next/image
+Disallow: /_next/
+Disallow: /mintlify-assets/
 
 Sitemap: https://docs.nimbusbci.com/sitemap.xml
