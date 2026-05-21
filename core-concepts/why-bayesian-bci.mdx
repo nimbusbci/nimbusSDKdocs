@@ -15,12 +15,48 @@ This page compares common BCI processing approaches and explains where Bayesian 
 
 The table below compares **classical / frequentist** approaches with **Bayesian inference on NimbusSDK**. Nimbus ships Bayesian versions of LDA and QDA (`NimbusLDA`, `NimbusQDA`); the contrast is about inference philosophy and BCI workflow support, not the Gaussian model family itself.
 
-| Criterion | Classical LDA | SVM | Deep Learning | Bayesian Inference (NimbusSDK) |
+| Criterion | LDA | SVM | DL | Nimbus |
 | --- | --- | --- | --- | --- |
-| **Real-time performance** | **High** — very fast on simple linear problems | **Medium** — slower with complex kernels | **Low** — often GPU-bound; many pipelines stay offline | **High (reactive)** — streaming APIs and incremental updates; 10–25 ms per trial on static heads |
-| **Adaptability** | **Low** — static model; full retrain for new data | **Medium** — adaptation is possible but awkward | **Medium** — needs large new datasets and retraining | **High (by design)** — `partial_fit()` on every head; `NimbusSTS` for session drift |
-| **Robustness (to noise)** | **Low** — sensitive to outliers and noisy covariances | **Medium** — more robust than LDA, still point-estimate | **Medium** — can learn noise patterns but needs vast data | **High (explicit modeling)** — Student's t posterior predictive, priors, and uncertainty-aware rejection |
-| **Interpretability** | **High** — linear boundaries and clear feature geometry | **Medium–Low** — opaque with non-linear kernels | **Very low** — black-box decisions | **Very high** — full posteriors, factor graphs, entropy, and calibration diagnostics |
+| Real-time | High | Medium | Low | **High** |
+| Adaptability | Low | Medium | Medium | **High** |
+| Robustness | Low | Medium | Medium | **High** |
+| Interpretability | High | Med–low | Very low | **Very high** |
+| Online update | Low | Low | Low | **~10× faster** |
+
+DL = deep learning. Expand any row for details:
+
+<AccordionGroup>
+  <Accordion title="Real-time performance" icon="bolt">
+    - **LDA** — Very fast on simple linear problems.
+    - **SVM** — Slower inference, especially with complex kernels.
+    - **Deep learning** — Often GPU-bound; many pipelines stay offline.
+    - **Nimbus** — Streaming APIs and incremental updates; 10–25 ms per trial on static heads.
+  </Accordion>
+  <Accordion title="Adaptability" icon="refresh-cw">
+    - **LDA** — Static model; full retrain for new data.
+    - **SVM** — Adaptation is possible but awkward.
+    - **Deep learning** — Needs large new datasets and retraining.
+    - **Nimbus** — `partial_fit()` on every head; `NimbusSTS` for session drift.
+  </Accordion>
+  <Accordion title="Robustness (to noise)" icon="shield">
+    - **LDA** — Sensitive to outliers and noisy covariances.
+    - **SVM** — More robust than LDA, still point-estimate.
+    - **Deep learning** — Can learn noise patterns but needs vast data.
+    - **Nimbus** — Student's t posterior predictive, priors, and uncertainty-aware rejection.
+  </Accordion>
+  <Accordion title="Interpretability" icon="eye">
+    - **LDA** — Linear boundaries and clear feature geometry.
+    - **SVM** — Opaque with non-linear kernels.
+    - **Deep learning** — Black-box decisions.
+    - **Nimbus** — Full posteriors, factor graphs, entropy, and calibration diagnostics.
+  </Accordion>
+  <Accordion title="Online update speed (~10×)" icon="zap">
+    - **LDA (sklearn)** — Refit each round: ~835 µs median (~827 µs mean).
+    - **SVM** — No native `partial_fit`; refit or custom adaptation each round.
+    - **Deep learning** — Retrain or fine-tune; not suited to microsecond-scale online loops.
+    - **Nimbus** — Conjugate `partial_fit()`: ~87 µs median (~83 µs mean). **~9.7× faster than sklearn refit on average** (~7.5×–10.2× per subject, BNCI 2014-004).
+  </Accordion>
+</AccordionGroup>
 
 <Note>
 Classical LDA and `NimbusLDA` share the same Gaussian model family. The difference is inference: plug-in MLE probabilities vs. multivariate Student's t posterior predictives, conjugate online updates, and BCI-native reports. See [Probabilistic AI & Uncertainty](/core-concepts/probabilistic-ai) for how those outputs drive rejection and control.
@@ -46,17 +82,15 @@ Nimbus is designed for deployments where the question is not only *what class?* 
 
 ## ~10× Faster Online Updates
 
-During online calibration, how fast the model incorporates a new labeled trial directly affects user experience. Refitting a scikit-learn LDA model from scratch on every update is substantially slower than Nimbus's conjugate `partial_fit()` path.
+The **Online update** row above is benchmarked on Nimbus's checked-in online-update scenario (BNCI 2014-004, with Zhou 2016 as a supporting replication):
 
-Benchmarks from Nimbus's checked-in online-update scenario (BNCI 2014-004, with Zhou 2016 as a supporting replication) show:
-
-| Update strategy | Mean latency (per update) | Notes |
+| Strategy | Latency | Notes |
 | --- | --- | --- |
-| **`nimbus_partial_fit`** | **~87 µs** (median ~83 µs) | Conjugate NIW update; intended online path |
-| `nimbus_refit` | ~145 µs (median ~143 µs) | Full refit on Nimbus head |
-| `sklearn_refit` | ~835 µs (median ~827 µs) | Refit `LinearDiscriminantAnalysis` each round |
+| **`nimbus_partial_fit`** | **~87 µs** | Conjugate online update |
+| `nimbus_refit` | ~145 µs | Full Nimbus refit |
+| `sklearn_refit` | ~835 µs | sklearn LDA refit each round |
 
-**Result:** `sklearn_refit` / `nimbus_partial_fit` ≈ **9.7× on average** across subjects (~7.5×–10.2× per subject on the published run) — effectively **~10× faster** online adaptation.
+**Result:** `sklearn_refit` / `nimbus_partial_fit` ≈ **9.7× on average** across subjects (~7.5×–10.2× per subject on the published run) — effectively **~10× faster** online adaptation. Medians: ~83 µs vs. ~827 µs.
 
 <Tip>
 Reproduce these numbers from the checked-in benchmark CSV via `notebooks/s3_update_latency_head_vs_sklearn.ipynb`. Full context, plots, and the sklearn / pyRiemann workflow comparison are in the [blog post](https://www.nimbusbci.com/blog/why-nimbus-sdk-bci-scikit-learn-pyriemann).
@@ -68,11 +102,11 @@ This latency advantage compounds in cued-calibration loops: faster updates mean 
 
 Nimbus is a **decision layer**, not a replacement for every ML or geometry library.
 
-| Tool | Role in the pipeline |
+| Tool | Role |
 | --- | --- |
-| **scikit-learn** | Offline baselines, generic pipelines, frequentist comparisons |
-| **pyRiemann** | Covariance geometry, tangent space, MDM-style classifiers on trial covariances |
-| **NimbusSDK** | Bayesian classifier heads, streaming sessions, posteriors, entropy, ITR, and active learning on Euclidean features |
+| **scikit-learn** | Offline baselines and frequentist comparisons |
+| **pyRiemann** | Covariance geometry and tangent-space features |
+| **NimbusSDK** | Bayesian heads, streaming, posteriors, and BCI diagnostics |
 
 Typical composition:
 
