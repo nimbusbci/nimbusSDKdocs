@@ -7,7 +7,7 @@ icon: "python"
 
 # Python SDK
 
-The **nimbus-bci** Python library provides sklearn-compatible Bayesian classifiers for Brain-Computer Interface applications. It delivers local probabilistic inference with uncertainty quantification, streaming support, and rich diagnostics. The optional `NimbusSoftmax` model uses JAX and is available with `pip install nimbus-bci[softmax]`.
+The **nimbus-bci** Python library provides sklearn-compatible Bayesian classifiers for Brain-Computer Interface applications. It delivers local probabilistic inference with uncertainty quantification, streaming support, and rich diagnostics. Optional extras add `NimbusSoftmax` via JAX (`pip install nimbus-bci[softmax]`) and pyRiemann feature pipelines (`pip install nimbus-bci[riemann]`).
 
 ## Start Here
 
@@ -32,7 +32,7 @@ pip install nimbus-bci
 ```
 
 <Note>
-**New in `nimbus-bci`:** `CalibrationSession` packages active-learning helpers into a first-class workflow for label-efficient calibration, pool bookkeeping, online updates, and stopping checks. See [Active Learning](/python-sdk/active-learning).
+**New in `nimbus-bci`:** `CalibrationSession` packages active-learning helpers into a first-class workflow, and `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)` composes pyRiemann covariance/tangent features with Nimbus heads. See [Active Learning](/python-sdk/active-learning) and [API Reference](/python-sdk/api-reference).
 </Note>
 
 ## Key Features
@@ -46,6 +46,9 @@ pip install nimbus-bci
   </Card>
   <Card title="MNE Integration" icon="brain">
     Seamless integration with MNE-Python for EEG preprocessing and feature extraction.
+  </Card>
+  <Card title="Riemannian Features" icon="code">
+    Optional pyRiemann covariance/tangent feature pipelines feeding existing Nimbus classifier heads.
   </Card>
   <Card title="Rich Diagnostics" icon="chart-line">
     Entropy, calibration metrics (ECE/MCE), ITR calculation, and quality assessment.
@@ -206,6 +209,9 @@ The `nimbus-bci` package provides:
 - `from_mne_epochs()` - Convert MNE Epochs to BCIData
 - `extract_csp_features()` - CSP feature extraction
 - `extract_bandpower_features()` - Bandpower features
+
+**Optional Riemannian Features:**
+- `make_riemann_nimbus_pipeline()` - Build an EEG-epoch pipeline from pyRiemann covariance/tangent transforms to a Nimbus classifier head
 
 ## Next Read
 

@@ -124,7 +124,7 @@ Typical composition:
 EEG → CSP / bandpower / pyRiemann tangent vectors → NimbusLDA or NimbusQDA → confidence-aware action
 ```
 
-Use pyRiemann (or CSP) for **representation**; use Nimbus for **inference and BCI reports** when uncertainty and online updates matter.
+Use pyRiemann (or CSP) for **representation**; use Nimbus for **inference and BCI reports** when uncertainty and online updates matter. In Python, `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)` packages the pyRiemann covariance/tangent workflow with a Nimbus head while keeping it a composition helper, not a separate Riemannian Bayesian model.
 
 ## Picking a Nimbus Model
 

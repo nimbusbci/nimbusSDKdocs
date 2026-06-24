@@ -298,6 +298,55 @@ predictions = clf_day2.predict(X_day2_test)
 See [Bayesian STS Documentation](/models/rxsts) for complete usage guide.
 </Note>
 
+## Optional Riemannian Pipelines
+
+### `make_riemann_nimbus_pipeline()`
+
+Factory for composing pyRiemann covariance/tangent feature extraction with an existing Nimbus classifier head.
+
+Install the optional extra before using this API:
+
+```bash
+pip install nimbus-bci[riemann]
+```
+
+```python
+from nimbus_bci import NimbusLDA
+from nimbus_bci.riemann import make_riemann_nimbus_pipeline
+
+pipe = make_riemann_nimbus_pipeline(
+    head=NimbusLDA(),
+    covariance_estimator="oas",
+    tangent_metric="riemann",
+)
+```
+
+**Parameters:**
+- `head` (object or None, default=None): Final sklearn-compatible classifier exposing `fit`, `predict`, and `predict_proba`. Defaults to `NimbusLDA()` when omitted.
+- `covariance_estimator` (str, default=`"oas"`): Estimator passed to `pyriemann.estimation.Covariances`.
+- `tangent_metric` (str, default=`"riemann"`): Metric passed to `pyriemann.tangentspace.TangentSpace`.
+
+**Returns:**
+- `sklearn.pipeline.Pipeline`: Pipeline with `covariances`, `tangent`, and `head` steps.
+
+**Example:**
+
+```python
+from nimbus_bci import NimbusLDA
+from nimbus_bci.riemann import make_riemann_nimbus_pipeline
+
+# X_epochs shape: (n_trials, n_channels, n_times)
+pipe = make_riemann_nimbus_pipeline(head=NimbusLDA(mu_scale=5.0))
+pipe.fit(X_epochs_train, y_train)
+
+probs = pipe.predict_proba(X_epochs_test)
+predictions = pipe.predict(X_epochs_test)
+```
+
+<Note>
+Nimbus supports Riemannian workflows by consuming tangent-space features from pyRiemann; this is not a separate Riemannian Bayesian model. The returned object is a standard sklearn `Pipeline`, so do not rely on pipeline-level `partial_fit()` for this path.
+</Note>
+
 ## Data Structures
 
 ### BCIData

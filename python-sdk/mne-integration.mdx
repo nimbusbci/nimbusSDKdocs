@@ -150,6 +150,43 @@ print(f"Train accuracy: {train_score:.2%}")
 print(f"Test accuracy: {test_score:.2%}")
 ```
 
+## Optional Riemannian Feature Pipeline
+
+For workflows that use covariance geometry, install the pyRiemann extra and build a sklearn pipeline from EEG epochs to a Nimbus classifier head:
+
+```bash
+pip install nimbus-bci[riemann]
+```
+
+```python
+import mne
+from nimbus_bci import NimbusLDA
+from nimbus_bci.riemann import make_riemann_nimbus_pipeline
+from sklearn.model_selection import train_test_split
+
+raw = mne.io.read_raw_gdf("motor_imagery.gdf", preload=True)
+raw.filter(8, 30)
+events = mne.find_events(raw)
+epochs = mne.Epochs(raw, events, tmin=0, tmax=4, baseline=None, preload=True)
+
+X_epochs = epochs.get_data()  # (n_trials, n_channels, n_times)
+y = epochs.events[:, 2]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_epochs, y, test_size=0.2, stratify=y, random_state=42
+)
+
+pipe = make_riemann_nimbus_pipeline(head=NimbusLDA())
+pipe.fit(X_train, y_train)
+
+probs = pipe.predict_proba(X_test)
+predictions = pipe.predict(X_test)
+```
+
+<Note>
+This factory delegates covariance and tangent-space transforms to pyRiemann, then feeds the resulting feature rows into a Nimbus head. It is a composition helper, not a new Riemannian Bayesian model family.
+</Note>
+
 ## CSP Feature Extraction
 
 ### Basic CSP

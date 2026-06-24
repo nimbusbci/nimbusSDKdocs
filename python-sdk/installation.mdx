@@ -71,6 +71,21 @@ pip install nimbus-bci[softmax]
 This adds:
 - JAX ≥ 0.4.25
 
+### Riemannian Feature Pipelines
+
+For pyRiemann covariance and tangent-space feature extraction with Nimbus classifier heads:
+
+```bash
+pip install nimbus-bci[riemann]
+```
+
+This adds:
+- pyRiemann ≥ 0.11
+
+<Note>
+The `riemann` extra enables `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)`. This is a feature-extraction bridge from EEG epochs to Nimbus heads, not a separate Riemannian Bayesian model family.
+</Note>
+
 ### All Optional Dependencies
 
 Install everything:
