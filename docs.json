@@ -158,6 +158,10 @@
     {
       "source": "/core-concepts/real-time-processing",
       "destination": "/inference-configuration/real-time-setup"
+    },
+    {
+      "source": "/v1/installer/github-token",
+      "destination": "/cloud-api/authentication#get-/v1/installer/github-token"
     }
   ],
   "anchors": [
