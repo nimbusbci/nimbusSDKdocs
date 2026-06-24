@@ -939,6 +939,8 @@ Active learning helpers reduce calibration cost by ranking unlabeled feature row
 
 ```python
 from nimbus_bci.active_learning import (
+    CalibrationRound,
+    CalibrationSession,
     CalibrationStatus,
     QueryResult,
     StreamingQueryDecision,
@@ -953,6 +955,74 @@ All helpers accept either a fitted Nimbus classifier (`NimbusLDA`, `NimbusQDA`, 
 <Info>
 Active learning expects preprocessed features. Use `X_pool` shaped `(n_pool, n_features)` for pool-based ranking and stopping, and `x_new` shaped `(n_features,)` or `(1, n_features)` for streaming query decisions.
 </Info>
+
+### `CalibrationSession`
+
+Stateful workflow object for active calibration loops. Use it when you want the SDK to manage active-pool bookkeeping, selected index history, `partial_fit()` updates, and previous model snapshots for `posterior_stability`.
+
+```python
+CalibrationSession(
+    model,
+    X_pool,
+    *,
+    pool_strategy="bald",
+    streaming_strategy="entropy",
+    batch_size=1,
+    stopping_criterion="posterior_stability",
+    stopping_threshold=None,
+    streaming_threshold=None,
+    num_posterior_samples=256,
+    rng_seed=0,
+)
+```
+
+**Parameters:**
+- `model` (`NimbusModel` or fitted Nimbus classifier): Model used for scoring. `update(...)` requires a fitted Nimbus classifier with `partial_fit()`.
+- `X_pool` (`np.ndarray`): Original unlabeled feature pool with shape `(n_pool, n_features)`.
+- `pool_strategy` (`"entropy"`, `"margin"`, `"least_confidence"`, or `"bald"`, default=`"bald"`): Strategy used by `suggest_next_trial()`.
+- `streaming_strategy` (`"entropy"`, `"margin"`, or `"least_confidence"`, default=`"entropy"`): Strategy used by `should_query()`.
+- `batch_size` (int, default=`1`): Default number of pool candidates to request per round.
+- `stopping_criterion` (`"posterior_stability"` or `"expected_info_gain"`, default=`"posterior_stability"`): Criterion used by `calibration_sufficient()`.
+- `stopping_threshold` (float, optional): Default stopping threshold.
+- `streaming_threshold` (float, optional): Default streaming query threshold.
+- `num_posterior_samples` (int, default=`256`): Default sample count forwarded to active-learning helpers.
+- `rng_seed` (int, default=`0`): Default deterministic seed.
+
+**Methods:**
+- `suggest_next_trial(...) -> QueryResult`: Rank the current active pool. Returned indices are local to `remaining_pool`.
+- `update(chosen_indices, y_new) -> CalibrationSession`: Map pool-local indices to original pool rows, capture the pre-update snapshot, call `partial_fit()`, and remove selected rows.
+- `calibration_sufficient(...) -> CalibrationStatus`: Evaluate whether calibration can stop.
+- `should_query(x_new, ...) -> StreamingQueryDecision`: Delegate streaming query decisions with session defaults.
+- `get_model() -> NimbusModel`: Return the current Nimbus model snapshot.
+
+**Properties:**
+- `remaining_indices`: Original pool indices still available.
+- `remaining_pool`: Active feature rows still available.
+- `n_remaining`: Number of active candidates left.
+- `is_exhausted`: Whether no candidates remain.
+- `round_index`: Number of completed update rounds.
+- `n_labeled`: Number of labels applied through `update(...)`.
+
+```python
+session = CalibrationSession(
+    clf,
+    X_pool,
+    pool_strategy="bald",
+    batch_size=4,
+    stopping_threshold=0.02,
+)
+
+ranked = session.suggest_next_trial()
+global_indices = session.remaining_indices[ranked.indices]
+y_new = collect_labels_for(global_indices)
+session.update(ranked.indices, y_new)
+
+status = session.calibration_sufficient()
+```
+
+<Note>
+For `posterior_stability`, `calibration_sufficient()` requires at least one prior `update(...)` unless you pass an explicit `previous` snapshot.
+</Note>
 
 ### `suggest_next_trial()`
 
@@ -985,6 +1055,7 @@ suggest_next_trial(
 - `n_posterior_samples`: Posterior samples used (`1` for cheap strategies)
 
 ```python
+previous = clf.get_model()
 ranked = suggest_next_trial(
     clf,
     X_pool,
@@ -993,8 +1064,16 @@ ranked = suggest_next_trial(
     num_posterior_samples=256,
 )
 
-X_new, y_new = collect_labels_for(ranked.indices)
+X_new = X_pool[ranked.indices]
+y_new = collect_labels_for(ranked.indices)
 clf.partial_fit(X_new, y_new)
+
+status = calibration_sufficient(
+    clf,
+    X_pool,
+    previous=previous,
+    threshold=0.02,
+)
 ```
 
 <Note>
@@ -1083,7 +1162,7 @@ calibration_sufficient(
 ```python
 previous = clf.get_model()
 
-# ... collect labels and call clf.partial_fit(...)
+# ... collect labels and call clf.partial_fit(...) on the current round ...
 
 status = calibration_sufficient(
     clf,

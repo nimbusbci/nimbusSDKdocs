@@ -32,7 +32,7 @@ pip install nimbus-bci
 ```
 
 <Note>
-**New in `nimbus-bci` 0.4.1:** active-learning helpers for label-efficient calibration, including `suggest_next_trial()`, `should_query()`, and `calibration_sufficient()`. See [Active Learning](/python-sdk/active-learning).
+**New in `nimbus-bci`:** `CalibrationSession` packages active-learning helpers into a first-class workflow for label-efficient calibration, pool bookkeeping, online updates, and stopping checks. See [Active Learning](/python-sdk/active-learning).
 </Note>
 
 ## Key Features
@@ -186,6 +186,7 @@ The `nimbus-bci` package provides:
 - `StreamingSession` - Real-time chunk processing
 
 **Active Learning:**
+- `CalibrationSession` - Manage pool-based calibration rounds and stopping snapshots
 - `suggest_next_trial()` - Rank unlabeled feature pools by informativeness
 - `should_query()` - Decide whether an arriving trial is worth labeling
 - `calibration_sufficient()` - Stop calibration when the posterior stabilizes

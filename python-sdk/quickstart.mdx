@@ -175,33 +175,27 @@ print("Model updated with new data")
 Use active learning to label only the most informative calibration trials:
 
 ```python
-from nimbus_bci.active_learning import calibration_sufficient, suggest_next_trial
+from nimbus_bci.active_learning import CalibrationSession
 
-previous = clf.get_model()
-
-ranked = suggest_next_trial(
+session = CalibrationSession(
     clf,
     X_pool,
-    strategy="bald",
-    n=4,
+    pool_strategy="bald",
+    batch_size=4,
+    stopping_threshold=0.02,
     num_posterior_samples=256,
 )
 
-# Cue and label the selected pool rows, then update.
-X_new, y_new = collect_labels_for(ranked.indices)
-clf.partial_fit(X_new, y_new)
+ranked = session.suggest_next_trial()
+global_indices = session.remaining_indices[ranked.indices]
+y_new = collect_labels_for(global_indices)
+session.update(ranked.indices, y_new)
 
-status = calibration_sufficient(
-    clf,
-    X_pool,
-    criterion="posterior_stability",
-    previous=previous,
-    threshold=0.02,
-)
+status = session.calibration_sufficient()
 ```
 
 <Tip>
-Active learning expects feature rows shaped `(n_trials, n_features)`. See [Active Learning](/python-sdk/active-learning) for strategy guidance and stopping criteria.
+Active learning expects feature rows shaped `(n_trials, n_features)`. `CalibrationSession` returns indices local to the current active pool, so use `session.remaining_indices[ranked.indices]` when labels are keyed by the original pool. See [Active Learning](/python-sdk/active-learning) for strategy guidance and stopping criteria.
 </Tip>
   </Step>
 

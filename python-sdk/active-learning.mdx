@@ -1,13 +1,13 @@
 ---
 title: "Active Learning"
-description: "Use nimbus-bci active learning helpers to reduce calibration time with pool-based trial ranking, streaming query gates, and label-free stopping."
-keywords: ["active learning", "BCI calibration", "BALD", "label-efficient calibration", "Python SDK", "nimbus-bci", "suggest_next_trial", "calibration_sufficient"]
+description: "Use nimbus-bci CalibrationSession and active learning helpers to reduce calibration time with pool-based trial ranking, streaming query gates, and label-free stopping."
+keywords: ["active learning", "BCI calibration", "BALD", "label-efficient calibration", "Python SDK", "nimbus-bci", "CalibrationSession", "suggest_next_trial", "calibration_sufficient"]
 icon: "target"
 ---
 
 # Active Learning
 
-Use active learning to collect labels for the trials that are most likely to improve your BCI model. The Python SDK exposes stateless helpers for pool-based calibration, streaming label requests, and label-free stopping.
+Use active learning to collect labels for the trials that are most likely to improve your BCI model. The Python SDK exposes `CalibrationSession` for full calibration loops, plus stateless helpers for custom pool ranking, streaming label requests, and label-free stopping.
 
 <Info>
 Active learning operates on **preprocessed feature rows**, not raw EEG. Use arrays shaped `(n_trials, n_features)` for pools and `(n_features,)` or `(1, n_features)` for single streaming trials.
@@ -15,12 +15,12 @@ Active learning operates on **preprocessed feature rows**, not raw EEG. Use arra
 
 ## Core Workflow
 
-Start with a small seed calibration set, rank an unlabeled feature pool, collect labels for the most informative trials, update with `partial_fit()`, and stop when the posterior stops changing.
+Start with a small seed calibration set, rank an unlabeled feature pool, collect labels for the most informative trials, update with `partial_fit()`, and stop when the posterior stops changing. For most applications, use `CalibrationSession` so pool bookkeeping and model snapshots stay consistent.
 
 ```mermaid
 flowchart LR
     seedModel["Seed model"] --> unlabeledPool["Unlabeled feature pool"]
-    unlabeledPool --> rankTrials["suggest_next_trial"]
+    unlabeledPool --> rankTrials["CalibrationSession.suggest_next_trial"]
     rankTrials --> labelTrials["Collect labels"]
     labelTrials --> updateModel["partial_fit"]
     updateModel --> stopCheck["calibration_sufficient"]
@@ -30,36 +30,79 @@ flowchart LR
 
 ```python
 from nimbus_bci import NimbusLDA
-from nimbus_bci.active_learning import calibration_sufficient, suggest_next_trial
+from nimbus_bci.active_learning import CalibrationSession
 
 clf = NimbusLDA().fit(X_seed, y_seed)
-previous = clf.get_model()
+session = CalibrationSession(
+    clf,
+    X_pool,
+    pool_strategy="bald",
+    batch_size=4,
+    stopping_threshold=0.02,
+    num_posterior_samples=256,
+)
 
 for _ in range(max_rounds):
-    ranked = suggest_next_trial(
-        clf,
-        X_pool,
-        strategy="bald",
-        n=4,
-        num_posterior_samples=256,
-        rng_seed=0,
-    )
+    ranked = session.suggest_next_trial()
+    global_indices = session.remaining_indices[ranked.indices]
+    y_new = collect_labels_for(global_indices)
+    session.update(ranked.indices, y_new)
 
-    X_new, y_new = collect_labels_for(ranked.indices)
-    clf.partial_fit(X_new, y_new)
-
-    status = calibration_sufficient(
-        clf,
-        X_pool,
-        criterion="posterior_stability",
-        previous=previous,
-        threshold=0.02,
-    )
+    status = session.calibration_sufficient()
     if status.is_sufficient:
         break
-
-    previous = clf.get_model()
 ```
+
+## CalibrationSession
+
+Use `CalibrationSession` when you want the SDK to manage the active pool, selected index history, `partial_fit()` updates, and the previous model snapshot needed by `posterior_stability`.
+
+```python
+from nimbus_bci.active_learning import CalibrationSession
+
+session = CalibrationSession(
+    clf,
+    X_pool,
+    pool_strategy="bald",
+    streaming_strategy="entropy",
+    batch_size=4,
+    stopping_threshold=0.02,
+    streaming_threshold=1.0,
+    num_posterior_samples=256,
+    rng_seed=0,
+)
+
+ranked = session.suggest_next_trial()
+global_indices = session.remaining_indices[ranked.indices]
+y_new = collect_labels_for(global_indices)
+session.update(ranked.indices, y_new)
+
+status = session.calibration_sufficient()
+decision = session.should_query(x_new)
+```
+
+`suggest_next_trial()` returns indices local to the current active pool. Use `session.remaining_indices[ranked.indices]` when labels are stored against the original pool. `update()` captures the pre-update model snapshot, calls `partial_fit()`, removes selected rows, and increments `round_index` and `n_labeled`.
+
+<Note>
+For `posterior_stability`, call `session.calibration_sufficient()` only after at least one `session.update(...)`. Before then, there is no previous model snapshot to compare.
+</Note>
+
+### Session State
+
+Useful properties and history fields:
+
+- `remaining_indices`: original pool indices still available for querying.
+- `remaining_pool`: feature rows still available for querying.
+- `n_remaining`: number of candidates left.
+- `is_exhausted`: whether no candidates remain.
+- `n_labeled`: number of labels applied through `update()`.
+- `query_history`: `QueryResult` objects returned by session ranking calls.
+- `stopping_history`: `CalibrationStatus` objects returned by stopping checks.
+- `selected_global_indices`: original pool indices selected each round.
+
+### When to Use Stateless Helpers
+
+Use the lower-level helpers directly when you are building a custom loop, working with raw `NimbusModel` snapshots, or do not want the SDK to mutate a fitted classifier. `CalibrationSession.update(...)` requires a fitted Nimbus classifier with `partial_fit()`.
 
 ## Pool-Based Trial Ranking
 
@@ -189,6 +232,7 @@ For conservative calibration, use `posterior_stability` as the primary stopping 
 
 ## Practical Defaults
 
+- Use `CalibrationSession` for end-to-end calibration loops.
 - Start with `strategy="bald"` for pool-based calibration when using `NimbusLDA`, `NimbusQDA`, or `NimbusSoftmax`.
 - Use `num_posterior_samples=256` for BALD ranking stability. Lower values can be faster but noisier.
 - Use `strategy="entropy"` for streaming `should_query()` gates.
