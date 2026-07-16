@@ -52,7 +52,12 @@
         "group": "Getting Started",
         "pages": [
           "index",
-          "quickstart",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Personalizer & Middleware",
+        "pages": [
           "python-sdk/middleware"
         ]
       },
@@ -61,7 +66,6 @@
         "pages": [
           "python-sdk/introduction",
           "python-sdk/installation",
-          "python-sdk/middleware",
           "python-sdk/quickstart",
           "python-sdk/api-reference",
           "python-sdk/active-learning",
