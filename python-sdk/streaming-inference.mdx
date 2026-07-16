@@ -779,6 +779,25 @@ with open("adapted_model_day1.pkl", "wb") as f:
 **Pro Tip**: For long BCI sessions, monitor the state uncertainty. If it grows too large, consider a brief recalibration (5-10 trials) to re-anchor the model.
 </Tip>
 
+## Bridge to BrainState
+
+For app integration, convert a finalized `StreamingResult` into a `BrainState`:
+
+```python
+from nimbus_bci import NimbusLDA, StreamingSession, brain_state_from_streaming_result
+
+clf = NimbusLDA().fit(X_cal, y_cal)
+session = StreamingSession(clf, n_features=X_cal.shape[1], chunk_size=25)
+
+# ... process_chunk(...) for the trial ...
+final = session.finalize_trial()
+state = brain_state_from_streaming_result(final, classes=["left", "right"])
+print(state.intent, state.confidence, state.need_more_data)
+session.reset()
+```
+
+Prefer `BrainState` when shipping device / UI decisions. Keep `StreamingResult` for research diagnostics. See [Personalizer & Middleware](/python-sdk/middleware).
+
 ## Best Practices
 
 ### 1. Always Reset Between Trials
@@ -821,14 +840,14 @@ if chunk is None or np.any(np.isnan(chunk)):
 ## Next Read
 
 <CardGroup cols={2}>
+  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+    BrainState contract and encoder personalization
+  </Card>
   <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">
     Complete EEG preprocessing pipeline
   </Card>
   <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
     Complete API documentation
-  </Card>
-  <Card title="sklearn Integration" icon="code" href="/python-sdk/sklearn-integration">
-    Advanced sklearn patterns
   </Card>
   <Card title="Examples" icon="braces" href="/examples/basic-examples">
     Working code examples

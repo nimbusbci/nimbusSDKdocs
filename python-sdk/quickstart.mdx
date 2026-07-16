@@ -1,18 +1,18 @@
 ---
 title: "Python SDK Quickstart"
-description: "Build your first nimbus-bci classifier in minutes with installation, sklearn integration, and real-time streaming inference."
-keywords: ["Python SDK", "nimbus-bci", "BCI quickstart", "Bayesian BCI", "Python tutorial", "sklearn integration", "streaming inference", "motor imagery", "P300"]
+description: "Build your first nimbus-bci Personalizer in minutes — wrap an encoder, adapt online, ship BrainState — plus classical sklearn heads."
+keywords: ["Python SDK", "nimbus-bci", "Personalizer", "BrainState", "BCI quickstart", "Bayesian BCI", "sklearn integration", "streaming inference"]
 icon: "rocket"
 ---
 
 # Python SDK Quickstart
 
-Get started with nimbus-bci and build your first Bayesian BCI classifier in just a few minutes.
+Get started with nimbus-bci: wrap any frozen encoder, personalize with a Bayesian head, and consume `BrainState` outputs.
 
 <Info>
 **Time to complete:** ~10 minutes
 
-This guide walks you through installation, basic usage, sklearn integration, and real-time streaming inference.
+This guide walks through installation, Personalizer (product path), classical heads, sklearn integration, and streaming.
 </Info>
 
 ## Prerequisites
@@ -21,10 +21,10 @@ Before you begin:
 
 - **Python ≥ 3.11** installed
 - **Basic understanding** of EEG data and BCI concepts
-- **Preprocessed features** (CSP, bandpower, etc.) - see [preprocessing requirements](/inference-configuration/preprocessing-requirements)
+- **Embeddings** from a frozen trunk, or **preprocessed features** (CSP, bandpower, etc.) — see [Personalizer & Middleware](/python-sdk/middleware) and [preprocessing requirements](/inference-configuration/preprocessing-requirements)
 
 <Tip>
-nimbus-bci expects **preprocessed features**, not raw EEG data. Use MNE-Python or similar tools for preprocessing.
+nimbus-bci expects **embeddings or preprocessed features**, not raw EEG. Plug a frozen trunk via `wrap()`, or extract CSP / bandpower with MNE-Python.
 </Tip>
 
 ---
@@ -46,29 +46,59 @@ pip install nimbus-bci[mne]
 Verify installation:
 
 ```python
+from nimbus_bci import Personalizer, wrap, BrainState
 import nimbus_bci
 print(f"nimbus-bci version: {nimbus_bci.__version__}")
 ```
   </Step>
 
-  <Step title="Basic Classification">
-Create your first Bayesian classifier:
+  <Step title="Personalizer (product path)">
+Wrap a frozen encoder and adapt online:
+
+```python
+from nimbus_bci import Personalizer, wrap
+import numpy as np
+
+np.random.seed(42)
+n_samples, n_features = 100, 16
+X_cal = np.random.randn(n_samples, n_features)
+y_cal = np.random.randint(0, 2, n_samples)
+X_test = np.random.randn(20, n_features)
+
+# Toy identity encoder — replace with partner / foundation encode(X) → Z
+enc = wrap(lambda X: X, model_id="demo-encoder", embedding_dim=n_features)
+adapter = Personalizer(
+    encoder=enc,
+    head="lda",
+    classes=["left", "right"],
+    preset="research",
+)
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)  # list[BrainState]
+print(states[0].intent, states[0].confidence, states[0].need_more_data)
+adapter.save("subject_demo_profile")
+```
+
+<Info>
+**Key concepts:** `wrap()` freezes the encoder contract, `Personalizer` owns the Bayesian head + gating, and `BrainState` is what apps consume. Full contract: [Personalizer & Middleware](/python-sdk/middleware).
+</Info>
+  </Step>
+
+  <Step title="Classical features (optional)">
+Already have CSP / bandpower vectors? Use a head directly (or `Personalizer(encoder=None)`):
 
 ```python
 from nimbus_bci import NimbusLDA
 import numpy as np
 
-# Generate sample data (in practice, use your preprocessed EEG features)
 np.random.seed(42)
 n_samples, n_features = 100, 16
 X_train = np.random.randn(n_samples, n_features)
 y_train = np.random.randint(0, 4, n_samples)  # 4-class problem
 
-# Create and fit classifier
 clf = NimbusLDA()
 clf.fit(X_train, y_train)
 
-# Predict on new data
 X_test = np.random.randn(20, n_features)
 predictions = clf.predict(X_test)
 probabilities = clf.predict_proba(X_test)
@@ -78,7 +108,7 @@ print(f"Probabilities shape: {probabilities.shape}")  # (20, 4)
 ```
 
 <Info>
-**Key concepts:** `NimbusLDA()` creates a Bayesian LDA classifier, `fit()` trains the model on labeled data, `predict()` returns class predictions, and `predict_proba()` returns full posterior distributions.
+**Key concepts:** `NimbusLDA()` is the default Personalizer head and also a standalone sklearn-compatible classifier.
 </Info>
   </Step>
 

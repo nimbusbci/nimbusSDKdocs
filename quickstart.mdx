@@ -7,38 +7,42 @@ icon: "rocket"
 
 # Quickstart
 
-Choose the SDK that matches your workflow. The Python SDK runs fully locally with an sklearn-style API, while the Julia SDK uses NimbusSDK.jl and requires an API key for the commercial core.
+Choose the SDK that matches your workflow. The Python SDK leads with `wrap` → `Personalizer` → `BrainState` (classical heads remain available). The Julia SDK uses NimbusSDK.jl and requires an API key for the commercial core.
 
 <CardGroup cols={2}>
   <Card title="Python SDK Quickstart" icon="python" href="/python-sdk/quickstart">
-    Install `nimbus-bci`, fit your first classifier, and try batch, streaming, and active-learning workflows.
+    Install `nimbus-bci`, fit a Personalizer (or classical head), and try streaming / active learning.
   </Card>
   <Card title="Julia SDK Quickstart" icon="code" href="/julia-sdk/quickstart">
     Install NimbusSDK.jl, authenticate with an API key, and run your first Julia inference workflow.
   </Card>
 </CardGroup>
 
+<Tip>
+Using a frozen neural encoder (EEGNet, BrainDecode, REVE, …)? Start with [Personalizer & Middleware](/python-sdk/middleware) instead of the classical classifier path.
+</Tip>
+
 ## Before You Start
 
 - Use **Python 3.11+** for the Python SDK or **Julia 1.9+** for the Julia SDK.
-- Provide **preprocessed EEG features**, not raw EEG.
-- Start with the [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) guide if you are not sure how to prepare CSP, bandpower, or ERP features.
+- Provide **embeddings** (`encode(X) → Z`) or **preprocessed EEG features**, not raw EEG.
+- Start with [Personalizer & Middleware](/python-sdk/middleware) for the encoder contract, or [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) for CSP / bandpower / ERP features.
 
 <Tip>
-Nimbus focuses on Bayesian inference and BCI workflow tooling. Filtering, artifact removal, epoching, and feature extraction happen before data reaches the SDK.
+Nimbus focuses on Bayesian personalization and BCI workflow tooling. Filtering, artifact removal, epoching, and feature extraction (or a frozen trunk) happen before data reaches the head.
 </Tip>
 
 ## Common Next Steps
 
 <CardGroup cols={2}>
+  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+    Encoder contract, BrainState, and decision presets.
+  </Card>
   <Card title="Model Selection" icon="brain" href="/model-specification">
-    Compare NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusProbit, and NimbusSTS.
+    Compare NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusProbit, and NimbusSTS heads.
   </Card>
   <Card title="Feature Normalization" icon="arrows-up-down" href="/inference-configuration/feature-normalization">
     Normalize features consistently across sessions.
-  </Card>
-  <Card title="Batch Processing" icon="list" href="/inference-configuration/batch-processing">
-    Evaluate complete trials offline and compute diagnostics.
   </Card>
   <Card title="Streaming Inference" icon="activity" href="/inference-configuration/streaming-inference">
     Configure chunk-by-chunk low-latency inference.
@@ -52,9 +56,9 @@ Nimbus focuses on Bayesian inference and BCI workflow tooling. Filtering, artifa
     No. The Python SDK (`nimbus-bci`) runs locally and does not require an API key. The Julia SDK (`NimbusSDK.jl`) requires an API key to install and use NimbusSDKCore.
   </Accordion>
   <Accordion title="Which quickstart should I choose?" icon="arrow-right">
-    Choose Python if you want sklearn/MNE integration and local installation. Choose Julia if you want the NimbusSDK.jl workflow, RxInfer-backed models, or access to Julia model registry tooling.
+    Choose Python for Personalizer / BrainState app integration, sklearn/MNE, and local installation. Choose Julia for the NimbusSDK.jl workflow, RxInfer-backed models, or Julia model registry tooling.
   </Accordion>
   <Accordion title="What data format does Nimbus expect?" icon="database">
-    Use extracted features, not raw EEG. Python examples usually use `(n_trials, n_features)` arrays for classifiers. Julia batch data usually uses `(n_features, n_samples, n_trials)` inside `BCIData`.
+    Embeddings or extracted features — not raw EEG. Personalizer expects `(n_trials, n_features)` after encode (or with `encoder=None`). Classical classifier examples use the same shape. Julia batch data usually uses `(n_features, n_samples, n_trials)` inside `BCIData`.
   </Accordion>
 </AccordionGroup>

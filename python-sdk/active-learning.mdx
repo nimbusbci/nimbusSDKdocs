@@ -10,8 +10,47 @@ icon: "target"
 Use active learning to collect labels for the trials that are most likely to improve your BCI model. The Python SDK exposes `CalibrationSession` for full calibration loops, plus stateless helpers for custom pool ranking, streaming label requests, and label-free stopping.
 
 <Info>
-Active learning operates on **preprocessed feature rows**, not raw EEG. Use arrays shaped `(n_trials, n_features)` for pools and `(n_features,)` or `(1, n_features)` for single streaming trials.
+Active learning operates on **preprocessed feature rows** (or already-encoded embeddings), not raw EEG. Use arrays shaped `(n_trials, n_features)` for pools and `(n_features,)` or `(1, n_features)` for single streaming trials. With Personalizer, run AL on the head (`adapter.head`) or feed encoded pools into `partial_fit` — see [Personalizer & Middleware](/python-sdk/middleware).
 </Info>
+
+## With Personalizer
+
+Compose active learning with the product surface: choose labels, then update the Personalizer head.
+
+```python
+from copy import deepcopy
+from nimbus_bci import Personalizer, wrap, calibration_sufficient
+from nimbus_bci.active_learning import CalibrationSession
+
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+adapter = Personalizer(encoder=enc, head="lda", classes=["left", "right"])
+adapter.fit(X_seed, y_seed)
+
+# Prefer the head for CalibrationSession (sklearn-compatible)
+session = CalibrationSession(
+    adapter.head,
+    Z_pool,  # already-encoded unlabeled pool
+    pool_strategy="bald",
+    batch_size=4,
+    stopping_threshold=0.02,
+)
+
+for _ in range(max_rounds):
+    ranked = session.suggest_next_trial()
+    global_indices = session.remaining_indices[ranked.indices]
+    y_new = collect_labels_for(global_indices)
+    X_new = X_pool[global_indices]  # raw trials for Personalizer encode path
+    session.update(ranked.indices, y_new)
+    adapter.partial_fit(X_new, y_new)
+    if session.calibration_sufficient().is_sufficient:
+        break
+
+# Or label-free stopping directly on the Personalizer head
+previous = deepcopy(adapter.head)
+status = calibration_sufficient(
+    adapter.head, Z_pool, previous=previous, criterion="posterior_stability"
+)
+```
 
 ## Core Workflow
 

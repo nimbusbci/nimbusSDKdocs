@@ -1,7 +1,7 @@
 ---
 title: "Python SDK API Reference"
-description: "Full nimbus-bci Python API reference for NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusSTS, and core inference utilities."
-keywords: ["API reference", "Python SDK", "nimbus-bci", "NimbusLDA", "NimbusQDA", "NimbusSoftmax", "NimbusSTS", "BCI API", "Python documentation"]
+description: "Full nimbus-bci Python API reference for Personalizer, BrainState, wrap, NimbusLDA, NimbusQDA, NimbusSoftmax, NimbusSTS, and core inference utilities."
+keywords: ["API reference", "Python SDK", "nimbus-bci", "Personalizer", "BrainState", "NimbusLDA", "NimbusQDA", "NimbusSoftmax", "NimbusSTS", "BCI API"]
 icon: "book"
 ---
 
@@ -12,22 +12,117 @@ Complete reference for the nimbus-bci Python library.
 ## Start Here
 
 <CardGroup cols={3}>
+  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+    Encoder contract and BrainState guide before diving into signatures.
+  </Card>
   <Card title="Python SDK Quickstart" icon="rocket" href="/python-sdk/quickstart">
-    Build and run your first classifier before diving into full API details.
+    Fit a Personalizer (or classical head) before diving into full API details.
   </Card>
   <Card title="Model Selection" icon="brain" href="/model-specification">
-    Compare NimbusLDA, NimbusQDA, NimbusSoftmax, and NimbusSTS use cases.
-  </Card>
-  <Card title="Streaming Inference" icon="activity" href="/python-sdk/streaming-inference">
-    Move from batch workflows to real-time BCI inference patterns.
+    Compare NimbusLDA, NimbusQDA, NimbusSoftmax, and NimbusSTS heads.
   </Card>
 </CardGroup>
 
+## Middleware
+
+Product surface: frozen trunk → Bayesian head → `BrainState`. Narrative guide: [Personalizer & Middleware](/python-sdk/middleware).
+
+### Personalizer
+
+Bayesian personalization head over an optional frozen encoder.
+
+```python
+from nimbus_bci import Personalizer, wrap
+
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+adapter = Personalizer(
+    encoder=enc,          # FrozenEncoder | callable | None
+    head="lda",           # "lda" | "qda" | "softmax" | sklearn-like object
+    user="subject_001",
+    classes=["left", "right"],
+    preset="research",    # "research" | "consumer" | None
+    confidence_threshold=0.6,
+    uncertainty_threshold=0.55,
+    paradigm=None,
+    mc_samples=None,      # >=2 → posterior sampling (BALD)
+    mc_rng_seed=0,
+)
+```
+
+**Methods:**
+- `fit(X, y)` — calibrate on labeled trials (encodes then fits head)
+- `partial_fit(X, y, classes=None)` — cumulative online update
+- `predict(X)` → `list[BrainState]`
+- `predict_one(x)` → `BrainState`
+- `update_from_prediction(...)` — optional feedback path
+- `save(path)` / `Personalizer.load(path, encoder=...)` — persist head; **re-attach encoder on load**
+
+**Notes:**
+- `encoder=None` uses classical features / embeddings already shaped `(n, d)`
+- `head="softmax"` requires `pip install nimbus-bci[softmax]`
+- `partial_fit` is cumulative (no forgetting / decay)
+
+### wrap / FrozenEncoder
+
+```python
+from nimbus_bci import wrap
+
+enc = wrap(
+    model.encode,              # callable | sklearn transformer | torch Module
+    model_id="partner-encoder",
+    embedding_dim=64,          # optional width check
+)
+Z = enc.encode(X)              # (n, d)
+```
+
+Optional shortcuts: `wrap_eegnet(clf)`, `wrap_braindecode(module, kind="eegnetv4"|"reve"|"eegpt")`.
+
+### BrainState
+
+App-facing decision object.
+
+**Fields:** `intent`, `confidence`, `posterior`, `uncertainty`, `alternatives`, `need_more_data`, `rejected`, `rejection_reason`, `embedding`, `user_id`, `model_id`, `paradigm`, `extras`
+
+**Methods:** `to_dict()` — JSON-friendly export (`brain_state_version` currently `1`)
+
+### Prediction / decide
+
+```python
+from nimbus_bci import Prediction, decide
+
+state = decide(
+    Prediction(
+        classes=["left", "right"],
+        probabilities=[0.7, 0.3],
+        uncertainty=0.2,
+    ),
+    preset="research",
+    user_id="subject_001",
+)
+```
+
+### Bridges
+
+```python
+from nimbus_bci import (
+    brain_states_from_batch,
+    brain_state_from_streaming_result,
+    predict_batch,
+)
+
+states = brain_states_from_batch(predict_batch(clf, X), classes=["left", "right"])
+state = brain_state_from_streaming_result(final, classes=["left", "right"])
+```
+
+Also exported: `fuse_uncertainty`, `resolve_preset`, `DecisionPreset`, `IntentHypothesis`, `EncoderProtocol`.
+
 ## Classifiers
+
+Bayesian heads used by `Personalizer(head=...)` and as standalone sklearn classifiers.
 
 ### NimbusLDA
 
-Bayesian Linear Discriminant Analysis with shared covariance.
+Bayesian Linear Discriminant Analysis with shared covariance. Default Personalizer head (`head="lda"`).
 
 ```python
 from nimbus_bci import NimbusLDA

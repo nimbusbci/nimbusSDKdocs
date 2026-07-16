@@ -1,0 +1,240 @@
+---
+title: "Personalizer & Middleware"
+description: "Wrap any frozen encoder, personalize online with a Bayesian head, and ship apps on BrainState — the nimbus-bci product wedge."
+keywords: ["Personalizer", "middleware", "BrainState", "encoder contract", "frozen encoder", "wrap", "BCI personalization", "nimbus-bci"]
+icon: "layers"
+---
+
+# Personalizer & Middleware
+
+Nimbus middleware is the **product wedge**: a Bayesian personalization head for **frozen neural / foundation embeddings**. Encoders stay external. Apps consume thin `BrainState` outputs.
+
+**One-liner:** anything that can `encode(X) → Z` plugs in; Nimbus owns personalization, uncertainty gating, and cheap online updates — not the trunk.
+
+```text
+frozen trunk (your DL / partner model)
+        ↓  encode(X) → Z   ← encoder contract (product boundary)
+Personalizer (Nimbus Bayesian head)
+        ↓
+BrainState (intent, uncertainty, need_more_data)
+```
+
+<Info>
+Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encoder=None)` or the standalone heads (`NimbusLDA`, …) documented under [Models](/model-specification).
+</Info>
+
+## Start Here
+
+<CardGroup cols={3}>
+  <Card title="Python Quickstart" icon="rocket" href="/python-sdk/quickstart">
+    Fit a Personalizer in a few minutes.
+  </Card>
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference#middleware">
+    Full middleware symbols and signatures.
+  </Card>
+  <Card title="Active Learning" icon="target" href="/python-sdk/active-learning">
+    Label-efficient calibration with `CalibrationSession`.
+  </Card>
+</CardGroup>
+
+## Encoder contract
+
+The encode hook is not a gap — it **is** the product boundary. Nimbus does not host DL architectures. Integrators (or thin shortcuts) supply embeddings.
+
+| Layer | Owner | Responsibility |
+| --- | --- | --- |
+| Frozen trunk | You / partner / bench | `encode(X) → (n, d)` pre-classifier features |
+| Wrap | Nimbus | `wrap` / `FrozenEncoder` (+ optional named shortcuts) |
+| Head | Nimbus | `Personalizer` — LDA / QDA / Softmax, `fit` / `partial_fit` |
+| App | You | `BrainState` + presets (`research` / `consumer`) |
+
+**Rules:**
+
+- Freeze the trunk before personalizing
+- Feed **embeddings**, never class logits
+- `Personalizer.load` requires **re-attaching** the encoder
+- Optional `embedding_dim=` validates embedding width
+
+```python
+from nimbus_bci import Personalizer, wrap
+
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+adapter = Personalizer(
+    encoder=enc,
+    head="lda",
+    user="subject_001",
+    classes=["left", "right"],
+    preset="research",
+    # Optional: MC epistemic → Prediction.uncertainty for upstream gating
+    # mc_samples=64,
+)
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)  # list[BrainState]
+adapter.save("subject_001_profile")
+loaded = Personalizer.load("subject_001_profile", encoder=enc)
+```
+
+Already have features / CSP / Riemann vectors? Skip the trunk:
+
+```python
+from nimbus_bci import Personalizer
+
+adapter = Personalizer(encoder=None, classes=["left", "right"], preset="consumer")
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)
+```
+
+<Warning>
+`partial_fit` is **cumulative** (no forgetting / decay). That matches session calibration and short stream budgets. Do not treat unbounded lifetime accumulation as a shipped product guarantee until a forgetting mechanism exists.
+</Warning>
+
+**Foundation pooling:** REVE / EEGPT adapters mean-pool (or flatten) token / patch features to flat `(n, d)` so LDA/QDA heads can consume them. Spatial/temporal structure is collapsed at the encoder boundary, not inside the Bayesian head.
+
+## Optional shortcuts
+
+Named helpers only reduce boilerplate. Architectures stay outside core:
+
+| Shortcut | Trunk lives in | Notes |
+| --- | --- | --- |
+| `wrap(...)` | Your code | Canonical — any callable / sklearn / torch |
+| `wrap_eegnet(clf)` | `nimbusbench.models.eegnet` | Convenience over `.encode` / `.freeze` |
+| `wrap_braindecode(..., kind="eegnetv4")` | `braindecode` (optional) | Or pass any `encode_fn` |
+| `wrap_braindecode(..., kind="reve")` | `braindecode` REVE (optional) | Foundation EEG; electrode positions + pooled embeddings |
+| `wrap_braindecode(..., kind="eegpt")` | `braindecode` EEGPT (optional) | Patch-pooled foundation embeddings |
+
+```python
+from nimbus_bci import wrap_braindecode, wrap_eegnet
+
+enc = wrap_eegnet(clf, freeze=True)
+enc = wrap_braindecode(module, kind="eegnetv4")
+enc = wrap_braindecode(reve_module, kind="reve", channel_names=chans)
+enc = wrap_braindecode(eegpt_module, kind="eegpt")
+enc = wrap_braindecode(my_encode_fn)  # any other BrainDecode / custom net
+```
+
+Claim for second trunks: **API interchangeability** under the same `Personalizer` / `BrainState` contract — not a confirmatory accuracy bake-off.
+
+## BrainState
+
+`BrainState` is the app-facing output. Key fields:
+
+| Field | Meaning |
+| --- | --- |
+| `intent` | Top semantic label (from `classes`) |
+| `confidence` | Top-class posterior mass |
+| `posterior` | Full class → probability map |
+| `uncertainty` | Fused uncertainty used for gating |
+| `alternatives` | Other `IntentHypothesis` entries |
+| `need_more_data` | Ask for more evidence / calibration |
+| `rejected` / `rejection_reason` | Decision gate outcome |
+| `embedding` | Optional embedding snapshot |
+| `user_id` / `model_id` / `paradigm` | Provenance stamps |
+
+Use `BrainState.to_dict()` for JSON-friendly export (`brain_state_version` is currently `1`).
+
+### Decision presets
+
+| Preset | Intent |
+| --- | --- |
+| `research` | Lower confidence bar; more accepts |
+| `consumer` | Stricter gating; prefer `need_more_data` when unsure |
+
+Uncertainty fusion: `BrainState.uncertainty` is `max(normalized_entropy, upstream)` when upstream is set. Gating checks entropy and upstream thresholds independently.
+
+Optional `mc_samples>=2` on `Personalizer` draws posterior samples and sets normalized epistemic uncertainty (BALD / \(\log_2 K\)) as `Prediction.uncertainty`. MAP intent and confidence still use closed-form `predict_proba`. Breakdown bits land in `BrainState.extras` (`total_entropy_bits`, `aleatoric_bits`, `epistemic_bits`).
+
+## Dual API & bridges
+
+| Object | Audience | Role |
+| --- | --- | --- |
+| `BatchResult` | researchers, benches | Posteriors, entropy, Mahalanobis, ECE, ITR sweeps |
+| `BrainState` | apps, devices | Intent, confidence, uncertainty, alternatives, `need_more_data` |
+
+```python
+from nimbus_bci import (
+    predict_batch,
+    brain_states_from_batch,
+    brain_state_from_streaming_result,
+)
+
+# Research batch → app states
+states = brain_states_from_batch(predict_batch(clf, X), classes=["left", "right"])
+
+# StreamingSession final → BrainState
+state = brain_state_from_streaming_result(final, classes=["left", "right"])
+```
+
+Upstream probabilities only (no head required):
+
+```python
+from nimbus_bci import Prediction, decide
+
+state = decide(
+    Prediction(classes=["left", "right"], probabilities=[0.7, 0.3], uncertainty=0.2),
+    preset="research",
+    user_id="subject_001",
+)
+```
+
+## Active learning → personalization
+
+Use `CalibrationSession` (or `suggest_next_trial`) to choose labels, then:
+
+```python
+adapter.partial_fit(X_queried, y_queried)
+```
+
+Label-free stopping on the head:
+
+```python
+from copy import deepcopy
+from nimbus_bci import calibration_sufficient
+
+previous = deepcopy(adapter.head)
+adapter.partial_fit(X_new, y_new)
+status = calibration_sufficient(
+    adapter.head,
+    Z_pool,  # already-encoded pool, or identity-encoder features
+    previous=previous,
+    criterion="posterior_stability",
+    threshold=0.05,
+)
+```
+
+See [Active Learning](/python-sdk/active-learning).
+
+## Product claim (honest boundaries)
+
+Nimbus is a lightweight **probabilistic adaptation layer** for frozen neural / foundation encoders: it restores decoder performance **when measurable deployment stress gates the factory**, does **not** claim accuracy gains when the factory already transfers, and across tested recovery scenarios needs **~30× less update compute** than neural fine-tuning.
+
+| Regime | When | What happens |
+| --- | --- | --- |
+| Factory works | Clean / weak natural transfer | Little accuracy job for adaptation |
+| Factory breaks | Controlled stress gates frozen performance | Head adaptation recovers with small labeled cal |
+| Full retrain unnecessary | Same budgets as stress recovery | Fine-tune ≈ Personalizer accuracy band at ~30× higher fit wall |
+
+Not claimed: general cross-session magic, physical electrode robustness, “improves all EEG,” SOTA over EEGNet, or shipped “Active Inference for EEG.”
+
+## Integrator checklist
+
+1. **When to adapt** — factory works → little lift; gated stress → head adaptation; cost ~30× vs fine-tune.
+2. **Gate decisions** — `preset="research"` / `"consumer"`; inspect `BrainState.rejected`, `need_more_data`, `uncertainty`.
+3. **Head stability** — after online updates, use `calibration_sufficient` on an unlabeled pool.
+4. **Encoder swap** — freeze trunk; match `embedding_dim`; never pass logits as embeddings; keep `model_id` consistent across `save` / `load`.
+
+## Next Read
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/python-sdk/quickstart">
+    Personalizer-first walkthrough
+  </Card>
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference#middleware">
+    Middleware symbols
+  </Card>
+  <Card title="Streaming" icon="activity" href="/python-sdk/streaming-inference">
+    Bridge StreamingResult → BrainState
+  </Card>
+  <Card title="Heads / Models" icon="brain" href="/model-specification">
+    LDA, QDA, Softmax, STS as Personalizer heads
+  </Card>
+</CardGroup>

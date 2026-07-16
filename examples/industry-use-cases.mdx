@@ -9,15 +9,19 @@ icon: "briefcase"
 
 This page maps common BCI product scenarios to Nimbus model and workflow choices. It is intentionally pattern-focused; use [Basic Examples](/examples/basic-examples) and [Advanced Applications](/examples/advanced-applications) for implementation recipes.
 
+<Tip>
+Shipping an app on a frozen partner / foundation encoder? Lead with [Personalizer → BrainState](/python-sdk/middleware). The head choices below (`NimbusLDA`, …) are what Personalizer uses under the hood (`head="lda"|...`) and also work standalone on classical features.
+</Tip>
+
 ## Healthcare And Rehabilitation
 
 **Scenario:** motor imagery rehabilitation after stroke or injury.
 
 Recommended pattern:
 
-- Use CSP features from motor imagery sessions.
-- Start with `NimbusLDA` for fast baseline feedback.
-- Use confidence thresholds to decide whether feedback should be shown.
+- Prefer Personalizer when a frozen trunk is available; otherwise use CSP features from motor imagery sessions.
+- Start with `NimbusLDA` / `Personalizer(head="lda")` for fast baseline feedback.
+- Use confidence thresholds / `BrainState.need_more_data` to decide whether feedback should be shown.
 - Track session-level accuracy, confidence, fatigue indicators, and rejection rate.
 - Keep a clinician-visible audit trail for model version, calibration data, and session metrics.
 

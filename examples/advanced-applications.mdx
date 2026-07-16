@@ -10,8 +10,12 @@ icon: "rocket"
 This page summarizes advanced BCI patterns without duplicating full SDK walkthroughs. Use it as an implementation checklist, then follow the linked SDK guides for exact APIs.
 
 <Note>
-For Python-specific streaming and sklearn patterns, see [Python Streaming Inference](/python-sdk/streaming-inference) and [sklearn Integration](/python-sdk/sklearn-integration). For Julia streaming, see [Julia Streaming Inference](/julia-sdk/streaming-inference).
+For frozen-encoder personalization, see [Personalizer & Middleware](/python-sdk/middleware). For Python-specific streaming and sklearn patterns, see [Python Streaming Inference](/python-sdk/streaming-inference) and [sklearn Integration](/python-sdk/sklearn-integration). For Julia streaming, see [Julia Streaming Inference](/julia-sdk/streaming-inference).
 </Note>
+
+<Tip>
+When adapting a frozen neural trunk under deployment stress, prefer `Personalizer` + small labeled calibration over full fine-tuning. Classical cross-subject / multi-session recipes below still apply to feature pipelines and standalone heads.
+</Tip>
 
 ## Cross-Subject Training
 

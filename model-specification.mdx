@@ -7,15 +7,15 @@ icon: "box"
 
 # Probabilistic Model Specification
 
-NimbusSDK provides **pre-built probabilistic models** powered by [RxInfer.jl](https://github.com/ReactiveBayes/RxInfer.jl), a reactive message passing framework for efficient Bayesian inference.
+NimbusSDK provides **pre-built probabilistic models** powered by [RxInfer.jl](https://github.com/ReactiveBayes/RxInfer.jl), a reactive message passing framework for efficient Bayesian inference. In the Python SDK these models are also the **heads** behind `Personalizer(head=...)` — see [Personalizer & Middleware](/python-sdk/middleware).
 
 <Info>
 **Nimbus Models Available:**
-- [NimbusLDA](/models/rxlda) - Fast, shared covariance (**Python + Julia**)
-- [NimbusQDA](/models/rxgmm) - Flexible, class-specific covariances (**Python + Julia**)
-- [NimbusSoftmax](/models/rxpolya) - Non-Gaussian static model (**Python only**)
+- [NimbusLDA](/models/rxlda) - Fast, shared covariance (**Python + Julia**); default `Personalizer(head="lda")`
+- [NimbusQDA](/models/rxgmm) - Flexible, class-specific covariances (**Python + Julia**); `Personalizer(head="qda")`
+- [NimbusSoftmax](/models/rxpolya) - Non-Gaussian static model (**Python only**); `Personalizer(head="softmax")`
 - [NimbusProbit](/models/nimbusprobit) - Non-Gaussian static model (**Julia only**)
-- [NimbusSTS](/models/rxsts) - Stateful adaptive model (**Python only**)
+- [NimbusSTS](/models/rxsts) - Stateful adaptive model (**Python only**; classical / streaming path)
 
 For detailed implementation, see the individual model pages above.
 </Info>

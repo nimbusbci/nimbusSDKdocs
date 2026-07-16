@@ -10,10 +10,34 @@ icon: "play"
 Use these recipes after installation and preprocessing are complete. They show the smallest useful pattern for each workflow and link to deeper SDK-specific guides instead of repeating full setup instructions.
 
 <Note>
+- Python product path: [Personalizer & Middleware](/python-sdk/middleware)
 - Python quickstart: [Python SDK Quickstart](/python-sdk/quickstart)
 - Julia quickstart: [Julia SDK Quickstart](/julia-sdk/quickstart)
 - Feature preparation: [Preprocessing Requirements](/inference-configuration/preprocessing-requirements)
 </Note>
+
+## Personalizer (frozen encoder)
+
+Product path: wrap any `encode(X) → Z`, personalize online, consume `BrainState`.
+
+```python
+from nimbus_bci import Personalizer, wrap
+import numpy as np
+
+# Toy identity encoder — replace with partner / foundation encode(X) → Z
+enc = wrap(lambda X: X, model_id="demo-encoder", embedding_dim=16)
+adapter = Personalizer(
+    encoder=enc,
+    head="lda",
+    classes=["left", "right"],
+    preset="research",
+)
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)
+print(states[0].intent, states[0].confidence, states[0].need_more_data)
+```
+
+Already have CSP / bandpower features? Use `Personalizer(encoder=None)` or the classical heads below. Full contract: [Personalizer & Middleware](/python-sdk/middleware).
 
 ## Motor Imagery
 

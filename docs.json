@@ -106,6 +106,7 @@
           "python-sdk/quickstart",
           "python-sdk/introduction",
           "python-sdk/installation",
+          "python-sdk/middleware",
           "python-sdk/api-reference",
           "python-sdk/sklearn-integration",
           "python-sdk/streaming-inference",

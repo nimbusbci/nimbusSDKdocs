@@ -114,31 +114,37 @@ This includes:
 
 ## Verify Installation
 
-Test your installation:
+Test your installation — product surface first, then classical heads:
 
 ```python
 import nimbus_bci
 print(f"nimbus-bci version: {nimbus_bci.__version__}")
 
-# Check available core classifiers
-from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSTS
-print("✓ Core classifiers imported successfully")
+from nimbus_bci import Personalizer, wrap, BrainState
+print("✓ Personalizer / wrap / BrainState imported successfully")
 
-# Quick test
+from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSTS
+print("✓ Core heads imported successfully")
+
 import numpy as np
-clf = NimbusLDA()
 X = np.random.randn(100, 10)
 y = np.random.randint(0, 2, 100)
-clf.fit(X, y)
-print("✓ Basic functionality works")
+
+enc = wrap(lambda Z: Z, model_id="verify-encoder", embedding_dim=10)
+adapter = Personalizer(encoder=enc, head="lda", classes=["a", "b"])
+adapter.fit(X, y)
+states = adapter.predict(X[:5])
+assert isinstance(states[0], BrainState)
+print("✓ Personalizer smoke test works")
 ```
 
 Expected output:
 
 ```
-nimbus-bci version: 0.4.1
-✓ Core classifiers imported successfully
-✓ Basic functionality works
+nimbus-bci version: 0.5.0
+✓ Personalizer / wrap / BrainState imported successfully
+✓ Core heads imported successfully
+✓ Personalizer smoke test works
 ```
 
 ## Platform-Specific Notes

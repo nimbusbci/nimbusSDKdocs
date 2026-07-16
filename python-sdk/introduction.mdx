@@ -1,13 +1,13 @@
 ---
 title: "Python SDK"
-description: "Overview of the nimbus-bci Python SDK: sklearn-compatible Bayesian classifiers with MNE integration for motor imagery, P300, and SSVEP."
-keywords: ["Python SDK", "nimbus-bci", "Python BCI", "Bayesian BCI", "sklearn", "MNE-Python", "motor imagery", "P300", "SSVEP", "Python library", "BCI classification"]
+description: "Overview of the nimbus-bci Python SDK: Personalizer middleware for frozen encoders, BrainState app outputs, and sklearn-compatible Bayesian heads."
+keywords: ["Python SDK", "nimbus-bci", "Personalizer", "BrainState", "Python BCI", "Bayesian BCI", "sklearn", "MNE-Python", "motor imagery", "P300", "SSVEP"]
 icon: "python"
 ---
 
 # Python SDK
 
-The **nimbus-bci** Python library provides sklearn-compatible Bayesian classifiers for Brain-Computer Interface applications. It delivers local probabilistic inference with uncertainty quantification, streaming support, and rich diagnostics. Optional extras add `NimbusSoftmax` via JAX (`pip install nimbus-bci[softmax]`) and pyRiemann feature pipelines (`pip install nimbus-bci[riemann]`).
+The **nimbus-bci** Python library is a Bayesian personalization head for frozen neural EEG embeddings — and sklearn-compatible classifiers for classical feature pipelines. Wrap any trunk that emits `encode(X) → Z`, adapt online with `Personalizer`, and ship apps on `BrainState`. Optional extras add `NimbusSoftmax` via JAX (`pip install nimbus-bci[softmax]`) and pyRiemann feature pipelines (`pip install nimbus-bci[riemann]`).
 
 ## Start Here
 
@@ -15,49 +15,52 @@ The **nimbus-bci** Python library provides sklearn-compatible Bayesian classifie
   <Card title="Install nimbus-bci" icon="download" href="/python-sdk/installation">
     Install and verify your Python SDK environment.
   </Card>
-  <Card title="Run Quickstart" icon="rocket" href="/python-sdk/quickstart">
-    Build your first Bayesian BCI classifier in minutes.
+  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+    Encoder contract, BrainState, and decision presets.
   </Card>
-  <Card title="Pick a Model" icon="brain" href="/model-specification">
-    Compare NimbusLDA, NimbusQDA, NimbusSoftmax, and NimbusSTS.
+  <Card title="Run Quickstart" icon="rocket" href="/python-sdk/quickstart">
+    Fit your first Personalizer in minutes.
   </Card>
 </CardGroup>
 
 ## Overview
 
-`nimbus-bci` is a production-ready Python package available on PyPI that brings Bayesian inference to BCI applications with a familiar sklearn-compatible API.
+`nimbus-bci` is a production-ready Python package on PyPI. The product surface is middleware; the Bayesian heads (`NimbusLDA`, …) power `Personalizer` and remain usable standalone.
 
 ```bash
 pip install nimbus-bci
 ```
 
 <Note>
-**New in `nimbus-bci`:** `CalibrationSession` packages active-learning helpers into a first-class workflow, and `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)` composes pyRiemann covariance/tangent features with Nimbus heads. See [Active Learning](/python-sdk/active-learning) and [API Reference](/python-sdk/api-reference).
+**Product wedge:** `wrap` → `Personalizer` → `BrainState`. Also: `CalibrationSession` for active learning, and `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)` for pyRiemann + Nimbus heads. See [Personalizer & Middleware](/python-sdk/middleware) and [Active Learning](/python-sdk/active-learning).
 </Note>
 
 ## Key Features
 
 <CardGroup cols={2}>
-  <Card title="sklearn Compatible" icon="code">
-    Drop-in replacement for sklearn classifiers. Works with pipelines, cross-validation, and GridSearchCV.
+  <Card title="Personalizer Middleware" icon="layers" href="/python-sdk/middleware">
+    Plug any frozen trunk; personalize online; ship `BrainState` to apps.
+  </Card>
+  <Card title="sklearn Compatible Heads" icon="code">
+    Bayesian heads work as drop-in sklearn classifiers in pipelines and CV.
   </Card>
   <Card title="Streaming Inference" icon="activity">
-    Real-time chunk-by-chunk processing for online BCI applications with weighted aggregation.
+    Real-time chunk-by-chunk processing with optional BrainState bridges.
   </Card>
   <Card title="MNE Integration" icon="brain">
     Seamless integration with MNE-Python for EEG preprocessing and feature extraction.
   </Card>
   <Card title="Riemannian Features" icon="code">
-    Optional pyRiemann covariance/tangent feature pipelines feeding existing Nimbus classifier heads.
+    Optional pyRiemann covariance/tangent feature pipelines feeding Nimbus heads.
   </Card>
   <Card title="Rich Diagnostics" icon="chart-line">
     Entropy, calibration metrics (ECE/MCE), ITR calculation, and quality assessment.
   </Card>
   <Card title="Online Learning" icon="graduation-cap">
-    Update models incrementally with `partial_fit()` without retraining from scratch.
+    Update heads incrementally with `partial_fit()` without retraining from scratch.
   </Card>
   <Card title="Active Learning" icon="target" href="/python-sdk/active-learning">
-    Rank unlabeled trials, request labels only when useful, and stop calibration when the posterior stabilizes.
+    Rank unlabeled trials, request labels only when useful, and stop when the posterior stabilizes.
   </Card>
   <Card title="Fully Local" icon="lock">
     No API keys required. All processing happens on your machine for maximum privacy.
@@ -67,18 +70,29 @@ pip install nimbus-bci
 ## Quick Example
 
 ```python
-from nimbus_bci import NimbusLDA
+from nimbus_bci import Personalizer, wrap
 import numpy as np
 
-# Create and fit classifier
-clf = NimbusLDA()
-clf.fit(X_train, y_train)
+# Toy frozen encoder — replace with partner / foundation encode(X) → Z
+def encode(X):
+    return X  # already embeddings or CSP features
 
-# Predict with uncertainty
-predictions = clf.predict(X_test)
-probabilities = clf.predict_proba(X_test)
+enc = wrap(encode, model_id="demo-encoder", embedding_dim=16)
+adapter = Personalizer(
+    encoder=enc,
+    head="lda",
+    classes=["left", "right"],
+    preset="research",
+)
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)  # list[BrainState]
+print(states[0].intent, states[0].confidence)
+```
 
-# Works with sklearn pipelines
+Classical features without a trunk:
+
+```python
+from nimbus_bci import NimbusLDA
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -86,18 +100,18 @@ pipe = make_pipeline(StandardScaler(), NimbusLDA())
 pipe.fit(X_train, y_train)
 ```
 
-## Available Classifiers
+## Available Heads
 
-The Python SDK provides four Bayesian classifiers:
+The Python SDK provides four Bayesian heads (used by `Personalizer(head=...)` or standalone):
 
-| Classifier | Description | Best For |
+| Head | Description | Best For |
 |------------|-------------|----------|
-| **NimbusLDA** | Bayesian LDA with shared covariance | Fast, well-separated classes (motor imagery) |
+| **NimbusLDA** | Bayesian LDA with shared covariance | Default Personalizer head; motor imagery |
 | **NimbusQDA** | Bayesian QDA with class-specific covariances | Complex distributions (P300) |
 | **NimbusSoftmax** | Bayesian logistic regression (Polya-Gamma VI) | Non-Gaussian decision boundaries |
-| **NimbusSTS** | Bayesian Structural Time Series (Extended Kalman Filter) | Non-stationary data, long sessions |
+| **NimbusSTS** | Bayesian Structural Time Series (EKF) | Non-stationary data, long sessions |
 
-All classifiers provide:
+All heads provide:
 - Full posterior distributions
 - Uncertainty quantification
 - Online learning via `partial_fit()`
@@ -141,21 +155,33 @@ Choose the Julia SDK if you:
 
 ## Architecture
 
+**Product path:**
+
+```text
+EEG → frozen trunk encode(X)→Z → Personalizer → BrainState → Your Application
 ```
-EEG Data → MNE-Python → nimbus-bci → Your Application
-           (Preprocessing)  (Classification)  (Control/Analysis)
+
+**Classical path:**
+
+```text
+EEG → MNE / CSP / Riemann → Nimbus head → Your Application
+         (Preprocessing)     (Classification)  (Control/Analysis)
 ```
 
 **Key Design Principles:**
+- **Encoder contract**: Nimbus does not own DL architectures — integrators supply embeddings
+- **App surface**: `BrainState` for devices; `BatchResult` for research diagnostics
 - **Local Processing**: All computation happens on your machine
 - **Privacy First**: Your EEG data never leaves your computer
-- **sklearn Compatible**: Works with existing ML workflows
-- **Fast Inference**: Efficient local inference, with optional JAX support for `NimbusSoftmax`
+- **sklearn Compatible**: Heads work with existing ML workflows
 - **Uncertainty Aware**: Full Bayesian posterior distributions
 
 ## Use Cases
 
 <CardGroup cols={2}>
+  <Card title="Frozen Encoder Personalization" icon="layers">
+    Plug EEGNet / BrainDecode / partner trunks into Personalizer
+  </Card>
   <Card title="Motor Imagery BCI" icon="hand">
     Control devices with imagined movements using CSP features and NimbusLDA
   </Card>
@@ -165,16 +191,20 @@ EEG Data → MNE-Python → nimbus-bci → Your Application
   <Card title="Real-time Neurofeedback" icon="activity">
     Streaming inference for live brain state monitoring
   </Card>
-  <Card title="Research Pipelines" icon="flask-conical">
-    sklearn-compatible API for reproducible BCI research
-  </Card>
 </CardGroup>
 
 ## What's Included
 
 The `nimbus-bci` package provides:
 
-**Classifiers:**
+**Middleware (product surface):**
+- `Personalizer` - Bayesian personalization head over a frozen encoder
+- `wrap` / `FrozenEncoder` / `EncoderProtocol` - encoder contract
+- `BrainState` / `Prediction` / `IntentHypothesis` - app contracts
+- `decide` / `brain_states_from_batch` / `brain_state_from_streaming_result` - bridges
+- `wrap_eegnet` / `wrap_braindecode` - optional named adapters
+
+**Heads (classifiers):**
 - `NimbusLDA` - Bayesian Linear Discriminant Analysis
 - `NimbusQDA` - Bayesian Quadratic Discriminant Analysis
 - `NimbusSoftmax` - Bayesian Multinomial Logistic Regression
@@ -219,8 +249,11 @@ The `nimbus-bci` package provides:
   <Card title="Installation" icon="download" href="/python-sdk/installation">
     Install nimbus-bci and verify your setup
   </Card>
+  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+    Encoder contract and BrainState
+  </Card>
   <Card title="Quickstart" icon="rocket" href="/python-sdk/quickstart">
-    Build your first BCI classifier in 5 minutes
+    Fit your first Personalizer in minutes
   </Card>
   <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
     Complete API documentation with examples
@@ -254,7 +287,7 @@ Ready to get started? Head to the [Installation Guide](/python-sdk/installation)
       '@type': 'TechArticle',
       headline: 'Python SDK',
       description:
-        'Overview of the nimbus-bci Python SDK: sklearn-compatible Bayesian classifiers with MNE integration for motor imagery, P300, and SSVEP.',
+        'Overview of the nimbus-bci Python SDK: Personalizer middleware for frozen encoders, BrainState app outputs, and sklearn-compatible Bayesian heads.',
       author: {
         '@type': 'Organization',
         name: 'Nimbus BCI',

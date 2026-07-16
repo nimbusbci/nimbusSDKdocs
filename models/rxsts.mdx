@@ -13,6 +13,10 @@ icon: "brain"
 Bayesian STS is a **stateful** Bayesian classification model designed for **non-stationary BCI data**. It combines feature-based classification with latent state dynamics, allowing it to adapt to temporal drift, electrode changes, and long-session fatigue.
 
 <Note>
+**Python head:** prefer standalone `NimbusSTS` / streaming sessions for latent-state adaptation. Personalizer currently ships `lda` / `qda` / `softmax` heads; STS remains the classical path for non-stationary sessions. See [Personalizer & Middleware](/python-sdk/middleware).
+</Note>
+
+<Note>
 **Available in Python SDK:**
 - **Python SDK**: `NimbusSTS` class (sklearn-compatible with state management)
 - **Julia SDK**: Not currently available

@@ -1,13 +1,13 @@
 ---
 title: "Nimbus BCI Engine"
-description: "Production-ready Bayesian BCI inference in Python and Julia with real-time streaming, uncertainty quantification, and models for motor imagery, P300, and SSVEP."
-keywords: ["BCI", "brain-computer interface", "Bayesian inference", "EEG", "Nimbus BCI", "Python SDK", "Julia SDK", "uncertainty quantification", "real-time BCI"]
+description: "Bayesian personalization for frozen EEG encoders — wrap any trunk, adapt online with Personalizer, ship apps on BrainState. Python and Julia SDKs."
+keywords: ["BCI", "brain-computer interface", "Bayesian inference", "EEG", "Nimbus BCI", "Personalizer", "BrainState", "Python SDK", "Julia SDK", "uncertainty quantification"]
 icon: "brain"
 ---
 
-_Production-ready Bayesian BCI inference for Python and Julia._
+_Bayesian personalization for frozen EEG encoders — and classical BCI heads when you already have features._
 
-Nimbus provides fast probabilistic inference for brain-computer interface applications. Use it for motor imagery, P300, SSVEP, adaptive BCI, and research workflows that need confidence-aware decisions.
+Nimbus owns the personalization layer: wrap any frozen trunk that emits `encode(X) → Z`, adapt online with a Bayesian head (`Personalizer`), and ship apps on `BrainState`. Classical CSP / bandpower / Riemann → `NimbusLDA` workflows remain fully supported.
 
 <img
   src="/images/hero.png"
@@ -18,14 +18,14 @@ Nimbus provides fast probabilistic inference for brain-computer interface applic
 ## Start Here
 
 <CardGroup cols={3}>
+  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+    Encoder contract: `wrap` → `Personalizer` → `BrainState`.
+  </Card>
   <Card title="Python SDK" icon="python" href="/python-sdk/quickstart">
-    Local sklearn-compatible workflows with `nimbus-bci`.
+    Local Personalizer workflows with `nimbus-bci`.
   </Card>
   <Card title="Julia SDK" icon="code" href="/julia-sdk/quickstart">
     RxInfer-backed workflows with `NimbusSDK.jl`.
-  </Card>
-  <Card title="Model Selection" icon="brain" href="/model-specification">
-    Choose between LDA, QDA, Softmax, Probit, and STS.
   </Card>
 </CardGroup>
 
@@ -41,19 +41,19 @@ Nimbus provides fast probabilistic inference for brain-computer interface applic
   <Card title="Real-Time Inference" icon="activity" href="/inference-configuration/streaming-inference">
     Batch and streaming workflows for low-latency BCI systems.
   </Card>
-  <Card title="BCI-Specific Models" icon="brain" href="/model-specification">
-    Bayesian model families tuned for neural feature data.
+  <Card title="Heads / Models" icon="brain" href="/model-specification">
+    Bayesian heads used by Personalizer and standalone classifiers.
   </Card>
   <Card title="Production Guardrails" icon="check" href="/inference-configuration/error-handling">
     Validation, quality gates, diagnostics, and deployment patterns.
   </Card>
 </CardGroup>
 
-## Models
+## Heads (used by Personalizer)
 
 | Model | SDK | Best For |
 | --- | --- | --- |
-| `NimbusLDA` | Python + Julia | Fast baseline for well-separated CSP or bandpower features. |
+| `NimbusLDA` | Python + Julia | Fast baseline; default `Personalizer(head="lda")`. |
 | `NimbusQDA` | Python + Julia | Overlapping classes and class-specific covariance. |
 | `NimbusSoftmax` | Python | Multiclass nonlinear boundaries with optional JAX install. |
 | `NimbusProbit` | Julia | Julia-native Bayesian multinomial probit workflows. |
@@ -61,11 +61,19 @@ Nimbus provides fast probabilistic inference for brain-computer interface applic
 
 ## Core Workflow
 
+**Product path (frozen trunk):**
+
 ```text
-EEG acquisition -> preprocessing -> Nimbus model -> confidence-aware action
+EEG → frozen encoder → Personalizer → BrainState → confidence-aware action
 ```
 
-Nimbus expects preprocessed features rather than raw EEG. Start with [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) if you are setting up CSP, bandpower, ERP, or external tool exports.
+**Classical path (features already extracted):**
+
+```text
+EEG → preprocessing (CSP / bandpower / Riemann) → Nimbus head → confidence-aware action
+```
+
+Nimbus expects embeddings or preprocessed features — not raw EEG. Start with [Personalizer & Middleware](/python-sdk/middleware) for the encoder contract, or [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) for classical CSP / bandpower / ERP.
 
 ## Documentation Map
 
@@ -91,17 +99,17 @@ Nimbus expects preprocessed features rather than raw EEG. Start with [Preprocess
     Python does not require an API key. Julia requires an API key to install and use the commercial core.
   </Accordion>
   <Accordion title="Can Nimbus process raw EEG?" icon="activity">
-    No. Nimbus expects features produced by preprocessing pipelines such as CSP, bandpower, or ERP extraction.
+    No. Nimbus expects embeddings from a frozen encoder (`encode(X) → Z`) or features from preprocessing pipelines such as CSP, bandpower, or ERP extraction.
   </Accordion>
   <Accordion title="Which SDK should I start with?" icon="arrow-right">
-    Use Python for sklearn/MNE workflows and local development. Use Julia for RxInfer-backed workflows and Julia-native model tooling.
+    Use Python for Personalizer / BrainState app integration, sklearn/MNE workflows, and local development. Use Julia for RxInfer-backed workflows and Julia-native model tooling.
   </Accordion>
 </AccordionGroup>
 
 ## Next Read
 
 <CardGroup cols={3}>
+  <Card title="Personalizer" icon="layers" href="/python-sdk/middleware" />
   <Card title="Python Quickstart" icon="python" href="/python-sdk/quickstart" />
   <Card title="Julia Quickstart" icon="code" href="/julia-sdk/quickstart" />
-  <Card title="Model Specification" icon="brain" href="/model-specification" />
 </CardGroup>
