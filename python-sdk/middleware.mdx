@@ -143,7 +143,7 @@ Use `BrainState.to_dict()` for JSON-friendly export (`brain_state_version` is cu
 
 Uncertainty fusion: `BrainState.uncertainty` is `max(normalized_entropy, upstream)` when upstream is set. Gating checks entropy and upstream thresholds independently.
 
-Optional `mc_samples>=2` on `Personalizer` draws posterior samples and sets normalized epistemic uncertainty (BALD / \(\log_2 K\)) as `Prediction.uncertainty`. MAP intent and confidence still use closed-form `predict_proba`. Breakdown bits land in `BrainState.extras` (`total_entropy_bits`, `aleatoric_bits`, `epistemic_bits`).
+Optional `mc_samples>=2` on `Personalizer` draws posterior samples and sets normalized epistemic uncertainty (BALD / log2 K) as `Prediction.uncertainty`. MAP intent and confidence still use closed-form `predict_proba`. Breakdown bits land in `BrainState.extras` (`total_entropy_bits`, `aleatoric_bits`, `epistemic_bits`).
 
 ## Dual API & bridges
 
@@ -216,7 +216,7 @@ All numbers are **exploratory**, protocol-local, and primarily locked to NimbusB
 
 ### Cost bake-off (BNCI primary)
 
-Under severe feature shift with \(n{=}40\) labeled stream trials, a Bayesian head recovers most of the full fine-tune accuracy gain at a fraction of the adaptation fit wall.
+Under severe feature shift with n=40 labeled stream trials, a Bayesian head recovers most of the full fine-tune accuracy gain at a fraction of the adaptation fit wall.
 
 <img
   src="/images/personalizer/fig_cost.png"
@@ -237,7 +237,7 @@ Under severe feature shift with \(n{=}40\) labeled stream trials, a Bayesian hea
 | Last-layer FT | 0.472 | 0.323 | 1.31 | — |
 | Full FT | 0.582 | 0.205 | 1.78 | 1.00 |
 
-Recovery \(= \Delta\mathrm{acc} / \Delta\mathrm{acc}_{\mathrm{full\,FT}}\). On Zhou2016 (supporting, \(n_{\mathrm{subj}}=4\)) the same cell is softer (~46% recovery at ~5.5× lower fit time).
+Recovery = Δacc / Δacc_fullFT. On Zhou2016 (supporting, 4 subjects) the same cell is softer (~46% recovery at ~5.5× lower fit time).
 
 ### Head vs fine-tune (same API)
 
