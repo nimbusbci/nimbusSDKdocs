@@ -11,13 +11,15 @@ Nimbus middleware is the **product wedge**: a Bayesian personalization head for 
 
 **One-liner:** anything that can `encode(X) → Z` plugs in; Nimbus owns personalization, uncertainty gating, and cheap online updates — not the trunk.
 
-```text
-frozen trunk (your DL / partner model)
-        ↓  encode(X) → Z   ← encoder contract (product boundary)
-Personalizer (Nimbus Bayesian head)
-        ↓
-BrainState (intent, uncertainty, need_more_data)
-```
+<img
+  src="/images/personalizer/fig_api.png"
+  alt="One API across many trunks: frozen encode(X)→Z, Personalizer Bayesian head, BrainState intent + UQ"
+  style={{ width: '100%', maxWidth: 720, borderRadius: 8, marginTop: 16, marginBottom: 8 }}
+/>
+
+<p style={{ fontSize: '0.875rem', opacity: 0.75, marginTop: 0 }}>
+  One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1b).
+</p>
 
 <Info>
 Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encoder=None)` or the standalone heads (`NimbusLDA`, …) documented under [Models](/model-specification).
@@ -203,21 +205,94 @@ status = calibration_sufficient(
 
 See [Active Learning](/python-sdk/active-learning).
 
-## Product claim (honest boundaries)
+## Evidence (from our papers)
 
-Nimbus is a lightweight **probabilistic adaptation layer** for frozen neural / foundation encoders: it restores decoder performance **when measurable deployment stress gates the factory**, does **not** claim accuracy gains when the factory already transfers, and across tested recovery scenarios needs **~30× less update compute** than neural fine-tuning.
+Figures and tables below come from two exploratory manuscripts:
+
+1. **Resource ladder** — *When Should a Deployed BCI Decoder Spend Adaptation Resources?* (Paper 1)
+2. **Universal Personalizer** — *One Personalizer Across Many Trunks* (Paper 1b)
+
+All numbers are **exploratory**, protocol-local, and primarily locked to NimbusBench CSVs. Do not treat them as suite-wide constants.
+
+### Cost bake-off (BNCI primary)
+
+Under severe feature shift with \(n{=}40\) labeled stream trials, a Bayesian head recovers most of the full fine-tune accuracy gain at a fraction of the adaptation fit wall.
+
+<img
+  src="/images/personalizer/fig_cost.png"
+  alt="BNCI2014-004 cost bake-off: Bayesian head accuracy vs adaptation fit time compared to frozen, linear probe, LoRA, last-layer FT, and full FT"
+  style={{ width: '100%', borderRadius: 8, marginTop: 12, marginBottom: 8 }}
+/>
+
+<p style={{ fontSize: '0.875rem', opacity: 0.75 }}>
+  Paper 1 — BNCI2014-004, severity 0.75, n=40 (mean over 9 subjects).
+</p>
+
+| Arm | Acc | ECE | Fit time (s) | Recovery vs full FT |
+| --- | --- | --- | --- | --- |
+| Frozen EEGNet | 0.476 | 0.333 | 0 | — |
+| **Bayesian head** | **0.553** | **0.136** | **0.35** | **0.73** |
+| Linear probe | 0.517 | 0.142 | 0.35 | 0.40 |
+| LoRA | 0.502 | 0.200 | 1.08 | 0.26 |
+| Last-layer FT | 0.472 | 0.323 | 1.31 | — |
+| Full FT | 0.582 | 0.205 | 1.78 | 1.00 |
+
+Recovery \(= \Delta\mathrm{acc} / \Delta\mathrm{acc}_{\mathrm{full\,FT}}\). On Zhou2016 (supporting, \(n_{\mathrm{subj}}=4\)) the same cell is softer (~46% recovery at ~5.5× lower fit time).
+
+### Head vs fine-tune (same API)
+
+<img
+  src="/images/personalizer/fig_ft.png"
+  alt="EEGNet Personalizer versus fine-tune arms: accuracy and adaptation fit time on BNCI and Zhou"
+  style={{ width: '100%', borderRadius: 8, marginTop: 12, marginBottom: 8 }}
+/>
+
+<p style={{ fontSize: '0.875rem', opacity: 0.75 }}>
+  Paper 1b — EEGNet severe n=40; Bayesian head vs full FT.
+</p>
+
+| Dataset | Acc frozen | Acc head | Acc FT | Recovery | Wall FT / head |
+| --- | --- | --- | --- | --- | --- |
+| BNCI | 0.476 | 0.553 | 0.582 | 73% | 5.0× |
+| Zhou | 0.352 | 0.430 | 0.523 | 46% | 5.5× |
+
+<img
+  src="/images/personalizer/fig_wall.png"
+  alt="Adaptation fit time under the same Personalizer API across trunks"
+  style={{ width: '100%', borderRadius: 8, marginTop: 16, marginBottom: 8 }}
+/>
+
+<p style={{ fontSize: '0.875rem', opacity: 0.75 }}>
+  Paper 1b — adaptation fit wall under the shared Personalizer API.
+</p>
+
+### Transfer across trunks
+
+The same Personalizer ladder is evaluated over an 18-cell trunk×dataset map. Soft clean→L0 transfer is common; the full ordinal principle is rarer — honesty beats overclaim.
+
+<img
+  src="/images/personalizer/fig_transfer_map.png"
+  alt="Transfer map for the Personalizer adaptation ladder across 18 trunk×dataset cells"
+  style={{ width: '100%', borderRadius: 8, marginTop: 12, marginBottom: 8 }}
+/>
+
+<p style={{ fontSize: '0.875rem', opacity: 0.75 }}>
+  Paper 1b — transfer map (exploratory). Soft clean→L0 holds on 14/18 cells; fuller ordinal structure on 9/18.
+</p>
+
+### Product claim (honest boundaries)
 
 | Regime | When | What happens |
 | --- | --- | --- |
 | Factory works | Clean / weak natural transfer | Little accuracy job for adaptation |
 | Factory breaks | Controlled stress gates frozen performance | Head adaptation recovers with small labeled cal |
-| Full retrain unnecessary | Same budgets as stress recovery | Fine-tune ≈ Personalizer accuracy band at ~30× higher fit wall |
+| Full retrain unnecessary | Same budgets as stress recovery | Head ≈ most of FT Δacc at ~5× lower fit wall (BNCI primary) |
 
-Not claimed: general cross-session magic, physical electrode robustness, “improves all EEG,” SOTA over EEGNet, or shipped “Active Inference for EEG.”
+Not claimed: general cross-session magic, physical electrode robustness, “improves all EEG,” SOTA over EEGNet, suite-wide 30× ratios from other protocols, or shipped “Active Inference for EEG.”
 
 ## Integrator checklist
 
-1. **When to adapt** — factory works → little lift; gated stress → head adaptation; cost ~30× vs fine-tune.
+1. **When to adapt** — factory works → little lift; gated stress → head adaptation; cost bake-off favors head before full FT.
 2. **Gate decisions** — `preset="research"` / `"consumer"`; inspect `BrainState.rejected`, `need_more_data`, `uncertainty`.
 3. **Head stability** — after online updates, use `calibration_sufficient` on an unlabeled pool.
 4. **Encoder swap** — freeze trunk; match `embedding_dim`; never pass logits as embeddings; keep `model_id` consistent across `save` / `load`.
