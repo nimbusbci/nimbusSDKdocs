@@ -1,0 +1,79 @@
+---
+title: "BrainState"
+description: "App-facing BrainState fields, decision presets, and bridges from BatchResult / StreamingResult / upstream probabilities."
+keywords: ["BrainState", "decision presets", "need_more_data", "decide", "brain_states_from_batch", "Personalizer"]
+icon: "brain"
+---
+
+# BrainState
+
+`BrainState` is the app-facing output. Key fields:
+
+| Field | Meaning |
+| --- | --- |
+| `intent` | Top semantic label (from `classes`) |
+| `confidence` | Top-class posterior mass |
+| `posterior` | Full class → probability map |
+| `uncertainty` | Fused uncertainty used for gating |
+| `alternatives` | Other `IntentHypothesis` entries |
+| `need_more_data` | Ask for more evidence / calibration |
+| `rejected` / `rejection_reason` | Decision gate outcome |
+| `embedding` | Optional embedding snapshot |
+| `user_id` / `model_id` / `paradigm` | Provenance stamps |
+
+Use `BrainState.to_dict()` for JSON-friendly export (`brain_state_version` is currently `1`).
+
+## Decision presets
+
+| Preset | Intent |
+| --- | --- |
+| `research` | Lower confidence bar; more accepts |
+| `consumer` | Stricter gating; prefer `need_more_data` when unsure |
+
+Uncertainty fusion: `BrainState.uncertainty` is `max(normalized_entropy, upstream)` when upstream is set. Gating checks entropy and upstream thresholds independently.
+
+Optional `mc_samples>=2` on `Personalizer` draws posterior samples and sets normalized epistemic uncertainty (BALD / log2 K) as `Prediction.uncertainty`. MAP intent and confidence still use closed-form `predict_proba`. Breakdown bits land in `BrainState.extras` (`total_entropy_bits`, `aleatoric_bits`, `epistemic_bits`).
+
+## Dual API & bridges
+
+| Object | Audience | Role |
+| --- | --- | --- |
+| `BatchResult` | researchers, benches | Posteriors, entropy, Mahalanobis, ECE, ITR sweeps |
+| `BrainState` | apps, devices | Intent, confidence, uncertainty, alternatives, `need_more_data` |
+
+```python
+from nimbus_bci import (
+    predict_batch,
+    brain_states_from_batch,
+    brain_state_from_streaming_result,
+)
+
+# Research batch → app states
+states = brain_states_from_batch(predict_batch(clf, X), classes=["left", "right"])
+
+# StreamingSession final → BrainState
+state = brain_state_from_streaming_result(final, classes=["left", "right"])
+```
+
+Upstream probabilities only (no head required):
+
+```python
+from nimbus_bci import Prediction, decide
+
+state = decide(
+    Prediction(classes=["left", "right"], probabilities=[0.7, 0.3], uncertainty=0.2),
+    preset="research",
+    user_id="subject_001",
+)
+```
+
+See also [Python Streaming Inference](/python-sdk/streaming-inference) for the streaming bridge in context.
+
+## Next Read
+
+<CardGroup cols={2}>
+  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract" />
+  <Card title="Evidence" icon="chart-line" href="/personalizer/evidence" />
+  <Card title="Overview" icon="layers" href="/personalizer/overview" />
+  <Card title="Streaming" icon="activity" href="/python-sdk/streaming-inference" />
+</CardGroup>

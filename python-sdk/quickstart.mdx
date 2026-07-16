@@ -21,7 +21,7 @@ Before you begin:
 
 - **Python ≥ 3.11** installed
 - **Basic understanding** of EEG data and BCI concepts
-- **Embeddings** from a frozen trunk, or **preprocessed features** (CSP, bandpower, etc.) — see [Personalizer & Middleware](/python-sdk/middleware) and [preprocessing requirements](/inference-configuration/preprocessing-requirements)
+- **Embeddings** from a frozen trunk, or **preprocessed features** (CSP, bandpower, etc.) — see [Encoder contract](/personalizer/encoder-contract) and [preprocessing requirements](/inference-configuration/preprocessing-requirements)
 
 <Tip>
 nimbus-bci expects **embeddings or preprocessed features**, not raw EEG. Plug a frozen trunk via `wrap()`, or extract CSP / bandpower with MNE-Python.
@@ -80,7 +80,7 @@ adapter.save("subject_demo_profile")
 ```
 
 <Info>
-**Key concepts:** `wrap()` freezes the encoder contract, `Personalizer` owns the Bayesian head + gating, and `BrainState` is what apps consume. Full contract: [Personalizer & Middleware](/python-sdk/middleware).
+**Key concepts:** `wrap()` freezes the encoder contract, `Personalizer` owns the Bayesian head + gating, and `BrainState` is what apps consume. Full contract: [Personalizer & Middleware](/personalizer/overview).
 </Info>
   </Step>
 

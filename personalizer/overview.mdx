@@ -1,0 +1,69 @@
+---
+title: "Overview"
+description: "Wrap any frozen encoder, personalize online with a Bayesian head, and ship apps on BrainState — the nimbus-bci product wedge."
+keywords: ["Personalizer", "middleware", "BrainState", "frozen encoder", "BCI personalization", "nimbus-bci"]
+icon: "layers"
+---
+
+# Personalizer overview
+
+Nimbus middleware is the **product wedge**: a Bayesian personalization head for **frozen neural / foundation embeddings**. Encoders stay external. Apps consume thin `BrainState` outputs.
+
+**One-liner:** anything that can `encode(X) → Z` plugs in; Nimbus owns personalization, uncertainty gating, and cheap online updates — not the trunk.
+
+![One API across many trunks: frozen encode(X)→Z, Personalizer Bayesian head, BrainState intent + UQ](/images/personalizer-api.png)
+
+*One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1b).*
+
+<Info>
+Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encoder=None)` or the standalone heads (`NimbusLDA`, …) documented under [Models](/model-specification).
+</Info>
+
+## Start Here
+
+<CardGroup cols={2}>
+  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
+    `wrap` → Personalizer → save/load rules.
+  </Card>
+  <Card title="BrainState" icon="brain" href="/personalizer/brain-state">
+    App-facing intents, presets, and bridges.
+  </Card>
+  <Card title="Evidence" icon="chart-line" href="/personalizer/evidence">
+    Cost bake-off, FT comparison, transfer map.
+  </Card>
+  <Card title="Python Quickstart" icon="rocket" href="/python-sdk/quickstart">
+    Fit a Personalizer in a few minutes.
+  </Card>
+</CardGroup>
+
+## Minimal example
+
+```python
+from nimbus_bci import Personalizer, wrap
+
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+adapter = Personalizer(
+    encoder=enc,
+    head="lda",
+    classes=["left", "right"],
+    preset="research",
+)
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)  # list[BrainState]
+```
+
+## Integrator checklist
+
+1. **When to adapt** — factory works → little lift; gated stress → head adaptation; cost bake-off favors head before full FT. See [Evidence](/personalizer/evidence).
+2. **Gate decisions** — `preset="research"` / `"consumer"`; inspect `BrainState.rejected`, `need_more_data`, `uncertainty`. See [BrainState](/personalizer/brain-state).
+3. **Head stability** — after online updates, use `calibration_sufficient` on an unlabeled pool.
+4. **Encoder swap** — freeze trunk; match `embedding_dim`; never pass logits as embeddings; keep `model_id` consistent across `save` / `load`. See [Encoder contract](/personalizer/encoder-contract).
+
+## Next Read
+
+<CardGroup cols={2}>
+  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract" />
+  <Card title="BrainState" icon="brain" href="/personalizer/brain-state" />
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference#middleware" />
+  <Card title="Heads / Models" icon="box" href="/model-specification" />
+</CardGroup>

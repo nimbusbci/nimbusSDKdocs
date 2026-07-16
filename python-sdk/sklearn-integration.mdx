@@ -7,11 +7,11 @@ icon: "code"
 
 # sklearn Integration
 
-The nimbus-bci **heads** are fully compatible with scikit-learn — pipelines, cross-validation, hyperparameter tuning, and the broader sklearn ecosystem. Use them standalone or as `Personalizer(head=...)` under the [middleware contract](/python-sdk/middleware).
+The nimbus-bci **heads** are fully compatible with scikit-learn — pipelines, cross-validation, hyperparameter tuning, and the broader sklearn ecosystem. Use them standalone or as `Personalizer(head=...)` under the [middleware contract](/personalizer/overview).
 
 <Tip>
 **Product vs sklearn surface**
-- Apps / devices: `Personalizer` → `BrainState` ([middleware](/python-sdk/middleware)).
+- Apps / devices: `Personalizer` → `BrainState` ([middleware](/personalizer/overview)).
 - Research CV / GridSearch: use the head directly (`NimbusLDA`, …) or `adapter.head` on already-encoded embeddings `Z`.
 </Tip>
 
@@ -635,7 +635,7 @@ test_score = grid.score(X_test, y_test)
 ## Next Read
 
 <CardGroup cols={2}>
-  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+  <Card title="Personalizer & Middleware" icon="layers" href="/personalizer/overview">
     App-facing BrainState contract
   </Card>
   <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">

@@ -10,7 +10,7 @@ icon: "rocket"
 This page summarizes advanced BCI patterns without duplicating full SDK walkthroughs. Use it as an implementation checklist, then follow the linked SDK guides for exact APIs.
 
 <Note>
-For frozen-encoder personalization, see [Personalizer & Middleware](/python-sdk/middleware). For Python-specific streaming and sklearn patterns, see [Python Streaming Inference](/python-sdk/streaming-inference) and [sklearn Integration](/python-sdk/sklearn-integration). For Julia streaming, see [Julia Streaming Inference](/julia-sdk/streaming-inference).
+For frozen-encoder personalization, see [Personalizer & Middleware](/personalizer/overview). For Python-specific streaming and sklearn patterns, see [Python Streaming Inference](/python-sdk/streaming-inference) and [sklearn Integration](/python-sdk/sklearn-integration). For Julia streaming, see [Julia Streaming Inference](/julia-sdk/streaming-inference).
 </Note>
 
 <Tip>
@@ -19,7 +19,7 @@ When adapting a frozen neural trunk under deployment stress, prefer `Personalize
 
 ## Cross-Subject Training
 
-Cross-subject models combine calibration data from multiple users and then adapt to a new user with a small amount of labeled data. When a frozen trunk already transfers, prefer [`Personalizer`](/python-sdk/middleware) + small per-user calibration over full fine-tuning.
+Cross-subject models combine calibration data from multiple users and then adapt to a new user with a small amount of labeled data. When a frozen trunk already transfers, prefer [`Personalizer`](/personalizer/overview) + small per-user calibration over full fine-tuning.
 
 Core workflow:
 

@@ -19,14 +19,14 @@ Choose the SDK that matches your workflow. The Python SDK leads with `wrap` → 
 </CardGroup>
 
 <Tip>
-Using a frozen neural encoder (EEGNet, BrainDecode, REVE, …)? Start with [Personalizer & Middleware](/python-sdk/middleware) instead of the classical classifier path.
+Using a frozen neural encoder (EEGNet, BrainDecode, REVE, …)? Start with [Personalizer & Middleware](/personalizer/overview) instead of the classical classifier path.
 </Tip>
 
 ## Before You Start
 
 - Use **Python 3.11+** for the Python SDK or **Julia 1.9+** for the Julia SDK.
 - Provide **embeddings** (`encode(X) → Z`) or **preprocessed EEG features**, not raw EEG.
-- Start with [Personalizer & Middleware](/python-sdk/middleware) for the encoder contract, or [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) for CSP / bandpower / ERP features.
+- Start with [Personalizer & Middleware](/personalizer/overview) for the encoder contract, or [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) for CSP / bandpower / ERP features.
 
 <Tip>
 Nimbus focuses on Bayesian personalization and BCI workflow tooling. Filtering, artifact removal, epoching, and feature extraction (or a frozen trunk) happen before data reaches the head.
@@ -35,7 +35,7 @@ Nimbus focuses on Bayesian personalization and BCI workflow tooling. Filtering, 
 ## Common Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+  <Card title="Personalizer & Middleware" icon="layers" href="/personalizer/overview">
     Encoder contract, BrainState, and decision presets.
   </Card>
   <Card title="Model Selection" icon="brain" href="/model-specification">

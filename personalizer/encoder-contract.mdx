@@ -1,0 +1,121 @@
+---
+title: "Encoder contract"
+description: "The encode(X)→Z product boundary: wrap, FrozenEncoder, Personalizer fit/partial_fit/save/load, and optional trunk shortcuts."
+keywords: ["encoder contract", "wrap", "FrozenEncoder", "Personalizer", "wrap_braindecode", "wrap_eegnet", "embedding_dim"]
+icon: "plug"
+---
+
+# Encoder contract
+
+The encode hook is not a gap — it **is** the product boundary. Nimbus does not host DL architectures. Integrators (or thin shortcuts) supply embeddings.
+
+| Layer | Owner | Responsibility |
+| --- | --- | --- |
+| Frozen trunk | You / partner / bench | `encode(X) → (n, d)` pre-classifier features |
+| Wrap | Nimbus | `wrap` / `FrozenEncoder` (+ optional named shortcuts) |
+| Head | Nimbus | `Personalizer` — LDA / QDA / Softmax, `fit` / `partial_fit` |
+| App | You | `BrainState` + presets (`research` / `consumer`) |
+
+**Rules:**
+
+- Freeze the trunk before personalizing
+- Feed **embeddings**, never class logits
+- `Personalizer.load` requires **re-attaching** the encoder
+- Optional `embedding_dim=` validates embedding width
+
+## Canonical recipe
+
+```python
+from nimbus_bci import Personalizer, wrap
+
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+adapter = Personalizer(
+    encoder=enc,
+    head="lda",
+    user="subject_001",
+    classes=["left", "right"],
+    preset="research",
+    # Optional: MC epistemic → Prediction.uncertainty for upstream gating
+    # mc_samples=64,
+)
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)  # list[BrainState]
+adapter.save("subject_001_profile")
+loaded = Personalizer.load("subject_001_profile", encoder=enc)
+```
+
+Already have features / CSP / Riemann vectors? Skip the trunk:
+
+```python
+from nimbus_bci import Personalizer
+
+adapter = Personalizer(encoder=None, classes=["left", "right"], preset="consumer")
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)
+```
+
+<Warning>
+`partial_fit` is **cumulative** (no forgetting / decay). That matches session calibration and short stream budgets. Do not treat unbounded lifetime accumulation as a shipped product guarantee until a forgetting mechanism exists.
+</Warning>
+
+**Foundation pooling:** REVE / EEGPT adapters mean-pool (or flatten) token / patch features to flat `(n, d)` so LDA/QDA heads can consume them. Spatial/temporal structure is collapsed at the encoder boundary, not inside the Bayesian head.
+
+## Optional shortcuts
+
+Named helpers only reduce boilerplate. Architectures stay outside core:
+
+| Shortcut | Trunk lives in | Notes |
+| --- | --- | --- |
+| `wrap(...)` | Your code | Canonical — any callable / sklearn / torch |
+| `wrap_eegnet(clf)` | `nimbusbench.models.eegnet` | Convenience over `.encode` / `.freeze` |
+| `wrap_braindecode(..., kind="eegnetv4")` | `braindecode` (optional) | Or pass any `encode_fn` |
+| `wrap_braindecode(..., kind="reve")` | `braindecode` REVE (optional) | Foundation EEG; electrode positions + pooled embeddings |
+| `wrap_braindecode(..., kind="eegpt")` | `braindecode` EEGPT (optional) | Patch-pooled foundation embeddings |
+
+```python
+from nimbus_bci import wrap_braindecode, wrap_eegnet
+
+enc = wrap_eegnet(clf, freeze=True)
+enc = wrap_braindecode(module, kind="eegnetv4")
+enc = wrap_braindecode(reve_module, kind="reve", channel_names=chans)
+enc = wrap_braindecode(eegpt_module, kind="eegpt")
+enc = wrap_braindecode(my_encode_fn)  # any other BrainDecode / custom net
+```
+
+Claim for second trunks: **API interchangeability** under the same `Personalizer` / `BrainState` contract — not a confirmatory accuracy bake-off.
+
+## Active learning → personalization
+
+Use `CalibrationSession` (or `suggest_next_trial`) to choose labels, then:
+
+```python
+adapter.partial_fit(X_queried, y_queried)
+```
+
+Label-free stopping on the head:
+
+```python
+from copy import deepcopy
+from nimbus_bci import calibration_sufficient
+
+previous = deepcopy(adapter.head)
+adapter.partial_fit(X_new, y_new)
+status = calibration_sufficient(
+    adapter.head,
+    Z_pool,  # already-encoded pool, or identity-encoder features
+    previous=previous,
+    criterion="posterior_stability",
+    threshold=0.05,
+)
+```
+
+See [Active Learning](/python-sdk/active-learning).
+
+## Next Read
+
+<CardGroup cols={2}>
+  <Card title="BrainState" icon="brain" href="/personalizer/brain-state" />
+  <Card title="Evidence" icon="chart-line" href="/personalizer/evidence" />
+  <Card title="Overview" icon="layers" href="/personalizer/overview" />
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference#middleware" />
+</CardGroup>

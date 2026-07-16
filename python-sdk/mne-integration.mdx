@@ -26,7 +26,7 @@ nimbus-bci handles:
 
 <Tip>
 **Dual path after MNE epochs**
-1. **Product:** epochs → frozen encoder (`wrap` / BrainDecode) → [`Personalizer`](/python-sdk/middleware) → `BrainState`
+1. **Product:** epochs → frozen encoder (`wrap` / BrainDecode) → [`Personalizer`](/personalizer/overview) → `BrainState`
 2. **Classical:** epochs → CSP / bandpower → `Personalizer(encoder=None)` or `NimbusLDA`
 </Tip>
 
@@ -82,7 +82,7 @@ print(states[0].intent, states[0].confidence, states[0].need_more_data)
 adapter.save("subject_mne_profile")
 ```
 
-Optional shortcuts: `wrap_eegnet`, `wrap_braindecode` — see [Personalizer & Middleware](/python-sdk/middleware).
+Optional shortcuts: `wrap_eegnet`, `wrap_braindecode` — see [Personalizer & Middleware](/personalizer/overview).
 
 ## Classical path: CSP → Personalizer / head
 
@@ -715,7 +715,7 @@ print(f"Warnings: {report.warnings}")
 ## Next Read
 
 <CardGroup cols={2}>
-  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+  <Card title="Personalizer & Middleware" icon="layers" href="/personalizer/overview">
     Encoder contract and BrainState
   </Card>
   <Card title="sklearn Integration" icon="code" href="/python-sdk/sklearn-integration">

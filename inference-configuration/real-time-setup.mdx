@@ -10,7 +10,7 @@ icon: "settings"
 This page owns hardware and acquisition setup: how EEG gets from an amplifier into embedding or feature chunks that Nimbus can consume. For SDK streaming APIs, see [Streaming Inference Configuration](/inference-configuration/streaming-inference), [Python Streaming Inference](/python-sdk/streaming-inference), and [Julia Streaming Inference](/julia-sdk/streaming-inference).
 
 <Tip>
-**Online encode path:** amplifier → preprocess → frozen trunk `encode` → embedding chunks → [`Personalizer`](/python-sdk/middleware) / streaming session → `BrainState`.  
+**Online encode path:** amplifier → preprocess → frozen trunk `encode` → embedding chunks → [`Personalizer`](/personalizer/overview) / streaming session → `BrainState`.  
 **Classical path:** amplifier → preprocess → CSP/bandpower chunks → head / streaming session.
 </Tip>
 

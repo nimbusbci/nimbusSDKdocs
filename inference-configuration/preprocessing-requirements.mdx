@@ -15,7 +15,7 @@ The SDK performs Bayesian inference on feature-space data — either frozen-enco
 
 <Tip>
 **Two valid handoffs into Nimbus**
-1. **Product path:** freeze a neural trunk → `wrap` → [`Personalizer`](/python-sdk/middleware) → `BrainState` (Nimbus does not own the DL architecture).
+1. **Product path:** freeze a neural trunk → `wrap` → [`Personalizer`](/personalizer/overview) → `BrainState` (Nimbus does not own the DL architecture).
 2. **Classical path:** extract CSP / bandpower / ERP features → `NimbusLDA` / other heads (this page).
 </Tip>
 
@@ -43,7 +43,7 @@ The SDK performs Bayesian inference on feature-space data — either frozen-enco
 5. **Focus**: NimbusSDK excels at Bayesian personalization and inference, not signal processing
 
 <Note>
-Encoder contract: [Personalizer & Middleware](/python-sdk/middleware). Classical tool integration: [Real-time Setup](/inference-configuration/real-time-setup).
+Encoder contract: [Encoder contract](/personalizer/encoder-contract). Classical tool integration: [Real-time Setup](/inference-configuration/real-time-setup).
 </Note>
 
 ## Required Preprocessing Pipeline

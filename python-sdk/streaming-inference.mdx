@@ -796,7 +796,7 @@ print(state.intent, state.confidence, state.need_more_data)
 session.reset()
 ```
 
-Prefer `BrainState` when shipping device / UI decisions. Keep `StreamingResult` for research diagnostics. See [Personalizer & Middleware](/python-sdk/middleware).
+Prefer `BrainState` when shipping device / UI decisions. Keep `StreamingResult` for research diagnostics. See [BrainState](/personalizer/brain-state).
 
 ## Best Practices
 
@@ -840,8 +840,8 @@ if chunk is None or np.any(np.isnan(chunk)):
 ## Next Read
 
 <CardGroup cols={2}>
-  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
-    BrainState contract and encoder personalization
+  <Card title="BrainState" icon="brain" href="/personalizer/brain-state">
+    App-facing intents, presets, and bridges
   </Card>
   <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">
     Complete EEG preprocessing pipeline
