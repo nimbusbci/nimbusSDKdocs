@@ -117,7 +117,8 @@ For deployed BCI systems, monitor:
 
 | Use Case | First Model | Workflow |
 | --- | --- | --- |
-| Motor imagery rehab | `NimbusLDA` | Streaming with confidence gates. |
+| Frozen encoder product | `Personalizer(head="lda")` | `wrap` → calibrate → `BrainState` gates. |
+| Motor imagery rehab | `NimbusLDA` / Personalizer | Streaming with confidence / `need_more_data` gates. |
 | P300 communication | `NimbusQDA` | Batch calibration, then confidence-gated selection. |
 | Long neurofeedback | `NimbusSTS` | Stateful Python streaming. |
 | Julia multinomial tasks | `NimbusProbit` | Julia training and streaming workflows. |

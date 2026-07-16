@@ -10,6 +10,7 @@ icon: "code"
 This guide covers project organization and production workflow. It does not repeat SDK installation or full examples; use the linked pages for those details.
 
 <Note>
+- Python product path: [Personalizer & Middleware](/python-sdk/middleware)
 - Python setup: [Python SDK Installation](/python-sdk/installation)
 - Julia setup: [Julia SDK Quickstart](/julia-sdk/quickstart)
 - Recipes: [Basic Examples](/examples/basic-examples) and [Advanced Applications](/examples/advanced-applications)
@@ -17,15 +18,16 @@ This guide covers project organization and production workflow. It does not repe
 
 ## Recommended Project Structure
 
-Keep acquisition, preprocessing, inference, and application logic separate. That makes it easier to test each stage and swap SDKs or models later.
+Keep acquisition, preprocessing / encoding, personalization, and application logic separate. That makes it easier to test each stage and swap trunks, heads, or SDKs later.
 
 ```text
 my-bci-project/
   src/
     acquisition/       # LSL, BrainFlow, hardware adapters
     preprocessing/     # filtering, artifact handling, feature extraction
-    models/            # training, loading, normalization params
-    inference/         # batch and streaming inference
+    encoders/          # frozen trunk wrappers (optional product path)
+    models/            # Personalizer profiles / head training, normalization
+    inference/         # batch and streaming inference → BrainState
     app/               # UI, control, feedback, safety policy
   data/
     raw/
@@ -39,11 +41,11 @@ my-bci-project/
 ## Development Workflow
 
 1. **Define the BCI paradigm**: motor imagery, P300, SSVEP, or another task.
-2. **Lock preprocessing**: feature type, sampling rate, channels, temporal window, normalization.
-3. **Train a baseline**: start with `NimbusLDA`, then compare alternatives only if the baseline fails.
-4. **Evaluate offline**: use cross-validation and held-out sessions before streaming.
-5. **Add streaming**: process feature chunks and aggregate trial decisions.
-6. **Add safety policy**: reject low confidence trials and log uncertainty.
+2. **Lock the input contract**: frozen encoder (`model_id`, `embedding_dim`) **or** classical feature type, sampling rate, channels, window, normalization.
+3. **Fit a baseline**: start with `Personalizer(head="lda")` on embeddings, or `NimbusLDA` on classical features; compare heads only if the baseline fails.
+4. **Evaluate offline**: use held-out sessions / CV before streaming; inspect `BrainState` gating.
+5. **Add streaming**: process embedding or feature chunks and aggregate trial decisions.
+6. **Add safety policy**: reject low confidence / high uncertainty (`need_more_data`) and log decisions.
 7. **Deploy with monitoring**: track latency, confidence, rejection rate, and drift.
 
 ## Data Contracts
@@ -70,30 +72,33 @@ Treat a deployed model as more than weights. Save:
 - training session metadata
 - validation metrics
 
-Example metadata:
+Example metadata (Personalizer profile):
 
 ```json
 {
-  "model": "NimbusLDA",
+  "surface": "Personalizer",
+  "head": "lda",
+  "model_id": "partner-encoder",
+  "embedding_dim": 64,
   "sdk": "nimbus-bci",
-  "feature_type": "csp",
-  "sampling_rate": 250,
-  "n_features": 8,
-  "normalization": "zscore",
+  "classes": ["left", "right"],
+  "preset": "research",
   "trained_on": "2026-04-25"
 }
 ```
+
+Classical-head metadata can still use `"model": "NimbusLDA"` + `"feature_type": "csp"`. Persist `Personalizer.save(...)` profiles separately from the frozen trunk weights.
 
 ## Testing Strategy
 
 Prioritize small tests around contracts and failure modes:
 
-- Preprocessing output has expected shape and finite values.
+- Encoder / preprocessing output has expected shape and finite values.
 - Labels match the number of trials.
 - Normalization params are reused, not recomputed on test data.
-- Model rejects incompatible feature dimensions.
+- Personalizer rejects incompatible `embedding_dim` / `model_id` on load.
 - Streaming chunks match `chunk_size`.
-- Low-confidence predictions trigger the expected safety path.
+- Low-confidence / high-uncertainty `BrainState` triggers the expected safety path.
 
 For numerical tests, avoid hardcoding exact posteriors unless the model is fully deterministic. Prefer shape, range, monotonicity, and threshold checks.
 
@@ -102,11 +107,11 @@ For numerical tests, avoid hardcoding exact posteriors unless the model is fully
 When accuracy or confidence is poor:
 
 1. Confirm data shape and label encoding.
-2. Check for NaN, Inf, constant features, or raw EEG accidentally passed as features.
-3. Verify the preprocessing band and time window match the paradigm.
+2. Check for NaN, Inf, constant features, logits passed as embeddings, or raw EEG as features.
+3. Verify the encode contract or preprocessing band / time window match the paradigm.
 4. Reuse training normalization parameters on test data.
-5. Compare against `NimbusLDA` as a baseline.
-6. Inspect confidence and posterior entropy, not only accuracy.
+5. Compare against `Personalizer(head="lda")` / `NimbusLDA` as a baseline.
+6. Inspect `BrainState` confidence, uncertainty, and `need_more_data`, not only accuracy.
 7. Run preprocessing diagnostics before tuning model hyperparameters.
 
 ## Performance Guidance

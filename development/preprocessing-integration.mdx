@@ -7,11 +7,15 @@ icon: "link"
 
 # External Preprocessing Integration
 
-Nimbus expects preprocessed features, not raw EEG. This page covers the handoff between external EEG tools and Nimbus SDKs: feature shape, label conventions, export formats, and validation.
+Nimbus expects embeddings or preprocessed features, not raw EEG. This page covers the handoff between external EEG tools and Nimbus SDKs: feature shape, label conventions, export formats, and validation.
 
 <Note>
-For preprocessing theory and recommended feature pipelines, start with [Preprocessing Requirements](/inference-configuration/preprocessing-requirements). For Python-native MNE workflows, use [Python SDK MNE Integration](/python-sdk/mne-integration).
+For preprocessing theory and recommended feature pipelines, start with [Preprocessing Requirements](/inference-configuration/preprocessing-requirements). For Python-native MNE workflows, use [Python SDK MNE Integration](/python-sdk/mne-integration). Encoder / Personalizer handoff: [Personalizer & Middleware](/python-sdk/middleware).
 </Note>
+
+<Tip>
+Exported embedding tables use the same `(n_trials, n_features)` shape as classical features — feed them to `Personalizer(encoder=None)` or attach a live encoder via `wrap`.
+</Tip>
 
 ## What This Page Owns
 
@@ -26,7 +30,7 @@ Use this page when you preprocess outside the SDK language that will run inferen
 
 | Target | Expected Shape | Notes |
 | --- | --- | --- |
-| Python classifiers | `(n_trials, n_features)` | Standard sklearn-style tabular features. |
+| Python Personalizer / heads | `(n_trials, n_features)` | Embeddings or classical features; sklearn-style tabular rows. |
 | Python `BCIData` utilities | `(n_features, n_samples, n_trials)` | Used by lower-level batch/streaming utilities. |
 | Julia `BCIData` | `(n_features, n_samples, n_trials)` | Labels are usually 1-indexed integers. |
 

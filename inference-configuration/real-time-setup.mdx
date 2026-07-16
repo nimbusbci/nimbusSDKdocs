@@ -7,15 +7,20 @@ icon: "settings"
 
 # Real-Time BCI Setup
 
-This page owns hardware and acquisition setup: how EEG gets from an amplifier into feature chunks that Nimbus can classify. For SDK streaming APIs, see [Streaming Inference Configuration](/inference-configuration/streaming-inference), [Python Streaming Inference](/python-sdk/streaming-inference), and [Julia Streaming Inference](/julia-sdk/streaming-inference).
+This page owns hardware and acquisition setup: how EEG gets from an amplifier into embedding or feature chunks that Nimbus can consume. For SDK streaming APIs, see [Streaming Inference Configuration](/inference-configuration/streaming-inference), [Python Streaming Inference](/python-sdk/streaming-inference), and [Julia Streaming Inference](/julia-sdk/streaming-inference).
+
+<Tip>
+**Online encode path:** amplifier → preprocess → frozen trunk `encode` → embedding chunks → [`Personalizer`](/python-sdk/middleware) / streaming session → `BrainState`.  
+**Classical path:** amplifier → preprocess → CSP/bandpower chunks → head / streaming session.
+</Tip>
 
 ## Real-Time Pipeline
 
 ```text
-EEG amplifier -> acquisition transport -> preprocessing -> feature chunks -> Nimbus streaming session -> application command
+EEG amplifier -> acquisition transport -> preprocess / encode -> chunks -> Nimbus (Personalizer / streaming) -> application command
 ```
 
-Nimbus expects **feature chunks**, not raw EEG. Your acquisition loop should filter, clean, epoch/window, and extract features before calling the SDK.
+Nimbus expects **embedding or feature chunks**, not raw EEG. Your acquisition loop should filter, clean, window, and either encode or extract features before calling the SDK.
 
 ## Acquisition Options
 

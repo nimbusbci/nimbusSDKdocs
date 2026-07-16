@@ -24,15 +24,18 @@ For detailed implementation, see the individual model pages above.
 
 ## Start Here
 
-<CardGroup cols={3}>
+<CardGroup cols={2}>
+  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+    Python product path: frozen trunk → Bayesian head → BrainState.
+  </Card>
   <Card title="Bayesian LDA" icon="brain" href="/models/rxlda">
-    Start with fast shared-covariance classification.
+    Default Personalizer head (`head="lda"`) and fast classical baseline.
   </Card>
   <Card title="Bayesian QDA" icon="brain" href="/models/rxgmm">
-    Use class-specific covariance for overlapping classes.
+    Class-specific covariance; `Personalizer(head="qda")`.
   </Card>
   <Card title="Bayesian STS" icon="brain" href="/models/rxsts">
-    Choose adaptive stateful modeling for non-stationarity.
+    Adaptive stateful modeling for non-stationarity.
   </Card>
 </CardGroup>
 

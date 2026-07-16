@@ -9,9 +9,13 @@ icon: "list"
 
 Batch inference processes complete trials offline. Use it for calibration, validation, model comparison, research studies, and quality review. Use [Streaming Inference Configuration](/inference-configuration/streaming-inference) when predictions must update during a live trial.
 
+<Tip>
+Python product path: calibrate [`Personalizer`](/python-sdk/middleware) on labeled trials (embeddings or classical features), then evaluate `BrainState` offline. Standalone heads (`NimbusLDA`, …) remain valid for research CV.
+</Tip>
+
 ## When To Use Batch
 
-- Train or calibrate a model on labeled trials.
+- Calibrate a Personalizer / head on labeled trials.
 - Evaluate held-out sessions or subjects.
 - Compare model families and hyperparameters.
 - Run preprocessing diagnostics before deployment.
@@ -21,16 +25,32 @@ Batch inference processes complete trials offline. Use it for calibration, valid
 
 | SDK | Typical Batch Shape | Notes |
 | --- | --- | --- |
-| Python classifiers | `(n_trials, n_features)` | sklearn-compatible estimator API. |
+| Python Personalizer / heads | `(n_trials, n_features)` | Embeddings after encode, or classical features; sklearn-compatible heads. |
 | Python `BCIData` utilities | `(n_features, n_samples, n_trials)` | Used by lower-level inference helpers. |
 | Julia `BCIData` | `(n_features, n_samples, n_trials)` | Labels are typically 1-indexed integers. |
 
-All batch workflows should use preprocessed features, not raw EEG.
+All batch workflows should use embeddings or preprocessed features, not raw EEG.
 
 ## Basic Pattern
 
 <Tabs>
-  <Tab title="Python">
+  <Tab title="Python Personalizer">
+```python
+from nimbus_bci import Personalizer, wrap
+
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+adapter = Personalizer(
+    encoder=enc,
+    head="lda",
+    classes=["left", "right"],
+    preset="research",
+)
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)  # list[BrainState]
+print(states[0].intent, states[0].confidence)
+```
+  </Tab>
+  <Tab title="Python head">
 ```python
 from nimbus_bci import NimbusLDA
 from sklearn.model_selection import cross_val_score

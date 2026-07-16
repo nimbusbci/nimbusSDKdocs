@@ -9,7 +9,7 @@ icon: "scale"
 
 BCI systems are not just classifiers. They are decision systems that must work under noise, adapt during sessions, and expose confidence before closing the control loop. Classical machine learning methods each solve part of that problem — but they trade away uncertainty, online updates, or transparency in ways that matter in production BCI.
 
-This page compares common BCI processing approaches and explains where Bayesian inference on NimbusSDK fits. For a deeper comparison with scikit-learn and pyRiemann — including benchmark methodology — see [Why Nimbus SDK? Beyond scikit-learn and pyRiemann for BCI](https://www.nimbusbci.com/blog/why-nimbus-sdk-bci-scikit-learn-pyriemann).
+This page compares common BCI processing approaches and explains where Bayesian inference on NimbusSDK fits. On the Python product surface, that wedge is [`Personalizer`](/python-sdk/middleware): keep the neural trunk frozen, adapt a Bayesian head online, and ship apps on `BrainState`. For a deeper comparison with scikit-learn and pyRiemann — including benchmark methodology — see [Why Nimbus SDK? Beyond scikit-learn and pyRiemann for BCI](https://www.nimbusbci.com/blog/why-nimbus-sdk-bci-scikit-learn-pyriemann).
 
 ## How BCI Processing Methods Compare
 

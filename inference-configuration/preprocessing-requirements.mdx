@@ -8,20 +8,27 @@ icon: "list-filter"
 # EEG Preprocessing Requirements
 
 <Warning>
-**NimbusSDK expects preprocessed features, NOT raw EEG.**
+**NimbusSDK expects embeddings or preprocessed features, NOT raw EEG.**
 
-The SDK performs Bayesian inference on feature-space data. You must preprocess your raw EEG signals before using NimbusSDK.
+The SDK performs Bayesian inference on feature-space data — either frozen-encoder embeddings (`encode(X) → Z`) or classical CSP / bandpower / ERP features.
 </Warning>
+
+<Tip>
+**Two valid handoffs into Nimbus**
+1. **Product path:** freeze a neural trunk → `wrap` → [`Personalizer`](/python-sdk/middleware) → `BrainState` (Nimbus does not own the DL architecture).
+2. **Classical path:** extract CSP / bandpower / ERP features → `NimbusLDA` / other heads (this page).
+</Tip>
 
 ## What NimbusSDK Does
 
-✅ Bayesian inference with NimbusLDA and NimbusQDA (Python + Julia), plus NimbusSoftmax and NimbusSTS (Python) and NimbusProbit (Julia)  
-✅ Real-time and batch classification  
-✅ Confidence scoring and quality assessment  
+✅ Bayesian personalization (`Personalizer`) and standalone heads (LDA / QDA / Softmax / STS / Probit)  
+✅ Real-time and batch inference with uncertainty  
+✅ Confidence scoring, gating (`BrainState`), and quality assessment  
 ✅ Performance metrics (ITR, accuracy)
 
 ## What NimbusSDK Does NOT Do
 
+❌ Host or train deep EEG architectures (trunks stay external)  
 ❌ Raw EEG filtering (bandpass, notch)  
 ❌ Artifact removal (ICA, regression, ASR)  
 ❌ Spatial filtering (CSP, ICA, Laplacian)  
@@ -29,14 +36,14 @@ The SDK performs Bayesian inference on feature-space data. You must preprocess y
 
 ## Why This Separation?
 
-1. **Preprocessing is paradigm-specific**: Motor Imagery needs CSP at 8-30 Hz, P300 needs ERP at 0.5-10 Hz
+1. **Preprocessing / encoding is paradigm-specific**: Motor Imagery needs CSP at 8-30 Hz, P300 needs ERP at 0.5-10 Hz; foundation trunks define their own encode contract
 2. **Hardware-dependent**: Different amplifiers require different artifact handling
-3. **Domain expertise**: Use established tools (MNE-Python, EEGLAB, etc.)
-4. **Flexibility**: You can use any preprocessing pipeline (Python, MATLAB, custom)
-5. **Focus**: NimbusSDK excels at Bayesian inference, not signal processing
+3. **Domain expertise**: Use established tools (MNE-Python, EEGLAB, BrainDecode, etc.)
+4. **Flexibility**: You can use any preprocessing or encoder pipeline
+5. **Focus**: NimbusSDK excels at Bayesian personalization and inference, not signal processing
 
 <Note>
-For integration examples with preprocessing tools, see [Real-time Setup](/inference-configuration/real-time-setup)
+Encoder contract: [Personalizer & Middleware](/python-sdk/middleware). Classical tool integration: [Real-time Setup](/inference-configuration/real-time-setup).
 </Note>
 
 ## Required Preprocessing Pipeline

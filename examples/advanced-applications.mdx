@@ -19,13 +19,13 @@ When adapting a frozen neural trunk under deployment stress, prefer `Personalize
 
 ## Cross-Subject Training
 
-Cross-subject models combine calibration data from multiple users and then adapt to a new user with a small amount of labeled data.
+Cross-subject models combine calibration data from multiple users and then adapt to a new user with a small amount of labeled data. When a frozen trunk already transfers, prefer [`Personalizer`](/python-sdk/middleware) + small per-user calibration over full fine-tuning.
 
 Core workflow:
 
-1. Extract the same feature type for every subject.
+1. Extract the same feature type (or freeze the same encoder) for every subject.
 2. Normalize using training subjects only.
-3. Train a conservative baseline model.
+3. Train a conservative baseline (`Personalizer(head="lda")` or `NimbusLDA`).
 4. Evaluate with subject-wise splits, not random trial splits.
 5. Personalize with a small calibration set for the target subject.
 
@@ -156,11 +156,11 @@ Suggested metadata to log:
 
 ## Robust Deployment
 
-Production systems should separate classification, control, and safety policy:
+Production systems should separate personalization / classification, control, and safety policy:
 
-1. Classifier returns prediction, posterior, and confidence.
-2. Quality gate accepts, rejects, or asks for confirmation.
-3. Control layer maps accepted predictions to actions.
+1. Personalizer / head returns `BrainState` (or prediction, posterior, and confidence).
+2. Quality gate accepts, rejects, or asks for more data (`need_more_data`).
+3. Control layer maps accepted intents to actions.
 4. Monitoring logs confidence, latency, rejection rate, and drift.
 
 Use fallback behavior when confidence is low:

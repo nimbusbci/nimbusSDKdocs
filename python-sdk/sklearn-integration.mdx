@@ -7,14 +7,20 @@ icon: "code"
 
 # sklearn Integration
 
-The nimbus-bci classifiers are fully compatible with scikit-learn, allowing seamless integration with pipelines, cross-validation, hyperparameter tuning, and the broader sklearn ecosystem.
+The nimbus-bci **heads** are fully compatible with scikit-learn — pipelines, cross-validation, hyperparameter tuning, and the broader sklearn ecosystem. Use them standalone or as `Personalizer(head=...)` under the [middleware contract](/python-sdk/middleware).
+
+<Tip>
+**Product vs sklearn surface**
+- Apps / devices: `Personalizer` → `BrainState` ([middleware](/python-sdk/middleware)).
+- Research CV / GridSearch: use the head directly (`NimbusLDA`, …) or `adapter.head` after fitting a Personalizer.
+</Tip>
 
 ## sklearn-Compatible API
 
-All nimbus-bci classifiers implement the sklearn estimator interface:
+All nimbus-bci heads implement the sklearn estimator interface:
 
 ```python
-from nimbus_bci import NimbusLDA
+from nimbus_bci import NimbusLDA, Personalizer, wrap
 
 clf = NimbusLDA()
 
@@ -23,6 +29,12 @@ clf.fit(X_train, y_train)              # Train
 predictions = clf.predict(X_test)       # Predict classes
 probabilities = clf.predict_proba(X_test)  # Predict probabilities
 score = clf.score(X_test, y_test)      # Accuracy score
+
+# Personalizer wraps the same head after encode
+enc = wrap(lambda X: X, model_id="demo", embedding_dim=X_train.shape[1])
+adapter = Personalizer(encoder=enc, head="lda", classes=["left", "right"])
+adapter.fit(X_train, y_train)
+# GridSearchCV / CV typically target adapter.head on already-encoded Z
 ```
 
 ## Pipelines

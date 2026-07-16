@@ -11,7 +11,8 @@ This page is the cross-SDK configuration overview for streaming inference. It ex
 
 <Note>
 For implementation-specific APIs, use the SDK pages:
-- **Python**: [Python Streaming Inference](/python-sdk/streaming-inference) documents `StreamingSession` and `StreamingSessionSTS`.
+- **Python**: [Python Streaming Inference](/python-sdk/streaming-inference) documents `StreamingSession`, `StreamingSessionSTS`, and the `BrainState` bridge.
+- **Python apps on frozen encoders**: prefer [Personalizer & Middleware](/python-sdk/middleware) for app-facing decisions.
 - **Julia**: [Julia Streaming Inference](/julia-sdk/streaming-inference) documents `init_streaming`, `process_chunk`, and `finalize_trial`.
 </Note>
 
@@ -19,10 +20,10 @@ For implementation-specific APIs, use the SDK pages:
 
 Use **batch inference** when full trials are already available and you are doing offline evaluation, model validation, or analytics.
 
-Use **streaming inference** when feature chunks arrive over time and the application needs low-latency updates before a complete trial has finished.
+Use **streaming inference** when embedding or feature chunks arrive over time and the application needs low-latency updates before a complete trial has finished.
 
 ```text
-EEG stream -> preprocessing -> feature chunks -> streaming session -> chunk posteriors -> final decision
+EEG stream -> preprocess / encode -> chunks -> streaming session -> BrainState / final decision
 ```
 
 ## Core Configuration

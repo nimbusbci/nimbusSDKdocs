@@ -7,7 +7,7 @@ icon: "brain"
 
 # MNE-Python Integration
 
-The nimbus-bci library integrates seamlessly with MNE-Python, the leading Python package for EEG/MEG analysis. This allows you to build complete BCI pipelines from raw EEG to classification.
+The nimbus-bci library integrates seamlessly with MNE-Python, the leading Python package for EEG/MEG analysis. Build complete BCI pipelines from raw EEG to `BrainState` decisions.
 
 ## Overview
 
@@ -18,11 +18,27 @@ MNE-Python handles:
 - Feature extraction (CSP, bandpower)
 
 nimbus-bci handles:
-- Bayesian classification
-- Uncertainty quantification
+- Bayesian personalization (`Personalizer`) and standalone heads
+- Uncertainty quantification and gating (`BrainState`)
 - Online learning
 - Real-time inference
-- Model families: `NimbusLDA`, `NimbusQDA`, `NimbusSoftmax`, `NimbusSTS`
+- Heads: `NimbusLDA`, `NimbusQDA`, `NimbusSoftmax`, `NimbusSTS`
+
+<Tip>
+**Dual path after MNE epochs**
+1. **Product:** epochs → frozen encoder (`wrap` / BrainDecode) → [`Personalizer`](/python-sdk/middleware) → `BrainState`
+2. **Classical:** epochs → CSP / bandpower → `NimbusLDA` (examples below)
+</Tip>
+
+```python
+from nimbus_bci import Personalizer, wrap
+
+# After you have trial tensors X for a frozen trunk
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+adapter = Personalizer(encoder=enc, head="lda", classes=["left", "right"])
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)
+```
 
 ## Installation
 
@@ -33,10 +49,10 @@ pip install nimbus-bci[mne]
 ```
 
 This installs:
-- `nimbus-bci` - Bayesian classifiers
+- `nimbus-bci` - Bayesian personalization + heads
 - `mne` ≥ 1.6 - EEG preprocessing
 
-## Basic Workflow
+## Basic Workflow (classical CSP path)
 
 ### 1. Load and Preprocess with MNE
 

@@ -26,14 +26,34 @@ For a structured comparison of classical LDA, SVM, and deep learning against Bay
 
 ## Bayesian Inference For BCI
 
-Both SDKs use Bayesian inference to model uncertainty explicitly with production-ready models: Bayesian LDA, Bayesian QDA, Bayesian Softmax, and Bayesian STS (Python SDK).
+Both SDKs use Bayesian inference to model uncertainty explicitly with production-ready heads: Bayesian LDA, Bayesian QDA, Bayesian Softmax, and Bayesian STS (Python SDK). In Python apps, prefer [`Personalizer` → `BrainState`](/python-sdk/middleware); use standalone heads for research diagnostics.
 
 <Tabs>
-  <Tab title="Python">
+  <Tab title="Python Personalizer">
+```python
+from nimbus_bci import Personalizer, wrap
+
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+adapter = Personalizer(
+    encoder=enc,
+    head="lda",
+    classes=["left", "right"],
+    preset="research",
+)
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)
+
+for state in states:
+    print(state.intent, state.confidence, state.uncertainty)
+    if state.need_more_data or state.rejected:
+        print("Gate: ask for more data / reject trial")
+```
+  </Tab>
+  <Tab title="Python head">
 ```python
 from nimbus_bci import NimbusLDA, compute_entropy
 
-# Train classifier
+# Train head
 clf = NimbusLDA()
 clf.fit(X_train, y_train)
 
