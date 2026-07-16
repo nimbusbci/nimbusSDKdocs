@@ -11,15 +11,9 @@ Nimbus middleware is the **product wedge**: a Bayesian personalization head for 
 
 **One-liner:** anything that can `encode(X) → Z` plugs in; Nimbus owns personalization, uncertainty gating, and cheap online updates — not the trunk.
 
-<img
-  src="/images/personalizer/fig_api.png"
-  alt="One API across many trunks: frozen encode(X)→Z, Personalizer Bayesian head, BrainState intent + UQ"
-  style={{ width: '100%', maxWidth: 720, borderRadius: 8, marginTop: 16, marginBottom: 8 }}
-/>
+![One API across many trunks: frozen encode(X)→Z, Personalizer Bayesian head, BrainState intent + UQ](/images/personalizer-api.png)
 
-<p style={{ fontSize: '0.875rem', opacity: 0.75, marginTop: 0 }}>
-  One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1b).
-</p>
+*One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1b).*
 
 <Info>
 Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encoder=None)` or the standalone heads (`NimbusLDA`, …) documented under [Models](/model-specification).
@@ -218,15 +212,9 @@ All numbers are **exploratory**, protocol-local, and primarily locked to NimbusB
 
 Under severe feature shift with n=40 labeled stream trials, a Bayesian head recovers most of the full fine-tune accuracy gain at a fraction of the adaptation fit wall.
 
-<img
-  src="/images/personalizer/fig_cost.png"
-  alt="BNCI2014-004 cost bake-off: Bayesian head accuracy vs adaptation fit time compared to frozen, linear probe, LoRA, last-layer FT, and full FT"
-  style={{ width: '100%', borderRadius: 8, marginTop: 12, marginBottom: 8 }}
-/>
+![BNCI2014-004 cost bake-off: Bayesian head accuracy vs adaptation fit time compared to frozen, linear probe, LoRA, last-layer FT, and full FT](/images/personalizer-cost.png)
 
-<p style={{ fontSize: '0.875rem', opacity: 0.75 }}>
-  Paper 1 — BNCI2014-004, severity 0.75, n=40 (mean over 9 subjects).
-</p>
+*Paper 1 — BNCI2014-004, severity 0.75, n=40 (mean over 9 subjects).*
 
 | Arm | Acc | ECE | Fit time (s) | Recovery vs full FT |
 | --- | --- | --- | --- | --- |
@@ -241,44 +229,26 @@ Recovery = Δacc / Δacc_fullFT. On Zhou2016 (supporting, 4 subjects) the same c
 
 ### Head vs fine-tune (same API)
 
-<img
-  src="/images/personalizer/fig_ft.png"
-  alt="EEGNet Personalizer versus fine-tune arms: accuracy and adaptation fit time on BNCI and Zhou"
-  style={{ width: '100%', borderRadius: 8, marginTop: 12, marginBottom: 8 }}
-/>
+![EEGNet Personalizer versus fine-tune arms: accuracy and adaptation fit time on BNCI and Zhou](/images/personalizer-ft.png)
 
-<p style={{ fontSize: '0.875rem', opacity: 0.75 }}>
-  Paper 1b — EEGNet severe n=40; Bayesian head vs full FT.
-</p>
+*Paper 1b — EEGNet severe n=40; Bayesian head vs full FT.*
 
 | Dataset | Acc frozen | Acc head | Acc FT | Recovery | Wall FT / head |
 | --- | --- | --- | --- | --- | --- |
 | BNCI | 0.476 | 0.553 | 0.582 | 73% | 5.0× |
 | Zhou | 0.352 | 0.430 | 0.523 | 46% | 5.5× |
 
-<img
-  src="/images/personalizer/fig_wall.png"
-  alt="Adaptation fit time under the same Personalizer API across trunks"
-  style={{ width: '100%', borderRadius: 8, marginTop: 16, marginBottom: 8 }}
-/>
+![Adaptation fit time under the same Personalizer API across trunks](/images/personalizer-wall.png)
 
-<p style={{ fontSize: '0.875rem', opacity: 0.75 }}>
-  Paper 1b — adaptation fit wall under the shared Personalizer API.
-</p>
+*Paper 1b — adaptation fit wall under the shared Personalizer API.*
 
 ### Transfer across trunks
 
 The same Personalizer ladder is evaluated over an 18-cell trunk×dataset map. Soft clean→L0 transfer is common; the full ordinal principle is rarer — honesty beats overclaim.
 
-<img
-  src="/images/personalizer/fig_transfer_map.png"
-  alt="Transfer map for the Personalizer adaptation ladder across 18 trunk×dataset cells"
-  style={{ width: '100%', borderRadius: 8, marginTop: 12, marginBottom: 8 }}
-/>
+![Transfer map for the Personalizer adaptation ladder across 18 trunk×dataset cells](/images/personalizer-transfer-map.png)
 
-<p style={{ fontSize: '0.875rem', opacity: 0.75 }}>
-  Paper 1b — transfer map (exploratory). Soft clean→L0 holds on 14/18 cells; fuller ordinal structure on 9/18.
-</p>
+*Paper 1b — transfer map (exploratory). Soft clean→L0 holds on 14/18 cells; fuller ordinal structure on 9/18.*
 
 ### Product claim (honest boundaries)
 
