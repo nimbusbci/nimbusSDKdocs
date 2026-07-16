@@ -60,6 +60,20 @@ states = adapter.predict(X_test)
 
 **Foundation pooling:** REVE / EEGPT adapters mean-pool (or flatten) token / patch features to flat `(n, d)` so LDA/QDA heads can consume them. Spatial/temporal structure is collapsed at the encoder boundary, not inside the Bayesian head.
 
+## Ladder levels under one API
+
+The same Personalizer surface can express three cheap personalization levels without changing the trunk (Paper 1b):
+
+| Level | What it is | When to think about it |
+| --- | --- | --- |
+| **L0 — cal-only** | Bayesian head fit on calibration embeddings only; no stream labels | Default when clean already transfers (cal-only-when-clean) |
+| **L1 — stream head** | L0 + stream `partial_fit` | Mid / severe shift when head capacity exists |
+| **L2 — affine-Z + head** | Supervised affine map on embeddings, then the same head | Optional mid-tier recovery; not automatic |
+
+Full encoder fine-tune (L3) stays a **priced escape hatch** — same API family, not the default integration path. Evidence for when L1 helps and how L3 is priced: [Evidence](/personalizer/evidence).
+
+**Heads:** product default is LDA (`head="lda"`). QDA is a documented severe-shift option behind the same API; Softmax stays optional (`nimbus-bci[softmax]`). The multi-trunk map in Paper 1b locks LDA for comparability.
+
 ## Optional shortcuts
 
 Named helpers only reduce boilerplate. Architectures stay outside core:

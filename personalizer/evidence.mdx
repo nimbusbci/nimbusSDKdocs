@@ -1,7 +1,7 @@
 ---
 title: "Evidence"
-description: "Exploratory Personalizer evidence from Papers 1 and 1b: cost bake-off, head vs fine-tune, wall times, and transfer map."
-keywords: ["Personalizer evidence", "cost bake-off", "fine-tune", "transfer map", "BNCI", "adaptation ladder"]
+description: "Exploratory Personalizer evidence from Papers 1 and 1b: severity sweep, EEGNet/REVE cost, transfer map, and honest boundaries."
+keywords: ["Personalizer evidence", "severity sweep", "REVE", "cost bake-off", "fine-tune", "transfer map", "adaptation ladder"]
 icon: "chart-line"
 ---
 
@@ -14,7 +14,37 @@ Figures and tables below come from two exploratory manuscripts:
 
 All numbers are **exploratory**, protocol-local, and primarily locked to NimbusBench CSVs. Do not treat them as suite-wide constants.
 
-## Cost bake-off (BNCI primary)
+**Headline (Paper 1b):** ship one Personalizer; treat fine-tune as a priced escape hatch. Use the head where capacity exists; stay cal-only when clean wins.
+
+## Where the head helps (severity sweep)
+
+Stream Personalizer (L1) vs cal-only (L0) across synthetic feature-shift severities on an 18-cell trunk×dataset map:
+
+| Severity | Cells with ΔU(L1−L0) > 0 |
+| --- | --- |
+| 0 (clean) | **4 / 18** |
+| 0.25 | **13 / 18** |
+| 0.50 | **16 / 18** |
+| 0.75 (severe) | **12 / 18** |
+
+![Personalizer head across severities: cells with positive L1−L0 utility and per-dataset mean gain](/images/personalizer-severity-sweep.png)
+
+*Paper 1b — mid shift already recovers; severe is a detailed slice, not the only supporting point. Kumar stays near zero (boundary).*
+
+### Severe winners (mean utility)
+
+At severity 0.75, which ladder level wins by mean utility (L0 cal-only / L1 stream head / L2 affine+head):
+
+| Dataset | n | EEGNet | Shallow | Deep | Conformer | ATCNet |
+| --- | --- | --- | --- | --- | --- | --- |
+| BNCI | 9 | L2 | L2 | L1 | L2 | L0 |
+| Zhou | 4 | L2 | L1 | L1 | L2 | L2 |
+| Kumar | 18 | L0 | L2 | — | L0 | — |
+| Shin | 9 | L1 | L0 | L1 | L2 | L0 |
+
+Zhou: head helps on every trunk. BNCI: often useful, not automatic (ATCNet stays L0). Kumar/Shin: boundaries — Personalizer is the default *integration* path, not a guarantee that L1 beats L0 everywhere.
+
+## Cost bake-off (EEGNet, BNCI primary)
 
 Under severe feature shift with n=40 labeled stream trials, a Bayesian head recovers most of the full fine-tune accuracy gain at a fraction of the adaptation fit wall.
 
@@ -33,38 +63,65 @@ Under severe feature shift with n=40 labeled stream trials, a Bayesian head reco
 
 Recovery = Δacc / Δacc_fullFT. On Zhou2016 (supporting, 4 subjects) the same cell is softer (~46% recovery at ~5.5× lower fit time).
 
-## Head vs fine-tune (same API)
+## Head vs fine-tune (EEGNet)
 
 ![EEGNet Personalizer versus fine-tune arms: accuracy and adaptation fit time on BNCI and Zhou](/images/personalizer-ft.png)
 
 *Paper 1b — EEGNet severe n=40; Bayesian head vs full FT.*
 
-| Dataset | Acc frozen | Acc head | Acc FT | Recovery | Wall FT / head |
+| Dataset | Acc frozen | Acc head | Acc FT | Recovery | Bake-off wall FT/head |
 | --- | --- | --- | --- | --- | --- |
-| BNCI | 0.476 | 0.553 | 0.582 | 73% | 5.0× |
-| Zhou | 0.352 | 0.430 | 0.523 | 46% | 5.5× |
+| BNCI | 0.476 | 0.553 | 0.582 | 73% | **5.0×** |
+| Zhou | 0.352 | 0.430 | 0.523 | 46% | **5.5×** |
+
+Bake-off walls (~5×) and ladder-transfer CUDA L3/L1 ratios (~20–30×) differ because L1 walls are millisecond-scale in the transfer protocol — same qualitative story: FT is the expensive hatch.
 
 ![Adaptation fit time under the same Personalizer API across trunks](/images/personalizer-wall.png)
 
-*Paper 1b — adaptation fit wall under the shared Personalizer API.*
+*Paper 1b — L1/L2 Personalizer vs L3 full FT wall across classical trunks (CUDA).*
+
+## Foundation REVE vs short fine-tune
+
+The same Personalizer contract runs on Hub REVE. Under severe shift, adapt wall stays sub-second while last-layer / full FT cost about **20×–40×** more on Zhou/Kumar.
+
+![REVE Personalizer versus short fine-tune: Δacc and adapt fit time on Zhou and Kumar](/images/personalizer-reve-ft.png)
+
+*Paper 1b — REVE severe n=40; accuracy × price.*
+
+| Dataset | Acc frozen | Acc head | Acc last | Acc full | Wall last/head | Wall full/head |
+| --- | --- | --- | --- | --- | --- | --- |
+| Zhou | 0.365 | 0.412 | 0.498 | 0.393 | **21×** | 47× |
+| Kumar | 0.490 | 0.548 | 0.541 | 0.512 | **24×** | 42× |
+
+- **Kumar:** head Pareto-dominates short FT (+5.8 pp vs last +5.1 pp at far lower wall).
+- **Zhou:** last-layer can buy extra pp (+13 vs head +4.7) at ~21× wall — priced purchase, not the default.
+- **Not claimed:** frozen REVE + Personalizer matches cal-trained EEGNet absolute accuracy. BNCI REVE cost is a 3-subject smoke — not a headline.
 
 ## Transfer across trunks
 
-The same Personalizer ladder is evaluated over an 18-cell trunk×dataset map. Soft clean→L0 transfer is common; the full ordinal principle is rarer — honesty beats overclaim.
+Soft operational default vs strict ordinal schedule (18 cells; exploratory):
+
+| Slice | Clean → L0 | Severe → L2 | Strict ordinal |
+| --- | --- | --- | --- |
+| Zhou | 5/5 | 3/5 | 3/5 |
+| BNCI | 4/5 | 3/5 | 2/5 |
+| Kumar | 3/3 | 1/3 | 1/3 |
+| Shin | 1/5 | 1/5 | 0/5 |
+| **Pooled** | **13/18** | **8/18** | **6/18** |
 
 ![Transfer map for the Personalizer adaptation ladder across 18 trunk×dataset cells](/images/personalizer-transfer-map.png)
 
-*Paper 1b — transfer map (exploratory). Soft clean→L0 holds on 14/18 cells; fuller ordinal structure on 9/18.*
+*Paper 1b — cal-only-when-clean transfers often (13/18); strict ordinal (clean→L0 and severe→L2) is conditional (6/18) — boundary, not the product headline.*
 
 ## Product claim (honest boundaries)
 
 | Regime | When | What happens |
 | --- | --- | --- |
-| Factory works | Clean / weak natural transfer | Little accuracy job for adaptation |
-| Factory breaks | Controlled stress gates frozen performance | Head adaptation recovers with small labeled cal |
-| Full retrain unnecessary | Same budgets as stress recovery | Head ≈ most of FT Δacc at ~5× lower fit wall (BNCI primary) |
+| Factory works | Clean / weak natural transfer | Stay cal-only (L0) — 13/18 cells |
+| Factory breaks | Mid / severe controlled stress | Stream head (L1) often lifts utility |
+| Full retrain unnecessary | Same budgets as stress recovery | EEGNet head ≈ most of FT Δacc at ~5× bake-off wall; REVE ~20–40× cheaper than short FT |
 
-Not claimed: general cross-session magic, physical electrode robustness, “improves all EEG,” SOTA over EEGNet, suite-wide 30× ratios from other protocols, or shipped “Active Inference for EEG.”
+Not claimed: L1 always beats L0; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic feature shift); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG.”
 
 ## Next Read
 
