@@ -19,6 +19,10 @@ Nimbus middleware is the **product wedge**: a Bayesian personalization head for 
 
 *One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1b).*
 
+![All classical trunks: Personalizer vs warm-start FT (ladder L3 · severe · n=40)](/images/personalizer-ft-trunks.png)
+
+*Why the hatch stays priced: across classical trunks, stream Personalizer (L1) recovers most of warm-start FT (L3) accuracy at a fraction of adapt wall — details and table on [Evidence](/personalizer/evidence).*
+
 <Info>
 Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encoder=None)` or the standalone heads (`NimbusLDA`, …) documented under [Models](/model-specification).
 </Info>
@@ -33,7 +37,7 @@ Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encod
     App-facing intents, presets, and bridges.
   </Card>
   <Card title="Evidence" icon="chart-line" href="/personalizer/evidence">
-    Severity sweep, EEGNet/REVE cost, transfer map.
+    Trunks vs warm-start FT, severity sweep, REVE, transfer map.
   </Card>
   <Card title="Python Quickstart" icon="rocket" href="/python-sdk/quickstart">
     Fit a Personalizer in a few minutes.

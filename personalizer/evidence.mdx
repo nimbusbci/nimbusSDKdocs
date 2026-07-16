@@ -1,7 +1,7 @@
 ---
 title: "Evidence"
-description: "Exploratory Personalizer evidence from Papers 1 and 1b: severity sweep, EEGNet/REVE cost, transfer map, and honest boundaries."
-keywords: ["Personalizer evidence", "severity sweep", "REVE", "cost bake-off", "fine-tune", "transfer map", "adaptation ladder"]
+description: "Exploratory Personalizer evidence from Papers 1 and 1b: classical trunks vs warm-start FT, severity sweep, REVE cost, transfer map."
+keywords: ["Personalizer evidence", "warm-start FT", "classical trunks", "severity sweep", "REVE", "cost bake-off", "transfer map"]
 icon: "chart-line"
 ---
 
@@ -15,6 +15,29 @@ Figures and tables below come from two exploratory manuscripts:
 All numbers are **exploratory**, protocol-local, and primarily locked to NimbusBench CSVs. Do not treat them as suite-wide constants.
 
 **Headline (Paper 1b):** ship one Personalizer; treat fine-tune as a priced escape hatch. Use the head where capacity exists; stay cal-only when clean wins.
+
+## Personalizer vs warm-start FT (all classical trunks)
+
+This is the main accuracy–cost figure for the product claim: under the same ladder-transfer cells (severe feature shift, n=40, CUDA), stream Personalizer (L1) recovers most of warm-start full FT (L3) while staying far cheaper on adapt fit wall.
+
+![All classical trunks: Personalizer vs warm-start FT (ladder L3 · severe · n=40)](/images/personalizer-ft-trunks.png)
+
+*Paper 1b — top: L0 / L1 / L3 accuracy with L1 recovery of the L0→L3 gap (or “≥FT” when the head matches or beats L3). Bottom: L1 vs L3 adapt fit wall with L3/L1 ratios.*
+
+| Dataset | Trunk | Acc L0 | Acc L1 | Acc L3 | Recovery | Wall L3/L1 |
+| --- | --- | --- | --- | --- | --- | --- |
+| BNCI | EEGNet | 0.505 | 0.556 | 0.571 | 77% | ~33× |
+| BNCI | Shallow | 0.495 | 0.572 | 0.553 | ≥FT | ~2× |
+| BNCI | Deep | 0.497 | 0.572 | 0.596 | 76% | ~25× |
+| BNCI | Conformer | 0.500 | 0.577 | 0.618 | 65% | ~33× |
+| BNCI | ATCNet | 0.501 | 0.508 | 0.602 | 7% | ~41× |
+| Zhou | EEGNet | 0.310 | 0.463 | 0.502 | 80% | ~21× |
+| Zhou | Shallow | 0.390 | 0.425 | 0.543 | 23% | ~2× |
+| Zhou | Deep | 0.338 | 0.467 | 0.482 | 90% | ~14× |
+| Zhou | Conformer | 0.338 | 0.397 | 0.488 | 39% | ~31× |
+| Zhou | ATCNet | 0.333 | 0.425 | 0.527 | 47% | ~39× |
+
+Recovery = (acc_L1 − acc_L0) / (acc_L3 − acc_L0). On most cells the head takes a large share of the FT gain at ~14–40× lower wall; Shallow can match or beat FT at ~2×; ATCNet on BNCI is the clear hatch case (7% recovery — escalate to FT when that accuracy gap matters).
 
 ## Where the head helps (severity sweep)
 
@@ -63,22 +86,18 @@ Under severe feature shift with n=40 labeled stream trials, a Bayesian head reco
 
 Recovery = Δacc / Δacc_fullFT. On Zhou2016 (supporting, 4 subjects) the same cell is softer (~46% recovery at ~5.5× lower fit time).
 
-## Head vs fine-tune (EEGNet)
+## Head vs fine-tune (EEGNet bake-off)
+
+Paper 1’s controlled bake-off (same trunk family, different protocol) tells the same story on EEGNet alone — useful for comparing linear probe / LoRA / last-layer / full FT under one timing harness. Absolute walls (~5×) are not the same as the ladder-transfer CUDA L3/L1 ratios above (~20–30× on deep trunks): L1 walls are millisecond-scale in the transfer suite.
 
 ![EEGNet Personalizer versus fine-tune arms: accuracy and adaptation fit time on BNCI and Zhou](/images/personalizer-ft.png)
 
-*Paper 1b — EEGNet severe n=40; Bayesian head vs full FT.*
+*Paper 1b companion — EEGNet severe n=40; Bayesian head vs full FT (bake-off walls).*
 
 | Dataset | Acc frozen | Acc head | Acc FT | Recovery | Bake-off wall FT/head |
 | --- | --- | --- | --- | --- | --- |
 | BNCI | 0.476 | 0.553 | 0.582 | 73% | **5.0×** |
 | Zhou | 0.352 | 0.430 | 0.523 | 46% | **5.5×** |
-
-Bake-off walls (~5×) and ladder-transfer CUDA L3/L1 ratios (~20–30×) differ because L1 walls are millisecond-scale in the transfer protocol — same qualitative story: FT is the expensive hatch.
-
-![Adaptation fit time under the same Personalizer API across trunks](/images/personalizer-wall.png)
-
-*Paper 1b — L1/L2 Personalizer vs L3 full FT wall across classical trunks (CUDA).*
 
 ## Foundation REVE vs short fine-tune
 
@@ -119,7 +138,7 @@ Soft operational default vs strict ordinal schedule (18 cells; exploratory):
 | --- | --- | --- |
 | Factory works | Clean / weak natural transfer | Stay cal-only (L0) — 13/18 cells |
 | Factory breaks | Mid / severe controlled stress | Stream head (L1) often lifts utility |
-| Full retrain unnecessary | Same budgets as stress recovery | EEGNet head ≈ most of FT Δacc at ~5× bake-off wall; REVE ~20–40× cheaper than short FT |
+| Full retrain unnecessary | Same budgets as stress recovery | Classical trunks: L1 recovers most of L3 at ~14–40× wall (see ft-trunks); EEGNet bake-off ~5×; REVE ~20–40× vs short FT |
 
 Not claimed: L1 always beats L0; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic feature shift); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG.”
 
