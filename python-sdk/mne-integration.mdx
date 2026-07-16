@@ -1,7 +1,7 @@
 ---
 title: "MNE-Python Integration"
-description: "Use nimbus-bci with MNE-Python for complete EEG preprocessing and classification. End-to-end pipeline from raw EEG to BCI predictions."
-keywords: ["MNE-Python", "EEG preprocessing", "Python SDK", "nimbus-bci", "EEG", "BCI", "signal processing", "CSP", "bandpower", "ERP", "MNE integration"]
+description: "Use MNE-Python with nimbus-bci: epochs → frozen encoder → Personalizer → BrainState, or classical CSP → Nimbus heads."
+keywords: ["MNE-Python", "EEG preprocessing", "Python SDK", "nimbus-bci", "Personalizer", "BrainState", "CSP", "bandpower", "ERP", "MNE integration"]
 icon: "brain"
 ---
 
@@ -27,18 +27,8 @@ nimbus-bci handles:
 <Tip>
 **Dual path after MNE epochs**
 1. **Product:** epochs → frozen encoder (`wrap` / BrainDecode) → [`Personalizer`](/python-sdk/middleware) → `BrainState`
-2. **Classical:** epochs → CSP / bandpower → `NimbusLDA` (examples below)
+2. **Classical:** epochs → CSP / bandpower → `Personalizer(encoder=None)` or `NimbusLDA`
 </Tip>
-
-```python
-from nimbus_bci import Personalizer, wrap
-
-# After you have trial tensors X for a frozen trunk
-enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
-adapter = Personalizer(encoder=enc, head="lda", classes=["left", "right"])
-adapter.fit(X_cal, y_cal)
-states = adapter.predict(X_test)
-```
 
 ## Installation
 
@@ -52,7 +42,49 @@ This installs:
 - `nimbus-bci` - Bayesian personalization + heads
 - `mne` ≥ 1.6 - EEG preprocessing
 
-## Basic Workflow (classical CSP path)
+## Product path: epochs → encoder → Personalizer
+
+Use MNE for acquisition / epoching, then hand trial tensors to a frozen trunk:
+
+```python
+import mne
+from nimbus_bci import Personalizer, wrap
+
+raw = mne.io.read_raw_gdf("motor_imagery.gdf", preload=True)
+raw.filter(8, 30)
+events = mne.find_events(raw)
+epochs = mne.Epochs(
+    raw,
+    events,
+    event_id={"left_hand": 1, "right_hand": 2},
+    tmin=0,
+    tmax=4,
+    baseline=None,
+    preload=True,
+)
+
+# Trial tensor for your frozen trunk — shape depends on encode()
+X = epochs.get_data()  # (n_epochs, n_channels, n_times)
+y = epochs.events[:, 2]
+# Map to semantic labels if needed
+classes = ["left", "right"]
+
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+adapter = Personalizer(
+    encoder=enc,
+    head="lda",
+    classes=classes,
+    preset="research",
+)
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)
+print(states[0].intent, states[0].confidence, states[0].need_more_data)
+adapter.save("subject_mne_profile")
+```
+
+Optional shortcuts: `wrap_eegnet`, `wrap_braindecode` — see [Personalizer & Middleware](/python-sdk/middleware).
+
+## Classical path: CSP → Personalizer / head
 
 ### 1. Load and Preprocess with MNE
 
@@ -92,32 +124,37 @@ csp_features, csp = extract_csp_features(epochs, n_components=8)
 # csp: fitted CSP object for later use
 ```
 
-### 3. Train Classifier
+### 3. Personalize (or fit a head)
 
 ```python
-from nimbus_bci import NimbusLDA
+from nimbus_bci import Personalizer, NimbusLDA
+from sklearn.model_selection import cross_val_score
 
-# Get labels
 labels = epochs.events[:, 2]
 
-# Train classifier
-clf = NimbusLDA()
-clf.fit(csp_features, labels)
+# Product-style on classical features
+adapter = Personalizer(
+    encoder=None,
+    head="lda",
+    classes=["left", "right"],
+    preset="research",
+)
+adapter.fit(csp_features, labels)
+states = adapter.predict(csp_features[:5])
 
-# Evaluate
-from sklearn.model_selection import cross_val_score
+# Or standalone head for sklearn CV
+clf = NimbusLDA()
 scores = cross_val_score(clf, csp_features, labels, cv=5)
 print(f"Accuracy: {scores.mean():.2%} (+/- {scores.std():.2%})")
 ```
 
-## Complete Motor Imagery Pipeline
+## Complete Motor Imagery Pipeline (classical)
 
 ```python
 import mne
-from nimbus_bci import NimbusLDA
+from nimbus_bci import Personalizer
 from nimbus_bci.compat import extract_csp_features
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 # 1. Load data
@@ -149,26 +186,31 @@ X_train, X_test, y_train, y_test = train_test_split(
     csp_features, labels, test_size=0.2, stratify=labels, random_state=42
 )
 
-# 7. Create pipeline
-pipe = make_pipeline(
-    StandardScaler(),
-    NimbusLDA(mu_scale=3.0)
+# 7. Scale + Personalizer (encoder=None on classical features)
+scaler = StandardScaler()
+Z_train = scaler.fit_transform(X_train)
+Z_test = scaler.transform(X_test)
+
+adapter = Personalizer(
+    encoder=None,
+    head="lda",
+    classes=["left", "right", "feet", "tongue"],
+    preset="research",
 )
+adapter.fit(Z_train, y_train)
+states = adapter.predict(Z_test)
+print(states[0].intent, states[0].confidence)
 
-# 8. Train
-pipe.fit(X_train, y_train)
-
-# 9. Evaluate
-train_score = pipe.score(X_train, y_train)
-test_score = pipe.score(X_test, y_test)
-
+# 8. Evaluate via the head (sklearn-compatible)
+train_score = adapter.head.score(Z_train, y_train)
+test_score = adapter.head.score(Z_test, y_test)
 print(f"Train accuracy: {train_score:.2%}")
 print(f"Test accuracy: {test_score:.2%}")
 ```
 
 ## Optional Riemannian Feature Pipeline
 
-For workflows that use covariance geometry, install the pyRiemann extra and build a sklearn pipeline from EEG epochs to a Nimbus classifier head:
+For workflows that use covariance geometry, install the pyRiemann extra and build a sklearn pipeline from EEG epochs to a Nimbus head (then optional Personalizer on the resulting features):
 
 ```bash
 pip install nimbus-bci[riemann]
@@ -673,17 +715,17 @@ print(f"Warnings: {report.warnings}")
 ## Next Read
 
 <CardGroup cols={2}>
+  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+    Encoder contract and BrainState
+  </Card>
+  <Card title="sklearn Integration" icon="code" href="/python-sdk/sklearn-integration">
+    CV / GridSearch on heads
+  </Card>
   <Card title="Streaming Inference" icon="activity" href="/python-sdk/streaming-inference">
     Real-time BCI with chunk processing
   </Card>
   <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
     Complete API documentation
-  </Card>
-  <Card title="sklearn Integration" icon="code" href="/python-sdk/sklearn-integration">
-    Advanced sklearn patterns
-  </Card>
-  <Card title="Examples" icon="braces" href="/examples/basic-examples">
-    Working code examples
   </Card>
 </CardGroup>
 

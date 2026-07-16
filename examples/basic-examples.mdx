@@ -41,12 +41,12 @@ Already have CSP / bandpower features? Use `Personalizer(encoder=None)` or the c
 
 ## Motor Imagery
 
-Motor imagery workflows usually use CSP or bandpower features from 8-30 Hz EEG.
+Motor imagery workflows usually use CSP or bandpower features from 8-30 Hz EEG — or embeddings from a frozen trunk.
 
 <Tabs>
   <Tab title="Python">
 ```python
-from nimbus_bci import NimbusLDA
+from nimbus_bci import Personalizer
 from nimbus_bci.compat import extract_csp_features
 from sklearn.model_selection import cross_val_score
 
@@ -54,11 +54,18 @@ from sklearn.model_selection import cross_val_score
 X, csp = extract_csp_features(epochs, n_components=8)
 y = epochs.events[:, 2]
 
-clf = NimbusLDA()
-scores = cross_val_score(clf, X, y, cv=5)
-clf.fit(X, y)
+adapter = Personalizer(
+    encoder=None,
+    head="lda",
+    classes=["left", "right"],
+    preset="research",
+)
+adapter.fit(X, y)
+states = adapter.predict(X[:5])
 
-print(f"CV accuracy: {scores.mean():.2%}")
+# Research CV still uses the head
+scores = cross_val_score(adapter.head, X, y, cv=5)
+print(states[0].intent, f"CV accuracy: {scores.mean():.2%}")
 ```
   </Tab>
   <Tab title="Julia">

@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "palm",
   "name": "Nimbus",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "colors": {
     "primary": "#FFD700",
     "light": "#FFFF66",
@@ -39,7 +39,7 @@
   "tabs": [
     {
       "name": "Python SDK",
-      "url": "python-sdk/quickstart"
+      "url": "python-sdk/middleware"
     },
     {
       "name": "Julia SDK",
@@ -52,7 +52,22 @@
         "group": "Getting Started",
         "pages": [
           "index",
-          "quickstart"
+          "quickstart",
+          "python-sdk/middleware"
+        ]
+      },
+      {
+        "group": "Python SDK",
+        "pages": [
+          "python-sdk/introduction",
+          "python-sdk/installation",
+          "python-sdk/middleware",
+          "python-sdk/quickstart",
+          "python-sdk/api-reference",
+          "python-sdk/active-learning",
+          "python-sdk/streaming-inference",
+          "python-sdk/mne-integration",
+          "python-sdk/sklearn-integration"
         ]
       },
       {
@@ -64,14 +79,14 @@
         ]
       },
       {
-        "group": "Models & Algorithms",
+        "group": "Heads & Models",
         "pages": [
+          "model-specification",
           "models/rxlda",
           "models/rxgmm",
           "models/rxpolya",
           "models/nimbusprobit",
-          "models/rxsts",
-          "model-specification"
+          "models/rxsts"
         ]
       },
       {
@@ -98,20 +113,6 @@
         "pages": [
           "development",
           "development/preprocessing-integration"
-        ]
-      },
-      {
-        "group": "Python SDK",
-        "pages": [
-          "python-sdk/quickstart",
-          "python-sdk/introduction",
-          "python-sdk/installation",
-          "python-sdk/middleware",
-          "python-sdk/api-reference",
-          "python-sdk/sklearn-integration",
-          "python-sdk/streaming-inference",
-          "python-sdk/active-learning",
-          "python-sdk/mne-integration"
         ]
       },
       {
@@ -241,8 +242,8 @@
     ]
   },
   "seo": {
-    "title": "Nimbus BCI Engine - Bayesian Inference for Brain-Computer Interfaces",
-    "description": "Documentation for Nimbus BCI: Bayesian inference in Python and Julia with sub-30ms latency, uncertainty quantification, and production-ready SDK workflows.",
+    "title": "Nimbus BCI Engine - Bayesian Personalization for Brain-Computer Interfaces",
+    "description": "Documentation for Nimbus BCI: wrap frozen EEG encoders, personalize with Personalizer, ship BrainState — plus classical Bayesian heads in Python and Julia.",
     "og": {
       "image": "/images/hero.png",
       "type": "website",

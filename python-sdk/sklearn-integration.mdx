@@ -1,7 +1,7 @@
 ---
 title: "sklearn Integration"
-description: "Use nimbus-bci with sklearn pipelines, cross-validation, and hyperparameter tuning. Seamless integration with scikit-learn workflows."
-keywords: ["sklearn", "scikit-learn", "Python SDK", "nimbus-bci", "pipelines", "cross-validation", "hyperparameter tuning", "sklearn integration", "BCI", "machine learning"]
+description: "Use nimbus-bci heads with sklearn pipelines, CV, and GridSearch — alongside Personalizer for app-facing BrainState outputs."
+keywords: ["sklearn", "scikit-learn", "Python SDK", "nimbus-bci", "Personalizer", "pipelines", "cross-validation", "hyperparameter tuning", "sklearn integration"]
 icon: "code"
 ---
 
@@ -12,15 +12,45 @@ The nimbus-bci **heads** are fully compatible with scikit-learn — pipelines, c
 <Tip>
 **Product vs sklearn surface**
 - Apps / devices: `Personalizer` → `BrainState` ([middleware](/python-sdk/middleware)).
-- Research CV / GridSearch: use the head directly (`NimbusLDA`, …) or `adapter.head` after fitting a Personalizer.
+- Research CV / GridSearch: use the head directly (`NimbusLDA`, …) or `adapter.head` on already-encoded embeddings `Z`.
 </Tip>
+
+## Personalizer + sklearn heads
+
+Encode once, personalize for apps, tune the head with sklearn:
+
+```python
+from nimbus_bci import Personalizer, wrap
+from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import StandardScaler
+import numpy as np
+
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+Z_train = enc.encode(X_train)
+Z_test = enc.encode(X_test)
+
+# App path — BrainState
+adapter = Personalizer(
+    encoder=None,  # already encoded
+    head="lda",
+    classes=["left", "right"],
+    preset="research",
+)
+adapter.fit(Z_train, y_train)
+states = adapter.predict(Z_test)
+
+# Research path — CV on the same head
+scores = cross_val_score(adapter.head, Z_train, y_train, cv=5)
+print(f"CV accuracy: {scores.mean():.2%}")
+print(states[0].intent, states[0].confidence)
+```
 
 ## sklearn-Compatible API
 
 All nimbus-bci heads implement the sklearn estimator interface:
 
 ```python
-from nimbus_bci import NimbusLDA, Personalizer, wrap
+from nimbus_bci import NimbusLDA
 
 clf = NimbusLDA()
 
@@ -29,26 +59,20 @@ clf.fit(X_train, y_train)              # Train
 predictions = clf.predict(X_test)       # Predict classes
 probabilities = clf.predict_proba(X_test)  # Predict probabilities
 score = clf.score(X_test, y_test)      # Accuracy score
-
-# Personalizer wraps the same head after encode
-enc = wrap(lambda X: X, model_id="demo", embedding_dim=X_train.shape[1])
-adapter = Personalizer(encoder=enc, head="lda", classes=["left", "right"])
-adapter.fit(X_train, y_train)
-# GridSearchCV / CV typically target adapter.head on already-encoded Z
 ```
 
 ## Pipelines
 
 ### Basic Pipeline
 
-Combine preprocessing with classification:
+Combine scaling with a Nimbus head (classical features or precomputed embeddings):
 
 ```python
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from nimbus_bci import NimbusLDA
 
-# Create pipeline
+# Create pipeline — head is also Personalizer(head="lda") under the hood
 pipe = make_pipeline(
     StandardScaler(),
     NimbusLDA(mu_scale=3.0)
@@ -269,29 +293,29 @@ print(f"Best pipeline: {grid.best_params_}")
 
 ## Model Selection
 
-### Compare Multiple Classifiers
+### Compare Multiple Heads
 
-Compare different nimbus-bci classifiers:
+Compare different nimbus-bci heads (same choices as `Personalizer(head=...)`):
 
 ```python
 from sklearn.model_selection import cross_val_score
 from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSTS
 
-classifiers = {
+heads = {
     'LDA': NimbusLDA(),
     'QDA': NimbusQDA(),
     'STS': NimbusSTS()
 }
 
 results = {}
-for name, clf in classifiers.items():
+for name, clf in heads.items():
     scores = cross_val_score(clf, X, y, cv=5, scoring='accuracy')
     results[name] = scores
     print(f"{name}: {scores.mean():.2%} (+/- {scores.std():.2%})")
 
 # Select best
-best_clf = max(results.items(), key=lambda x: x[1].mean())
-print(f"\nBest classifier: {best_clf[0]}")
+best_head = max(results.items(), key=lambda x: x[1].mean())
+print(f"\nBest head: {best_head[0]}")
 ```
 
 ### Compare with sklearn Classifiers
@@ -611,17 +635,17 @@ test_score = grid.score(X_test, y_test)
 ## Next Read
 
 <CardGroup cols={2}>
+  <Card title="Personalizer & Middleware" icon="layers" href="/python-sdk/middleware">
+    App-facing BrainState contract
+  </Card>
+  <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">
+    Epochs → encoder or CSP → Personalizer
+  </Card>
   <Card title="Streaming Inference" icon="activity" href="/python-sdk/streaming-inference">
     Real-time BCI with chunk processing
   </Card>
-  <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">
-    Complete EEG preprocessing pipeline
-  </Card>
   <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
     Complete API documentation
-  </Card>
-  <Card title="Examples" icon="braces" href="/examples/basic-examples">
-    Working code examples
   </Card>
 </CardGroup>
 
