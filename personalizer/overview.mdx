@@ -35,6 +35,8 @@ Nimbus middleware is the **product wedge**: a Bayesian personalization head for 
 
 Blue `rec %` on the figure = how much of the **L0→L3 accuracy gain** L1 recovers: `(acc_L1 − acc_L0) / (acc_L3 − acc_L0)`. `≥FT` means L1 matches or beats L3.
 
+How the Paper 1 / 1b numbers were produced (datasets, bandpass, session split, synthetic stress): [Evidence → How the experiments work](/personalizer/evidence#how-the-experiments-work-data-flow).
+
 <Info>
 Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encoder=None)` or the standalone heads (`NimbusLDA`, …) documented under [Models](/model-specification).
 </Info>

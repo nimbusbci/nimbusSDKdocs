@@ -18,6 +18,26 @@ All numbers are **exploratory**, protocol-local, and primarily locked to NimbusB
 
 Labels **L0 / L1 / LP / L2 / L3** — see the [plain-language legend](/personalizer/overview#ladder-legend-plain-language). **Shipped path = L0/L1**; LP is a bench control; L2 is protocol/bench (affine); L3 is the FT hatch.
 
+## How the experiments work (data flow)
+
+Before the numbers: this is the shared Paper 1 / 1b pipeline (NimbusBench ladder-transfer / cost cells).
+
+![Experimental pipeline: datasets → preprocess → session split → freeze trunk → optional feature_shift → encode → head / FT → score](/images/personalizer-pipeline.png)
+
+*Papers 1 & 1b — end-to-end data flow. Calibration stays clean; synthetic stress hits stream∥eval EEG only.*
+
+| Step | What happens |
+| --- | --- |
+| **Datasets** | MOABB MI: BNCI2014-004 (9 subj), Zhou2016 (4), Kumar2024 (18; post-first sessions online), Shin2017-A (9; short stream) |
+| **Preprocess** | Bandpass **8–30 Hz**, epoch window **[0.5, 2.5] s** after cue (classical trunks). Foundation REVE cells may use **1–40 Hz** under the same window |
+| **Sessions** | **Cal** = first session → **stream** = middle → **eval** = last |
+| **Trunk** | Train on clean cal only, **freeze**, then `encode(X) → Z` |
+| **Stress** | Optional synthetic `feature_shift` on concatenated **stream∥eval raw EEG** (not on Z): channel-permutation mix + signed bias at severity `{0, 0.25, 0.5, 0.75}`. Sev 0 = no synthetic operator (natural session layout may still differ). Cal stays clean |
+| **Adapt** | L0 cal-only head (1b) / factory softmax (Paper 1); L1 stream `partial_fit` (n≈40, Shin n=20); LP = linear probe control; L2 affine-Z (bench); L3 warm-start FT |
+| **Score** | Eval accuracy + adapt wall under U = acc − 0.02·wall − 0.05·(n/80) |
+
+Not claimed as covered by this stress: physical electrode displacement, SNR drop, or every clinical shift type — only controlled synthetic channel-mix/bias.
+
 ## Core: L0 / Bayesian head / linear probe / full FT
 
 Main multi-trunk accuracy–cost block (Paper 1b): under the same ladder-transfer cells (severe feature shift, n=40, CUDA), cal-only Personalizer (L0), stream Personalizer (L1), a matched sklearn linear probe on the same frozen embeddings, and warm-start full FT (L3).
