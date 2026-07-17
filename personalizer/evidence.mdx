@@ -16,28 +16,28 @@ All numbers are **exploratory**, protocol-local, and primarily locked to NimbusB
 
 **Headline (Paper 1b):** ship one Personalizer; treat fine-tune as a priced escape hatch. Use the head where capacity exists; stay cal-only when clean wins.
 
-## Core: Bayesian head vs linear probe vs full FT
+## Core: L0 / Bayesian head / linear probe / full FT
 
-Main multi-trunk accuracy–cost block (Paper 1b): under the same ladder-transfer cells (severe feature shift, n=40, CUDA), stream Personalizer (L1) is compared to a matched sklearn linear probe on the same frozen embeddings and to warm-start full FT (L3).
+Main multi-trunk accuracy–cost block (Paper 1b): under the same ladder-transfer cells (severe feature shift, n=40, CUDA), cal-only Personalizer (L0), stream Personalizer (L1), a matched sklearn linear probe on the same frozen embeddings, and warm-start full FT (L3).
 
-![Core: Bayesian head vs linear probe vs full FT (severe · n=40)](/images/personalizer-ft-trunks.png)
+![Core: L0 / Bayesian head / linear probe / full FT (severe · n=40)](/images/personalizer-ft-trunks.png)
 
-*Paper 1b — top: L1 / linear probe / L3 accuracy; blue labels are L1 recovery of the L0→L3 gap (or “≥FT” when L1 matches or beats L3). Bottom: L1 / probe / L3 adapt fit wall with L3/L1 ratios.*
+*Paper 1b — top: L0 / L1 / linear probe / L3 accuracy; blue `rec` labels = (acc_L1 − acc_L0) / (acc_L3 − acc_L0), or “≥FT” when L1 matches or beats L3. Bottom: adapt fit wall (L0 stream wall = 0) with L3/L1 ratios.*
 
-| Dataset | Trunk | Acc L1 | Acc LP | Acc L3 | Recovery | Wall L3/L1 |
-| --- | --- | --- | --- | --- | --- | --- |
-| BNCI | EEGNet | 0.556 | 0.514 | 0.571 | 77% | ~33× |
-| BNCI | Shallow | 0.572 | 0.580 | 0.553 | ≥FT | ~2× |
-| BNCI | Deep | 0.572 | 0.536 | 0.596 | 76% | ~25× |
-| BNCI | Conformer | 0.577 | 0.538 | 0.618 | 65% | ~33× |
-| BNCI | ATCNet | 0.508 | 0.510 | 0.602 | 7% | ~41× |
-| Zhou | EEGNet | 0.463 | 0.422 | 0.502 | 80% | ~21× |
-| Zhou | Shallow | 0.425 | 0.445 | 0.543 | 23% | ~2× |
-| Zhou | Deep | 0.467 | 0.462 | 0.482 | 90% | ~14× |
-| Zhou | Conformer | 0.397 | 0.377 | 0.488 | 39% | ~31× |
-| Zhou | ATCNet | 0.425 | 0.453 | 0.527 | 47% | ~39× |
+| Dataset | Trunk | Acc L0 | Acc L1 | Acc LP | Acc L3 | Recovery | Wall L3/L1 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| BNCI | EEGNet | 0.505 | 0.556 | 0.514 | 0.571 | 77% | ~33× |
+| BNCI | Shallow | 0.495 | 0.572 | 0.580 | 0.553 | ≥FT | ~2× |
+| BNCI | Deep | 0.497 | 0.572 | 0.536 | 0.596 | 76% | ~25× |
+| BNCI | Conformer | 0.500 | 0.577 | 0.538 | 0.618 | 65% | ~33× |
+| BNCI | ATCNet | 0.501 | 0.508 | 0.510 | 0.602 | 8% | ~41× |
+| Zhou | EEGNet | 0.310 | 0.463 | 0.422 | 0.502 | 80% | ~21× |
+| Zhou | Shallow | 0.390 | 0.425 | 0.445 | 0.543 | 23% | ~2× |
+| Zhou | Deep | 0.338 | 0.467 | 0.462 | 0.482 | 90% | ~14× |
+| Zhou | Conformer | 0.338 | 0.397 | 0.377 | 0.488 | 39% | ~31× |
+| Zhou | ATCNet | 0.333 | 0.425 | 0.453 | 0.527 | 47% | ~39× |
 
-Recovery = (acc_L1 − acc_L0) / (acc_L3 − acc_L0). On most trunks the Bayesian head recovers ~65–90% of the FT gain and beats the matched probe (EEGNet / Deep / Conformer). Shallow and ATCNet are probe-competitive (LP can edge L1 by a few points) while both stay far below L3 wall — Personalizer remains the product default (same API + UQ / `BrainState`), not a claim that L1 always wins raw accuracy. BNCI Shallow is still the Pareto win vs FT (~2× wall); ATCNet on BNCI is the hatch case (7% recovery).
+Recovery = (acc_L1 − acc_L0) / (acc_L3 − acc_L0). On most trunks the Bayesian head recovers ~65–90% of the FT gain over cal-only and beats the matched probe (EEGNet / Deep / Conformer). Shallow and ATCNet are probe-competitive (LP can edge L1 by a few points) while both stay far below L3 wall — Personalizer remains the product default (same API + UQ / `BrainState`), not a claim that L1 always wins raw accuracy. BNCI Shallow is still the Pareto win vs FT (~2× wall); ATCNet on BNCI is the hatch case (8% recovery).
 
 ## Where the head helps (severity sweep)
 

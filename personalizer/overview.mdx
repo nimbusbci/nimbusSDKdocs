@@ -19,9 +19,9 @@ Nimbus middleware is the **product wedge**: a Bayesian personalization head for 
 
 *One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1b).*
 
-![Core: Bayesian head vs linear probe vs full FT (severe · n=40)](/images/personalizer-ft-trunks.png)
+![Core: L0 / Bayesian head / linear probe / full FT (severe · n=40)](/images/personalizer-ft-trunks.png)
 
-*Why the hatch stays priced: across classical trunks, stream Personalizer (L1) recovers most of warm-start FT (L3) and usually beats a matched linear probe — details on [Evidence](/personalizer/evidence).*
+*Why the hatch stays priced: across classical trunks, stream Personalizer (L1) recovers most of the L0→L3 gain and usually beats a matched linear probe — details on [Evidence](/personalizer/evidence).*
 
 <Info>
 Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encoder=None)` or the standalone heads (`NimbusLDA`, …) documented under [Models](/model-specification).
