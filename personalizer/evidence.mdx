@@ -1,7 +1,7 @@
 ---
 title: "Evidence"
-description: "Exploratory Personalizer evidence from Papers 1 and 1b: Bayesian head vs linear probe vs FT, severity sweep, REVE, transfer map."
-keywords: ["Personalizer evidence", "linear probe", "warm-start FT", "classical trunks", "severity sweep", "REVE", "cost bake-off"]
+description: "Exploratory Personalizer evidence from Papers 1 and 1b: head vs probe vs FT, LDA/QDA/Softmax, severity sweep, REVE, transfer map."
+keywords: ["Personalizer evidence", "LDA", "QDA", "Softmax", "linear probe", "warm-start FT", "severity sweep", "REVE"]
 icon: "chart-line"
 ---
 
@@ -116,6 +116,31 @@ The same Personalizer contract runs on Hub REVE. Under severe shift, adapt wall 
 - **Zhou:** last-layer can buy extra pp (+13 vs head +4.7) at ~21× wall — priced purchase, not the default.
 - **Not claimed:** frozen REVE + Personalizer matches cal-trained EEGNet absolute accuracy. BNCI REVE cost is a 3-subject smoke — not a headline.
 
+## Which head? (LDA vs QDA vs Softmax)
+
+The multi-trunk map locks **LDA** for comparability. On the EEGNet path, Paper 1b also compares QDA and Softmax under the same bake-off geometry (severe and clean, n=40).
+
+![EEGNet Personalizer head family: LDA vs QDA vs Softmax under severe shift](/images/personalizer-heads.png)
+
+*Paper 1b — top: accuracy (Δacc vs LDA). Bottom: adapt fit wall with mean utility labels.*
+
+| Dataset | Sev | Head | Acc | Wall (s) | ΔU vs LDA |
+| --- | --- | --- | --- | --- | --- |
+| BNCI | 0.75 | LDA | 0.556 | 0.36 | — |
+| BNCI | 0.75 | QDA | 0.644 | 0.36 | +0.085 |
+| BNCI | 0.75 | Softmax | 0.589 | 0.59 | +0.031 |
+| BNCI | 0.00 | LDA / QDA / Softmax | ≈0.71 | 0.35–0.71 | ≈0 |
+| Zhou | 0.75 | LDA | 0.462 | 0.43 | — |
+| Zhou | 0.75 | QDA | 0.452 | 0.43 | −0.010 |
+| Zhou | 0.75 | Softmax | 0.457 | 0.71 | −0.005 |
+
+- **Product default:** LDA (`head="lda"`) — no optional dependency; locked ladder / FT narrative.
+- **BNCI severe:** QDA lifts utility (~+0.085–0.088) at essentially the same wall; Softmax gains accuracy but pays ~1.7× LDA wall.
+- **Zhou severe (n=4):** inconclusive — QDA / Softmax at or below LDA. Clean BNCI/Zhou: heads nearly tied on U.
+- Softmax stays optional (`nimbus-bci[softmax]`) for UQ-oriented deployments. The 18-cell transfer map is not re-run for every head.
+
+API knobs: [Encoder contract](/personalizer/encoder-contract).
+
 ## Transfer across trunks
 
 Soft operational default vs strict ordinal schedule (18 cells; exploratory):
@@ -139,8 +164,9 @@ Soft operational default vs strict ordinal schedule (18 cells; exploratory):
 | Factory works | Clean / weak natural transfer | Stay cal-only (L0) — 13/18 cells |
 | Factory breaks | Mid / severe controlled stress | Stream head (L1) often lifts utility; usually beats matched linear probe |
 | Full retrain unnecessary | Same budgets as stress recovery | Classical: L1 recovers most of L3 at ~14–40× wall; EEGNet BNCI head can beat FT (~5× bake-off wall); REVE ~20–40× vs short FT |
+| Head choice | Same Personalizer API | Default LDA; QDA optional under severe shift (BNCI); Softmax optional for UQ |
 
-Not claimed: L1 always beats L0 or LP; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic feature shift); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG.”
+Not claimed: L1 always beats L0 or LP; QDA always beats LDA; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic feature shift); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG.”
 
 ## Next Read
 
