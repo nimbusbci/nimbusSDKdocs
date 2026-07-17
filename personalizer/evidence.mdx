@@ -1,7 +1,7 @@
 ---
 title: "Evidence"
-description: "Exploratory Personalizer evidence from Papers 1 and 1b: classical trunks vs warm-start FT, severity sweep, REVE cost, transfer map."
-keywords: ["Personalizer evidence", "warm-start FT", "classical trunks", "severity sweep", "REVE", "cost bake-off", "transfer map"]
+description: "Exploratory Personalizer evidence from Papers 1 and 1b: Bayesian head vs linear probe vs FT, severity sweep, REVE, transfer map."
+keywords: ["Personalizer evidence", "linear probe", "warm-start FT", "classical trunks", "severity sweep", "REVE", "cost bake-off"]
 icon: "chart-line"
 ---
 
@@ -16,28 +16,28 @@ All numbers are **exploratory**, protocol-local, and primarily locked to NimbusB
 
 **Headline (Paper 1b):** ship one Personalizer; treat fine-tune as a priced escape hatch. Use the head where capacity exists; stay cal-only when clean wins.
 
-## Personalizer vs warm-start FT (all classical trunks)
+## Core: Bayesian head vs linear probe vs full FT
 
-This is the main accuracy–cost figure for the product claim: under the same ladder-transfer cells (severe feature shift, n=40, CUDA), stream Personalizer (L1) recovers most of warm-start full FT (L3) while staying far cheaper on adapt fit wall.
+Main multi-trunk accuracy–cost block (Paper 1b): under the same ladder-transfer cells (severe feature shift, n=40, CUDA), stream Personalizer (L1) is compared to a matched sklearn linear probe on the same frozen embeddings and to warm-start full FT (L3).
 
-![All classical trunks: Personalizer vs warm-start FT (ladder L3 · severe · n=40)](/images/personalizer-ft-trunks.png)
+![Core: Bayesian head vs linear probe vs full FT (severe · n=40)](/images/personalizer-ft-trunks.png)
 
-*Paper 1b — top: L0 / L1 / L3 accuracy with L1 recovery of the L0→L3 gap (or “≥FT” when the head matches or beats L3). Bottom: L1 vs L3 adapt fit wall with L3/L1 ratios.*
+*Paper 1b — top: L1 / linear probe / L3 accuracy; blue labels are L1 recovery of the L0→L3 gap (or “≥FT” when L1 matches or beats L3). Bottom: L1 / probe / L3 adapt fit wall with L3/L1 ratios.*
 
-| Dataset | Trunk | Acc L0 | Acc L1 | Acc L3 | Recovery | Wall L3/L1 |
+| Dataset | Trunk | Acc L1 | Acc LP | Acc L3 | Recovery | Wall L3/L1 |
 | --- | --- | --- | --- | --- | --- | --- |
-| BNCI | EEGNet | 0.505 | 0.556 | 0.571 | 77% | ~33× |
-| BNCI | Shallow | 0.495 | 0.572 | 0.553 | ≥FT | ~2× |
-| BNCI | Deep | 0.497 | 0.572 | 0.596 | 76% | ~25× |
-| BNCI | Conformer | 0.500 | 0.577 | 0.618 | 65% | ~33× |
-| BNCI | ATCNet | 0.501 | 0.508 | 0.602 | 7% | ~41× |
-| Zhou | EEGNet | 0.310 | 0.463 | 0.502 | 80% | ~21× |
-| Zhou | Shallow | 0.390 | 0.425 | 0.543 | 23% | ~2× |
-| Zhou | Deep | 0.338 | 0.467 | 0.482 | 90% | ~14× |
-| Zhou | Conformer | 0.338 | 0.397 | 0.488 | 39% | ~31× |
-| Zhou | ATCNet | 0.333 | 0.425 | 0.527 | 47% | ~39× |
+| BNCI | EEGNet | 0.556 | 0.514 | 0.571 | 77% | ~33× |
+| BNCI | Shallow | 0.572 | 0.580 | 0.553 | ≥FT | ~2× |
+| BNCI | Deep | 0.572 | 0.536 | 0.596 | 76% | ~25× |
+| BNCI | Conformer | 0.577 | 0.538 | 0.618 | 65% | ~33× |
+| BNCI | ATCNet | 0.508 | 0.510 | 0.602 | 7% | ~41× |
+| Zhou | EEGNet | 0.463 | 0.422 | 0.502 | 80% | ~21× |
+| Zhou | Shallow | 0.425 | 0.445 | 0.543 | 23% | ~2× |
+| Zhou | Deep | 0.467 | 0.462 | 0.482 | 90% | ~14× |
+| Zhou | Conformer | 0.397 | 0.377 | 0.488 | 39% | ~31× |
+| Zhou | ATCNet | 0.425 | 0.453 | 0.527 | 47% | ~39× |
 
-Recovery = (acc_L1 − acc_L0) / (acc_L3 − acc_L0). On most cells the head takes a large share of the FT gain at ~14–40× lower wall; Shallow can match or beat FT at ~2×; ATCNet on BNCI is the clear hatch case (7% recovery — escalate to FT when that accuracy gap matters).
+Recovery = (acc_L1 − acc_L0) / (acc_L3 − acc_L0). On most trunks the Bayesian head recovers ~65–90% of the FT gain and beats the matched probe (EEGNet / Deep / Conformer). Shallow and ATCNet are probe-competitive (LP can edge L1 by a few points) while both stay far below L3 wall — Personalizer remains the product default (same API + UQ / `BrainState`), not a claim that L1 always wins raw accuracy. BNCI Shallow is still the Pareto win vs FT (~2× wall); ATCNet on BNCI is the hatch case (7% recovery).
 
 ## Where the head helps (severity sweep)
 
@@ -67,9 +67,9 @@ At severity 0.75, which ladder level wins by mean utility (L0 cal-only / L1 stre
 
 Zhou: head helps on every trunk. BNCI: often useful, not automatic (ATCNet stays L0). Kumar/Shin: boundaries — Personalizer is the default *integration* path, not a guarantee that L1 beats L0 everywhere.
 
-## Cost bake-off (EEGNet, BNCI primary)
+## Spotlight: EEGNet denser baselines (Paper 1)
 
-Under severe feature shift with n=40 labeled stream trials, a Bayesian head recovers most of the full fine-tune accuracy gain at a fraction of the adaptation fit wall.
+Controlled bake-off on one classical reference trunk (BNCI primary). Under severe shift with n=40 labeled stream trials, the Bayesian head can **beat** full FT on BNCI in this protocol; Zhou is the honest softer boundary.
 
 ![BNCI2014-004 cost bake-off: Bayesian head accuracy vs adaptation fit time compared to frozen, linear probe, LoRA, last-layer FT, and full FT](/images/personalizer-cost.png)
 
@@ -77,31 +77,31 @@ Under severe feature shift with n=40 labeled stream trials, a Bayesian head reco
 
 | Arm | Acc | ECE | Fit time (s) | Recovery vs full FT |
 | --- | --- | --- | --- | --- |
-| Frozen EEGNet | 0.476 | 0.333 | 0 | — |
-| **Bayesian head** | **0.553** | **0.136** | **0.35** | **0.73** |
-| Linear probe | 0.517 | 0.142 | 0.35 | 0.40 |
-| LoRA | 0.502 | 0.200 | 1.08 | 0.26 |
-| Last-layer FT | 0.472 | 0.323 | 1.31 | — |
-| Full FT | 0.582 | 0.205 | 1.78 | 1.00 |
+| Frozen EEGNet | 0.497 | 0.347 | 0 | — |
+| **Bayesian head** | **0.556** | **0.142** | **0.35** | **1.59** |
+| Linear probe | 0.514 | 0.117 | 0.35 | 0.46 |
+| LoRA | 0.463 | 0.224 | 1.08 | −0.92 |
+| Last-layer FT | 0.496 | 0.329 | 1.31 | −0.03 |
+| Full FT | 0.534 | 0.191 | 1.78 | 1.00 |
 
-Recovery = Δacc / Δacc_fullFT. On Zhou2016 (supporting, 4 subjects) the same cell is softer (~46% recovery at ~5.5× lower fit time).
+Recovery = Δacc / Δacc_fullFT (values > 1 mean the head beats FT). Treat head-beats-FT as **BNCI-primary** in this protocol, not a suite-wide constant. On Zhou2016 (supporting, 4 subjects): frozen 0.317 → head 0.462 → full FT 0.540 (~0.43× of FT gain at ~5.5× lower fit time) — FT can still earn its cost.
 
-## Head vs fine-tune (EEGNet bake-off)
+## Spotlight: EEGNet arm zoo (Paper 1b)
 
-Paper 1’s controlled bake-off (same trunk family, different protocol) tells the same story on EEGNet alone — useful for comparing linear probe / LoRA / last-layer / full FT under one timing harness. Absolute walls (~5×) are not the same as the ladder-transfer CUDA L3/L1 ratios above (~20–30× on deep trunks): L1 walls are millisecond-scale in the transfer suite.
+Same denser arm grammar (frozen → Bayesian → linear → LoRA → last → full) as a Paper 1b spotlight — not the multi-trunk claim. Bake-off walls (~5×) differ from ladder-transfer CUDA L3/L1 ratios (~20–30× on deep trunks).
 
-![EEGNet Personalizer versus fine-tune arms: accuracy and adaptation fit time on BNCI and Zhou](/images/personalizer-ft.png)
+![EEGNet denser baselines from the cost bake-off (severe · n=40)](/images/personalizer-ft.png)
 
-*Paper 1b companion — EEGNet severe n=40; Bayesian head vs full FT (bake-off walls).*
+*Paper 1b — EEGNet severe n=40; spotlight mid-hatches (LoRA / last-layer are EEGNet-specific).*
 
 | Dataset | Acc frozen | Acc head | Acc FT | Recovery | Bake-off wall FT/head |
 | --- | --- | --- | --- | --- | --- |
-| BNCI | 0.476 | 0.553 | 0.582 | 73% | **5.0×** |
-| Zhou | 0.352 | 0.430 | 0.523 | 46% | **5.5×** |
+| BNCI | 0.497 | 0.556 | 0.534 | **1.59×** | **5.0×** |
+| Zhou | 0.317 | 0.462 | 0.540 | **0.43×** | **5.5×** |
 
-## Foundation REVE vs short fine-tune
+## Spotlight: foundation REVE
 
-The same Personalizer contract runs on Hub REVE. Under severe shift, adapt wall stays sub-second while last-layer / full FT cost about **20×–40×** more on Zhou/Kumar.
+The same Personalizer contract runs on Hub REVE. Under severe shift, adapt wall stays sub-second while last-layer / full FT cost about **20×–40×** more on Zhou/Kumar. Arm order matches the EEGNet spotlight (head / linear / last / full).
 
 ![REVE Personalizer versus short fine-tune: Δacc and adapt fit time on Zhou and Kumar](/images/personalizer-reve-ft.png)
 
@@ -137,10 +137,10 @@ Soft operational default vs strict ordinal schedule (18 cells; exploratory):
 | Regime | When | What happens |
 | --- | --- | --- |
 | Factory works | Clean / weak natural transfer | Stay cal-only (L0) — 13/18 cells |
-| Factory breaks | Mid / severe controlled stress | Stream head (L1) often lifts utility |
-| Full retrain unnecessary | Same budgets as stress recovery | Classical trunks: L1 recovers most of L3 at ~14–40× wall (see ft-trunks); EEGNet bake-off ~5×; REVE ~20–40× vs short FT |
+| Factory breaks | Mid / severe controlled stress | Stream head (L1) often lifts utility; usually beats matched linear probe |
+| Full retrain unnecessary | Same budgets as stress recovery | Classical: L1 recovers most of L3 at ~14–40× wall; EEGNet BNCI head can beat FT (~5× bake-off wall); REVE ~20–40× vs short FT |
 
-Not claimed: L1 always beats L0; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic feature shift); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG.”
+Not claimed: L1 always beats L0 or LP; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic feature shift); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG.”
 
 ## Next Read
 
