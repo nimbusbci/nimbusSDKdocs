@@ -12,7 +12,7 @@ Figures and tables below come from two exploratory manuscripts:
 1. **Resource ladder** — *When Should a Deployed BCI Decoder Spend Adaptation Resources?* (Paper 1)
 2. **Universal Personalizer** — *One Personalizer Across Many Trunks* (Paper 1b)
 
-All numbers are **exploratory**, protocol-local, and primarily locked to NimbusBench CSVs. Do not treat them as suite-wide constants.
+All numbers are **exploratory**, protocol-local, and locked to the evaluation suite CSVs. Do not treat them as suite-wide constants.
 
 **Headline (Paper 1b):** ship one Personalizer; treat fine-tune as a priced escape hatch. Use the head where capacity exists; stay cal-only when clean wins.
 
@@ -40,7 +40,7 @@ Not claimed as covered by this stress: physical electrode displacement, SNR drop
 
 ## Core: L0 / Bayesian head / linear probe / full FT
 
-Main multi-trunk accuracy–cost block (Paper 1b): under the same ladder-transfer cells (severe feature shift, n=40, CUDA), cal-only Personalizer (L0), stream Personalizer (L1), a matched sklearn linear probe on the same frozen embeddings, and warm-start full FT (L3).
+Main multi-trunk accuracy–cost block (Paper 1b): under the same transfer cells (severe channel-mix stress, n=40, CUDA), calibration-only Personalizer (L0), stream Personalizer (L1), a matched linear probe on the same frozen embeddings, and warm-start full fine-tune (L3).
 
 ![Core: L0 / Bayesian head / linear probe / full FT (severe · n=40)](/images/personalizer-ft-trunks.png)
 
@@ -92,7 +92,7 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
 
 <AccordionGroup>
   <Accordion title="Where the head helps (severity sweep + winners)" icon="chart-area">
-    Stream Personalizer (L1) vs cal-only (L0) across synthetic feature-shift severities on an 18-cell trunk×dataset map:
+    Stream Personalizer (L1) vs calibration-only (L0) across synthetic channel-mix stress levels on an 18-cell trunk×dataset map:
 
     | Severity | Cells with ΔU(L1−L0) > 0 |
     | --- | --- |
@@ -188,7 +188,7 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
 | Full retrain unnecessary | Same budgets as stress recovery | Classical: L1 recovers most of L3 at ~14–40× wall; EEGNet BNCI head can beat FT (~5× bake-off wall); REVE ~20–40× vs short FT |
 | Head choice | Same Personalizer API | Default LDA; QDA optional under severe shift (BNCI); Softmax optional for UQ |
 
-Not claimed: L1 always beats L0 or LP; QDA always beats LDA; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic feature shift); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG”; shipped affine-Z (L2) as a Personalizer API.
+Not claimed: L1 always beats L0 or LP; QDA always beats LDA; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic channel mixing); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG”; shipped affine map (L2) as a Personalizer API.
 
 ## Next Read
 

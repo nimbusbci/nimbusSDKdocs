@@ -9,13 +9,13 @@ icon: "layers"
 
 Nimbus middleware is the **product wedge**: a Bayesian personalization head for **frozen neural / foundation embeddings**. Encoders stay external. Apps consume thin `BrainState` outputs.
 
-**One-liner:** anything that can `encode(X) → Z` plugs in; Nimbus owns personalization, uncertainty gating, and cheap online updates — not the trunk.
+**One-liner:** anything that maps trials to embeddings plugs in; Nimbus owns personalization, uncertainty gating, and cheap online updates — not the trunk.
 
 <Tip>
 **Product takeaway (Paper 1b):** ship one Personalizer; treat fine-tune as a **priced escape hatch**, not the default integration path. Use the head where embedding capacity exists; stay cal-only when clean already wins.
 </Tip>
 
-![One API across many trunks: frozen encode(X)→Z, Personalizer Bayesian head, BrainState intent + UQ](/images/personalizer-api.png)
+![One API across many trunks: frozen trunk epochs to embeddings, Personalizer Bayesian head, app state intent + uncertainty](/images/personalizer-api.png)
 
 *One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1b).*
 
