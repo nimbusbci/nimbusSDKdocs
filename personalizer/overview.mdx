@@ -23,6 +23,18 @@ Nimbus middleware is the **product wedge**: a Bayesian personalization head for 
 
 *Why the hatch stays priced: across classical trunks, stream Personalizer (L1) recovers most of the L0→L3 gain and usually beats a matched linear probe — details on [Evidence](/personalizer/evidence).*
 
+## Ladder legend (plain language)
+
+| Label | What it is | Shipped? |
+| --- | --- | --- |
+| **L0 — cal-only** | Fit the Bayesian head on calibration data once; no stream updates | Yes — `Personalizer.fit` only |
+| **L1 — stream head** | L0 + online `partial_fit` on new labeled trials | Yes — default product path |
+| **LP — linear probe** | Sklearn logistic regression on the same frozen embeddings | Bench control (not a Personalizer head) |
+| **L2 — affine-Z + head** | Supervised affine map on embeddings, then the head | **Protocol / NimbusBench only** — not a `Personalizer` knob yet |
+| **L3 — full FT** | Warm-start fine-tune of the encoder | Escape hatch (outside Personalizer; priced) |
+
+Blue `rec %` on the figure = how much of the **L0→L3 accuracy gain** L1 recovers: `(acc_L1 − acc_L0) / (acc_L3 − acc_L0)`. `≥FT` means L1 matches or beats L3.
+
 <Info>
 Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encoder=None)` or the standalone heads (`NimbusLDA`, …) documented under [Models](/model-specification).
 </Info>

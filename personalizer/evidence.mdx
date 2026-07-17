@@ -16,6 +16,8 @@ All numbers are **exploratory**, protocol-local, and primarily locked to NimbusB
 
 **Headline (Paper 1b):** ship one Personalizer; treat fine-tune as a priced escape hatch. Use the head where capacity exists; stay cal-only when clean wins.
 
+Labels **L0 / L1 / LP / L2 / L3** — see the [plain-language legend](/personalizer/overview#ladder-legend-plain-language). **Shipped path = L0/L1**; LP is a bench control; L2 is protocol/bench (affine); L3 is the FT hatch.
+
 ## Core: L0 / Bayesian head / linear probe / full FT
 
 Main multi-trunk accuracy–cost block (Paper 1b): under the same ladder-transfer cells (severe feature shift, n=40, CUDA), cal-only Personalizer (L0), stream Personalizer (L1), a matched sklearn linear probe on the same frozen embeddings, and warm-start full FT (L3).
@@ -39,82 +41,7 @@ Main multi-trunk accuracy–cost block (Paper 1b): under the same ladder-transfe
 
 Recovery = (acc_L1 − acc_L0) / (acc_L3 − acc_L0). On most trunks the Bayesian head recovers ~65–90% of the FT gain over cal-only and beats the matched probe (EEGNet / Deep / Conformer). Shallow and ATCNet are probe-competitive (LP can edge L1 by a few points) while both stay far below L3 wall — Personalizer remains the product default (same API + UQ / `BrainState`), not a claim that L1 always wins raw accuracy. BNCI Shallow is still the Pareto win vs FT (~2× wall); ATCNet on BNCI is the hatch case (8% recovery).
 
-## Where the head helps (severity sweep)
-
-Stream Personalizer (L1) vs cal-only (L0) across synthetic feature-shift severities on an 18-cell trunk×dataset map:
-
-| Severity | Cells with ΔU(L1−L0) > 0 |
-| --- | --- |
-| 0 (clean) | **4 / 18** |
-| 0.25 | **13 / 18** |
-| 0.50 | **16 / 18** |
-| 0.75 (severe) | **12 / 18** |
-
-![Personalizer head across severities: cells with positive L1−L0 utility and per-dataset mean gain](/images/personalizer-severity-sweep.png)
-
-*Paper 1b — mid shift already recovers; severe is a detailed slice, not the only supporting point. Kumar stays near zero (boundary).*
-
-### Severe winners (mean utility)
-
-At severity 0.75, which ladder level wins by mean utility (L0 cal-only / L1 stream head / L2 affine+head):
-
-| Dataset | n | EEGNet | Shallow | Deep | Conformer | ATCNet |
-| --- | --- | --- | --- | --- | --- | --- |
-| BNCI | 9 | L2 | L2 | L1 | L2 | L0 |
-| Zhou | 4 | L2 | L1 | L1 | L2 | L2 |
-| Kumar | 18 | L0 | L2 | — | L0 | — |
-| Shin | 9 | L1 | L0 | L1 | L2 | L0 |
-
-Zhou: head helps on every trunk. BNCI: often useful, not automatic (ATCNet stays L0). Kumar/Shin: boundaries — Personalizer is the default *integration* path, not a guarantee that L1 beats L0 everywhere.
-
-## Spotlight: EEGNet denser baselines (Paper 1)
-
-Controlled bake-off on one classical reference trunk (BNCI primary). Under severe shift with n=40 labeled stream trials, the Bayesian head can **beat** full FT on BNCI in this protocol; Zhou is the honest softer boundary.
-
-![BNCI2014-004 cost bake-off: Bayesian head accuracy vs adaptation fit time compared to frozen, linear probe, LoRA, last-layer FT, and full FT](/images/personalizer-cost.png)
-
-*Paper 1 — BNCI2014-004, severity 0.75, n=40 (mean over 9 subjects).*
-
-| Arm | Acc | ECE | Fit time (s) | Recovery vs full FT |
-| --- | --- | --- | --- | --- |
-| Frozen EEGNet | 0.497 | 0.347 | 0 | — |
-| **Bayesian head** | **0.556** | **0.142** | **0.35** | **1.59** |
-| Linear probe | 0.514 | 0.117 | 0.35 | 0.46 |
-| LoRA | 0.463 | 0.224 | 1.08 | −0.92 |
-| Last-layer FT | 0.496 | 0.329 | 1.31 | −0.03 |
-| Full FT | 0.534 | 0.191 | 1.78 | 1.00 |
-
-Recovery = Δacc / Δacc_fullFT (values > 1 mean the head beats FT). Treat head-beats-FT as **BNCI-primary** in this protocol, not a suite-wide constant. On Zhou2016 (supporting, 4 subjects): frozen 0.317 → head 0.462 → full FT 0.540 (~0.43× of FT gain at ~5.5× lower fit time) — FT can still earn its cost.
-
-## Spotlight: EEGNet arm zoo (Paper 1b)
-
-Same denser arm grammar (frozen → Bayesian → linear → LoRA → last → full) as a Paper 1b spotlight — not the multi-trunk claim. Bake-off walls (~5×) differ from ladder-transfer CUDA L3/L1 ratios (~20–30× on deep trunks).
-
-![EEGNet denser baselines from the cost bake-off (severe · n=40)](/images/personalizer-ft.png)
-
-*Paper 1b — EEGNet severe n=40; spotlight mid-hatches (LoRA / last-layer are EEGNet-specific).*
-
-| Dataset | Acc frozen | Acc head | Acc FT | Recovery | Bake-off wall FT/head |
-| --- | --- | --- | --- | --- | --- |
-| BNCI | 0.497 | 0.556 | 0.534 | **1.59×** | **5.0×** |
-| Zhou | 0.317 | 0.462 | 0.540 | **0.43×** | **5.5×** |
-
-## Spotlight: foundation REVE
-
-The same Personalizer contract runs on Hub REVE. Under severe shift, adapt wall stays sub-second while last-layer / full FT cost about **20×–40×** more on Zhou/Kumar. Arm order matches the EEGNet spotlight (head / linear / last / full).
-
-![REVE Personalizer versus short fine-tune: Δacc and adapt fit time on Zhou and Kumar](/images/personalizer-reve-ft.png)
-
-*Paper 1b — REVE severe n=40; accuracy × price.*
-
-| Dataset | Acc frozen | Acc head | Acc last | Acc full | Wall last/head | Wall full/head |
-| --- | --- | --- | --- | --- | --- | --- |
-| Zhou | 0.365 | 0.412 | 0.498 | 0.393 | **21×** | 47× |
-| Kumar | 0.490 | 0.548 | 0.541 | 0.512 | **24×** | 42× |
-
-- **Kumar:** head Pareto-dominates short FT (+5.8 pp vs last +5.1 pp at far lower wall).
-- **Zhou:** last-layer can buy extra pp (+13 vs head +4.7) at ~21× wall — priced purchase, not the default.
-- **Not claimed:** frozen REVE + Personalizer matches cal-trained EEGNet absolute accuracy. BNCI REVE cost is a 3-subject smoke — not a headline.
+**Mid severity strengthens “head first”:** across BNCI+Zhou subject cells, stream L1 matches or beats warm-start L3 on accuracy in about half of cells at severity 0.25 / 0.5 (~49% / ~48%) versus about a third at 0.75 (~35%). Wall L3/L1 ratios stay expensive at every severity — severe is where FT most often still buys residual pp.
 
 ## Which head? (LDA vs QDA vs Softmax)
 
@@ -141,21 +68,96 @@ The multi-trunk map locks **LDA** for comparability. On the EEGNet path, Paper 1
 
 API knobs: [Encoder contract](/personalizer/encoder-contract).
 
-## Transfer across trunks
+## More evidence
 
-Soft operational default vs strict ordinal schedule (18 cells; exploratory):
+<AccordionGroup>
+  <Accordion title="Where the head helps (severity sweep + winners)" icon="chart-area">
+    Stream Personalizer (L1) vs cal-only (L0) across synthetic feature-shift severities on an 18-cell trunk×dataset map:
 
-| Slice | Clean → L0 | Severe → L2 | Strict ordinal |
-| --- | --- | --- | --- |
-| Zhou | 5/5 | 3/5 | 3/5 |
-| BNCI | 4/5 | 3/5 | 2/5 |
-| Kumar | 3/3 | 1/3 | 1/3 |
-| Shin | 1/5 | 1/5 | 0/5 |
-| **Pooled** | **13/18** | **8/18** | **6/18** |
+    | Severity | Cells with ΔU(L1−L0) > 0 |
+    | --- | --- |
+    | 0 (clean) | **4 / 18** |
+    | 0.25 | **13 / 18** |
+    | 0.50 | **16 / 18** |
+    | 0.75 (severe) | **12 / 18** |
 
-![Transfer map for the Personalizer adaptation ladder across 18 trunk×dataset cells](/images/personalizer-transfer-map.png)
+    ![Personalizer head across severities: cells with positive L1−L0 utility and per-dataset mean gain](/images/personalizer-severity-sweep.png)
 
-*Paper 1b — cal-only-when-clean transfers often (13/18); strict ordinal (clean→L0 and severe→L2) is conditional (6/18) — boundary, not the product headline.*
+    *Paper 1b — mid shift already recovers; severe is a detailed slice, not the only supporting point. Kumar stays near zero (boundary).*
+
+    At severity 0.75, which ladder level wins by mean utility (L0 / L1 / **L2 protocol affine+head** — L2 is bench-only):
+
+    | Dataset | n | EEGNet | Shallow | Deep | Conformer | ATCNet |
+    | --- | --- | --- | --- | --- | --- | --- |
+    | BNCI | 9 | L2 | L2 | L1 | L2 | L0 |
+    | Zhou | 4 | L2 | L1 | L1 | L2 | L2 |
+    | Kumar | 18 | L0 | L2 | — | L0 | — |
+    | Shin | 9 | L1 | L0 | L1 | L2 | L0 |
+
+    Zhou: head helps on every trunk. BNCI: often useful, not automatic (ATCNet stays L0). Kumar/Shin: boundaries — Personalizer is the default *integration* path, not a guarantee that L1 beats L0 everywhere.
+  </Accordion>
+
+  <Accordion title="Spotlight: EEGNet denser baselines" icon="flask">
+    Controlled bake-off on one classical reference trunk (BNCI primary, Paper 1). Under severe shift with n=40 labeled stream trials, the Bayesian head can **beat** full FT on BNCI in this protocol; Zhou is the honest softer boundary.
+
+    ![BNCI2014-004 cost bake-off: Bayesian head accuracy vs adaptation fit time compared to frozen, linear probe, LoRA, last-layer FT, and full FT](/images/personalizer-cost.png)
+
+    *Paper 1 — BNCI2014-004, severity 0.75, n=40 (mean over 9 subjects).*
+
+    | Arm | Acc | ECE | Fit time (s) | Recovery vs full FT |
+    | --- | --- | --- | --- | --- |
+    | Frozen EEGNet | 0.497 | 0.347 | 0 | — |
+    | **Bayesian head** | **0.556** | **0.142** | **0.35** | **1.59** |
+    | Linear probe | 0.514 | 0.117 | 0.35 | 0.46 |
+    | LoRA | 0.463 | 0.224 | 1.08 | −0.92 |
+    | Last-layer FT | 0.496 | 0.329 | 1.31 | −0.03 |
+    | Full FT | 0.534 | 0.191 | 1.78 | 1.00 |
+
+    Recovery = Δacc / Δacc_fullFT (values > 1 mean the head beats FT). Treat head-beats-FT as **BNCI-primary** in this protocol, not a suite-wide constant. On Zhou2016 (supporting, 4 subjects): frozen 0.317 → head 0.462 → full FT 0.540 (~0.43× of FT gain at ~5.5× lower fit time).
+
+    Paper 1b EEGNet arm zoo (same denser grammar; bake-off walls ~5× ≠ ladder CUDA L3/L1 ~20–30×):
+
+    ![EEGNet denser baselines from the cost bake-off (severe · n=40)](/images/personalizer-ft.png)
+
+    | Dataset | Acc frozen | Acc head | Acc FT | Recovery | Bake-off wall FT/head |
+    | --- | --- | --- | --- | --- | --- |
+    | BNCI | 0.497 | 0.556 | 0.534 | **1.59×** | **5.0×** |
+    | Zhou | 0.317 | 0.462 | 0.540 | **0.43×** | **5.5×** |
+  </Accordion>
+
+  <Accordion title="Spotlight: foundation REVE" icon="microchip">
+    The same Personalizer contract runs on Hub REVE. Under severe shift, adapt wall stays sub-second while last-layer / full FT cost about **20×–40×** more on Zhou/Kumar.
+
+    ![REVE Personalizer versus short fine-tune: Δacc and adapt fit time on Zhou and Kumar](/images/personalizer-reve-ft.png)
+
+    *Paper 1b — REVE severe n=40; accuracy × price.*
+
+    | Dataset | Acc frozen | Acc head | Acc last | Acc full | Wall last/head | Wall full/head |
+    | --- | --- | --- | --- | --- | --- | --- |
+    | Zhou | 0.365 | 0.412 | 0.498 | 0.393 | **21×** | 47× |
+    | Kumar | 0.490 | 0.548 | 0.541 | 0.512 | **24×** | 42× |
+
+    - **Kumar:** head Pareto-dominates short FT (+5.8 pp vs last +5.1 pp at far lower wall).
+    - **Zhou:** last-layer can buy extra pp (+13 vs head +4.7) at ~21× wall — priced purchase, not the default.
+    - **Not claimed:** frozen REVE + Personalizer matches cal-trained EEGNet absolute accuracy. BNCI REVE cost is a 3-subject smoke — not a headline.
+  </Accordion>
+
+  <Accordion title="Transfer across trunks" icon="diagram-project">
+    Soft operational default vs strict ordinal schedule (18 cells; exploratory). “Severe → L2” means the **protocol** affine+head winner — not a shipped Personalizer API call.
+
+    | Slice | Clean → L0 | Severe → L2 | Strict ordinal |
+    | --- | --- | --- | --- |
+    | Zhou | 5/5 | 3/5 | 3/5 |
+    | BNCI | 4/5 | 3/5 | 2/5 |
+    | Kumar | 3/3 | 1/3 | 1/3 |
+    | Shin | 1/5 | 1/5 | 0/5 |
+    | **Pooled** | **13/18** | **8/18** | **6/18** |
+
+    ![Transfer map for the Personalizer adaptation ladder across 18 trunk×dataset cells](/images/personalizer-transfer-map.png)
+
+    *Paper 1b — cal-only-when-clean transfers often (13/18); strict ordinal (clean→L0 and severe→L2) is conditional (6/18) — boundary, not the product headline.*
+  </Accordion>
+</AccordionGroup>
 
 ## Product claim (honest boundaries)
 
@@ -166,7 +168,7 @@ Soft operational default vs strict ordinal schedule (18 cells; exploratory):
 | Full retrain unnecessary | Same budgets as stress recovery | Classical: L1 recovers most of L3 at ~14–40× wall; EEGNet BNCI head can beat FT (~5× bake-off wall); REVE ~20–40× vs short FT |
 | Head choice | Same Personalizer API | Default LDA; QDA optional under severe shift (BNCI); Softmax optional for UQ |
 
-Not claimed: L1 always beats L0 or LP; QDA always beats LDA; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic feature shift); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG.”
+Not claimed: L1 always beats L0 or LP; QDA always beats LDA; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic feature shift); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG”; shipped affine-Z (L2) as a Personalizer API.
 
 ## Next Read
 

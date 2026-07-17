@@ -62,15 +62,21 @@ states = adapter.predict(X_test)
 
 ## Ladder levels under one API
 
-The same Personalizer surface can express three cheap personalization levels without changing the trunk (Paper 1b):
+**Shipped Personalizer path** (same trunk, no architecture change):
 
 | Level | What it is | When to think about it |
 | --- | --- | --- |
 | **L0 — cal-only** | Bayesian head fit on calibration embeddings only; no stream labels | Default when clean already transfers (cal-only-when-clean) |
 | **L1 — stream head** | L0 + stream `partial_fit` | Mid / severe shift when head capacity exists |
-| **L2 — affine-Z + head** | Supervised affine map on embeddings, then the same head | Optional mid-tier recovery; not automatic |
 
-Full encoder fine-tune (L3) stays a **priced escape hatch** — same API family, not the default integration path. Evidence for when L1 helps and how L3 is priced: [Evidence](/personalizer/evidence).
+**Not a Personalizer knob (yet):**
+
+| Level | What it is | Where it lives |
+| --- | --- | --- |
+| **L2 — affine-Z + head** | Supervised affine map on embeddings, then the same head | Paper 1b / NimbusBench ladder protocol — mid-tier in *evaluations*, not `Personalizer(...)` |
+| **L3 — full FT** | Warm-start encoder fine-tune | Priced escape hatch outside the Personalizer API |
+
+Linear probe (**LP**) in Evidence is a matched sklearn control on the same frozen `Z`, not a ladder level. Plain-language legend: [Overview](/personalizer/overview#ladder-legend-plain-language). Evidence for when L1 helps and how L3 is priced: [Evidence](/personalizer/evidence).
 
 **Heads:** product default is LDA (`head="lda"`). QDA is a documented severe-shift option behind the same API; Softmax stays optional (`nimbus-bci[softmax]`). The multi-trunk map in Paper 1b locks LDA for comparability — numbers for LDA vs QDA vs Softmax (EEGNet): [Evidence → Which head?](/personalizer/evidence#which-head-lda-vs-qda-vs-softmax).
 
