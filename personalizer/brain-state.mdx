@@ -23,6 +23,26 @@ icon: "brain"
 
 Use `BrainState.to_dict()` for JSON-friendly export (`brain_state_version` is currently `1`).
 
+## Trial gate vs adapt recommendation
+
+These are **different** signals:
+
+| Signal | API | Question |
+| --- | --- | --- |
+| **Trial gate** | `rejected`, `need_more_data`, presets | Accept this intent for the app? |
+| **Adapt recommendation** | `Personalizer.recommend_adapt(..., tau=...)` → `AdaptDecision` | Spend labels / call `partial_fit`? |
+
+`recommend_adapt` is a thin mean-shift helper against a user-supplied `tau` (L0 stay vs L1 stream update only). It does **not** auto-escalate to affine maps or full fine-tune. Optional session metadata:
+
+```python
+dec = adapter.recommend_adapt(X_stream, tau=0.25)
+states = adapter.predict(X_eval)
+for s in states:
+    s.extras.update(dec.to_extras())  # should_adapt, adapt_score, adapt_tau, …
+```
+
+After `Personalizer.load`, pass `X_ref=` (calibration embeddings are not serialized).
+
 ## Decision presets
 
 | Preset | Intent |

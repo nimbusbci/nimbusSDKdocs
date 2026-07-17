@@ -76,8 +76,18 @@ states = adapter.predict(X_test)  # list[BrainState]
 
 ## Integrator checklist
 
-1. **When to adapt** — clean → cal-only often wins; mid/severe shift → stream head (L1); escalate to FT only when accuracy budget justifies the wall. See [Evidence](/personalizer/evidence).
-2. **Gate decisions** — `preset="research"` / `"consumer"`; inspect `BrainState.rejected`, `need_more_data`, `uncertainty`. See [BrainState](/personalizer/brain-state).
+1. **When to adapt** — use the thin helper with a **user-supplied** threshold (not an automatic multi-level cascade):
+
+```python
+dec = adapter.recommend_adapt(X_stream, tau=your_tau)
+if dec.should_adapt:
+    adapter.partial_fit(X_lab, y_lab)
+# optional session metadata on any BrainState:
+# state.extras.update(dec.to_extras())
+```
+
+   Policy: stay on the current head when clean; stream-update (`partial_fit`) when shift clears `tau`; full fine-tune stays a manual escape hatch. See [Evidence](/personalizer/evidence).
+2. **Trial gate (different signal)** — `preset="research"` / `"consumer"`; inspect `BrainState.rejected`, `need_more_data`, `uncertainty`. See [BrainState](/personalizer/brain-state).
 3. **Head stability** — after online updates, use `calibration_sufficient` on an unlabeled pool.
 4. **Encoder swap** — freeze trunk; match `embedding_dim`; never pass logits as embeddings; keep `model_id` consistent across `save` / `load`. See [Encoder contract](/personalizer/encoder-contract).
 

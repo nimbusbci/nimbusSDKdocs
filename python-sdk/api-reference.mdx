@@ -54,13 +54,18 @@ adapter = Personalizer(
 - `partial_fit(X, y, classes=None)` — cumulative online update
 - `predict(X)` → `list[BrainState]`
 - `predict_one(x)` → `BrainState`
+- `recommend_adapt(X_stream, *, tau, X_ref=None)` → `AdaptDecision` — thin mean-shift helper (L0 vs L1 only; **user-supplied** `tau`; not a multi-level cascade)
 - `update_from_prediction(...)` — optional feedback path
 - `save(path)` / `Personalizer.load(path, encoder=...)` — persist head; **re-attach encoder on load**
+
+Also exported: `recommend_adapt`, `embedding_mean_shift`, `AdaptDecision` (standalone; same thin helper).
 
 **Notes:**
 - `encoder=None` uses classical features / embeddings already shaped `(n, d)`
 - `head="softmax"` requires `pip install nimbus-bci[softmax]`
 - `partial_fit` is cumulative (no forgetting / decay)
+- After `load`, pass `X_ref=` to `recommend_adapt` (cal embeddings are not serialized)
+- Trial rejection (`BrainState.rejected`) ≠ adapt recommendation (`should_adapt`)
 
 ### wrap / FrozenEncoder
 
