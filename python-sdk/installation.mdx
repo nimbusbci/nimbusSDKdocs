@@ -5,8 +5,6 @@ keywords: ["installation", "Python SDK", "nimbus-bci", "pip install", "Python se
 icon: "download"
 ---
 
-# Installation
-
 Install the nimbus-bci Python SDK from PyPI and verify your setup.
 
 ## Requirements
@@ -18,7 +16,7 @@ Before installing, ensure you have:
 - **64-bit system** (Linux, macOS, or Windows)
 
 <Note>
-The Python SDK does **not** require an API key. All processing is local.
+  The Python SDK does **not** require an API key. All processing is local.
 </Note>
 
 ## Install from PyPI
@@ -30,6 +28,7 @@ pip install nimbus-bci
 ```
 
 This installs the core package with all required dependencies:
+
 - NumPy ≥ 1.26
 - scikit-learn ≥ 1.4
 - SciPy ≥ 1.17.1
@@ -47,6 +46,7 @@ pip install nimbus-bci[mne]
 ```
 
 This adds:
+
 - MNE ≥ 1.6
 
 ### Visualization
@@ -58,6 +58,7 @@ pip install nimbus-bci[viz]
 ```
 
 This adds:
+
 - Matplotlib ≥ 3.8
 
 ### Softmax Model
@@ -69,6 +70,7 @@ pip install nimbus-bci[softmax]
 ```
 
 This adds:
+
 - JAX ≥ 0.4.25
 
 ### Riemannian Feature Pipelines
@@ -80,10 +82,11 @@ pip install nimbus-bci[riemann]
 ```
 
 This adds:
+
 - pyRiemann ≥ 0.11
 
 <Note>
-The `riemann` extra enables `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)`. This is a feature-extraction bridge from EEG epochs to Nimbus heads, not a separate Riemannian Bayesian model family.
+  The `riemann` extra enables `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)`. This is a feature-extraction bridge from EEG epochs to Nimbus heads, not a separate Riemannian Bayesian model family.
 </Note>
 
 ### All Optional Dependencies
@@ -108,6 +111,7 @@ pip install -e ".[dev,all]"
 ```
 
 This includes:
+
 - pytest for testing
 - Cython for building extensions
 - build and twine for packaging
@@ -121,10 +125,10 @@ import nimbus_bci
 print(f"nimbus-bci version: {nimbus_bci.__version__}")
 
 from nimbus_bci import Personalizer, wrap, BrainState
-print("✓ Personalizer / wrap / BrainState imported successfully")
+print("Personalizer / wrap / BrainState imported successfully")
 
 from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSTS
-print("✓ Core heads imported successfully")
+print("Core heads imported successfully")
 
 import numpy as np
 X = np.random.randn(100, 10)
@@ -135,32 +139,31 @@ adapter = Personalizer(encoder=enc, head="lda", classes=["a", "b"])
 adapter.fit(X, y)
 states = adapter.predict(X[:5])
 assert isinstance(states[0], BrainState)
-print("✓ Personalizer smoke test works")
+print("Personalizer smoke test works")
 ```
 
 Expected output:
 
-```
+```text
 nimbus-bci version: 0.5.0
-✓ Personalizer / wrap / BrainState imported successfully
-✓ Core heads imported successfully
-✓ Personalizer smoke test works
+Personalizer / wrap / BrainState imported successfully
+Core heads imported successfully
+Personalizer smoke test works
 ```
 
 ## Platform-Specific Notes
 
 ### macOS
 
-The package includes universal2 wheels for both Intel and Apple Silicon:
+Pre-built wheels for Intel (`x86_64`) and Apple Silicon (`arm64`):
 
 ```bash
-# Works on both Intel and M1/M2/M3 Macs
 pip install nimbus-bci
 ```
 
 ### Linux
 
-Pre-built wheels for x86_64 and aarch64 use the manylinux_2_28 platform tag:
+Pre-built wheels for **x86_64** use the `manylinux_2_28` platform tag. Other architectures fall back to building from the sdist (requires a C compiler and Cython).
 
 ```bash
 pip install nimbus-bci
@@ -175,7 +178,7 @@ pip install nimbus-bci
 ```
 
 <Note>
-32-bit systems are not supported. Use 64-bit Python on a 64-bit OS.
+  32-bit systems are not supported. Use 64-bit Python on a 64-bit OS.
 </Note>
 
 ## Troubleshooting
@@ -243,34 +246,31 @@ pip uninstall nimbus-bci
 
 ## License
 
-The nimbus-bci Python SDK is **proprietary software** with the following license tiers:
+The nimbus-bci Python SDK is **proprietary**, with two tracks under [LICENSE.txt](https://github.com/nimbusbci/nimbuspysdk/blob/main/LICENSE.txt) (v2.1):
 
-| Tier | Use Case | Cost |
-|------|----------|------|
-| **Evaluation** | 30-day free trial for R&D | Free |
-| **Academic** | University research | Free |
-| **Startup** | Companies < $1M revenue | Contact us |
-| **Commercial** | Full production rights | Contact us |
-| **Enterprise** | Unlimited deployments + SLA | Contact us |
-| **OEM/Embedded** | Medical devices, FDA support | Contact us |
+| Track | Use case | Cost |
+| --- | --- | --- |
+| **Non-Commercial** | Academic research, teaching, government / non-profit labs, personal learning | Free (self-executing; no registration) |
+| **Startup** | Companies with less than US \$1M annual revenue | Paid — contact us |
+| **Commercial** | Full production rights | Paid — contact us |
+| **Enterprise** | Unlimited deployments + SLA | Paid — contact us |
+| **OEM / Embedded** | Medical devices, FDA support | Paid — contact us |
 
-### Request a License
+Any use inside a for-profit company, in a paid product or service, or for sponsored / fee-for-service research requires a commercial license. Citation is requested as a community norm, not a license condition.
 
-To obtain a license:
+### Request a commercial license
 
-1. Email **hello@nimbusbci.com** with your use case
-2. Receive license agreement
-3. Start building
+Email [hello@nimbusbci.com](mailto:hello@nimbusbci.com) with your use case.
 
 <Note>
-The evaluation period allows full functionality for 30 days. Academic users receive free licenses for non-commercial research.
+  Non-commercial eligibility is self-executing — no license key or registration is required. Full terms ship with the package as `LICENSE.txt`.
 </Note>
 
-## What's Next?
+## What's next
 
-<CardGroup cols={2}>
+<Columns cols={2}>
   <Card title="Quickstart" icon="rocket" href="/python-sdk/quickstart">
-    Build your first BCI classifier in 5 minutes
+    Build your first Personalizer in minutes
   </Card>
   <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
     Explore the complete API documentation
@@ -281,17 +281,15 @@ The evaluation period allows full functionality for 30 days. Academic users rece
   <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">
     Preprocess EEG data with MNE-Python
   </Card>
-</CardGroup>
+</Columns>
 
 ## Support
 
 Need help with installation?
 
-- **Email**: hello@nimbusbci.com
+- **Email**: [hello@nimbusbci.com](mailto:hello@nimbusbci.com)
 - **GitHub Issues**: [github.com/nimbusbci/nimbuspysdk/issues](https://github.com/nimbusbci/nimbuspysdk/issues)
-- **Documentation**: Browse our comprehensive guides
 
 ---
 
-Successfully installed? Head to the [Quickstart Guide](/python-sdk/quickstart) to build your first BCI classifier.
-
+Successfully installed? Continue with the [Quickstart](/python-sdk/quickstart).

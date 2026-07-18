@@ -5,14 +5,12 @@ keywords: ["Python SDK", "nimbus-bci", "Personalizer", "BrainState", "BCI quicks
 icon: "rocket"
 ---
 
-# Python SDK Quickstart
-
 Get started with nimbus-bci: wrap any frozen encoder, personalize with a Bayesian head, and consume `BrainState` outputs.
 
 <Info>
-**Time to complete:** ~10 minutes
+  **Time to complete:** ~10 minutes
 
-This guide walks through installation, Personalizer (product path), classical heads, sklearn integration, and streaming.
+  This guide covers installation, Personalizer (product path), classical heads, and online updates. Deeper topics link out below.
 </Info>
 
 ## Prerequisites
@@ -20,671 +18,193 @@ This guide walks through installation, Personalizer (product path), classical he
 Before you begin:
 
 - **Python ≥ 3.11** installed
-- **Basic understanding** of EEG data and BCI concepts
 - **Embeddings** from a frozen trunk, or **preprocessed features** (CSP, bandpower, etc.) — see [Encoder contract](/personalizer/encoder-contract) and [preprocessing requirements](/inference-configuration/preprocessing-requirements)
 
 <Tip>
-nimbus-bci expects **embeddings or preprocessed features**, not raw EEG. Plug a frozen trunk via `wrap()`, or extract CSP / bandpower with MNE-Python.
+  nimbus-bci expects **embeddings or preprocessed features**, not raw EEG. Plug a frozen trunk via `wrap()`, or extract CSP / bandpower with MNE-Python.
 </Tip>
 
 ---
 
 <Steps>
   <Step title="Install nimbus-bci">
-Install from PyPI:
+    Install from PyPI:
 
-```bash
-pip install nimbus-bci
-```
+    ```bash
+    pip install nimbus-bci
+    ```
 
-For MNE-Python integration:
+    For MNE-Python integration:
 
-```bash
-pip install nimbus-bci[mne]
-```
+    ```bash
+    pip install nimbus-bci[mne]
+    ```
 
-Verify installation:
+    Verify installation:
 
-```python
-from nimbus_bci import Personalizer, wrap, BrainState
-import nimbus_bci
-print(f"nimbus-bci version: {nimbus_bci.__version__}")
-```
+    ```python
+    from nimbus_bci import Personalizer, wrap, BrainState
+    import nimbus_bci
+    print(f"nimbus-bci version: {nimbus_bci.__version__}")
+    ```
   </Step>
 
   <Step title="Personalizer (product path)">
-Wrap a frozen encoder and adapt online:
+    Wrap a frozen encoder and adapt online:
 
-```python
-from nimbus_bci import Personalizer, wrap
-import numpy as np
+    ```python
+    from nimbus_bci import Personalizer, wrap
+    import numpy as np
 
-np.random.seed(42)
-n_samples, n_features = 100, 16
-X_cal = np.random.randn(n_samples, n_features)
-y_cal = np.random.randint(0, 2, n_samples)
-X_test = np.random.randn(20, n_features)
+    np.random.seed(42)
+    n_samples, n_features = 100, 16
+    X_cal = np.random.randn(n_samples, n_features)
+    y_cal = np.random.randint(0, 2, n_samples)
+    X_test = np.random.randn(20, n_features)
 
-# Toy identity encoder — replace with partner / foundation encode(X) → Z
-enc = wrap(lambda X: X, model_id="demo-encoder", embedding_dim=n_features)
-adapter = Personalizer(
-    encoder=enc,
-    head="lda",
-    classes=["left", "right"],
-    preset="research",
-)
-adapter.fit(X_cal, y_cal)
-states = adapter.predict(X_test)  # list[BrainState]
-print(states[0].intent, states[0].confidence, states[0].need_more_data)
-adapter.save("subject_demo_profile")
-```
+    # Toy identity encoder — replace with partner / foundation encode(X) → Z
+    enc = wrap(lambda X: X, model_id="demo-encoder", embedding_dim=n_features)
+    adapter = Personalizer(
+        encoder=enc,
+        head="lda",
+        classes=["left", "right"],
+        preset="research",
+    )
+    adapter.fit(X_cal, y_cal)
+    states = adapter.predict(X_test)  # list[BrainState]
+    print(states[0].intent, states[0].confidence, states[0].need_more_data)
+    adapter.save("subject_demo_profile")
+    ```
 
-<Info>
-**Key concepts:** `wrap()` freezes the encoder contract, `Personalizer` owns the Bayesian head + gating, and `BrainState` is what apps consume. Full contract: [Personalizer & Middleware](/personalizer/overview).
-</Info>
+    <Info>
+      `wrap()` freezes the encoder contract, `Personalizer` owns the Bayesian head and gating, and `BrainState` is what apps consume. Full contract: [Personalizer & Middleware](/personalizer/overview).
+    </Info>
   </Step>
 
   <Step title="Classical features (optional)">
-Already have CSP / bandpower vectors? Use a head directly (or `Personalizer(encoder=None)`):
+    Already have CSP / bandpower vectors? Use a head directly (or `Personalizer(encoder=None)`):
 
-```python
-from nimbus_bci import NimbusLDA
-import numpy as np
+    ```python
+    from nimbus_bci import NimbusLDA
+    import numpy as np
 
-np.random.seed(42)
-n_samples, n_features = 100, 16
-X_train = np.random.randn(n_samples, n_features)
-y_train = np.random.randint(0, 4, n_samples)  # 4-class problem
+    np.random.seed(42)
+    n_samples, n_features = 100, 16
+    X_train = np.random.randn(n_samples, n_features)
+    y_train = np.random.randint(0, 4, n_samples)
 
-clf = NimbusLDA()
-clf.fit(X_train, y_train)
+    clf = NimbusLDA()
+    clf.fit(X_train, y_train)
 
-X_test = np.random.randn(20, n_features)
-predictions = clf.predict(X_test)
-probabilities = clf.predict_proba(X_test)
+    X_test = np.random.randn(20, n_features)
+    predictions = clf.predict(X_test)
+    probabilities = clf.predict_proba(X_test)
 
-print(f"Predictions: {predictions}")
-print(f"Probabilities shape: {probabilities.shape}")  # (20, 4)
-```
-
-<Info>
-**Key concepts:** `NimbusLDA()` is the default Personalizer head and also a standalone sklearn-compatible classifier.
-</Info>
+    print(f"Predictions: {predictions}")
+    print(f"Probabilities shape: {probabilities.shape}")  # (20, 4)
+    ```
   </Step>
 
-  <Step title="sklearn Pipeline Integration">
-Use nimbus-bci with sklearn pipelines:
+  <Step title="sklearn pipeline">
+    Use nimbus-bci with sklearn pipelines:
 
-```python
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_val_score
-from nimbus_bci import NimbusLDA
+    ```python
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.model_selection import cross_val_score
+    from nimbus_bci import NimbusLDA
 
-# Create pipeline with preprocessing
-pipe = make_pipeline(
-    StandardScaler(),
-    NimbusLDA(mu_scale=3.0)
-)
+    pipe = make_pipeline(
+        StandardScaler(),
+        NimbusLDA(mu_scale=3.0),
+    )
+    pipe.fit(X_train, y_train)
+    predictions = pipe.predict(X_test)
+    scores = cross_val_score(pipe, X_train, y_train, cv=5)
+    print(f"CV Accuracy: {scores.mean():.2%} (+/- {scores.std():.2%})")
+    ```
 
-# Fit pipeline
-pipe.fit(X_train, y_train)
-
-# Predict
-predictions = pipe.predict(X_test)
-
-# Cross-validation
-scores = cross_val_score(pipe, X_train, y_train, cv=5)
-print(f"CV Accuracy: {scores.mean():.2%} (+/- {scores.std():.2%})")
-```
-
-<Tip>
-nimbus-bci classifiers are fully sklearn-compatible. Use them with `Pipeline`, `GridSearchCV`, `cross_val_score`, and all sklearn tools.
-</Tip>
+    <Tip>
+      Heads are sklearn-compatible. Use them with `Pipeline`, `GridSearchCV`, and `cross_val_score`. See [sklearn Integration](/python-sdk/sklearn-integration).
+    </Tip>
   </Step>
 
-  <Step title="Optional: Riemannian Feature Pipeline">
-Use pyRiemann covariance and tangent-space transforms before a Nimbus head:
+  <Step title="Online updates">
+    Update with new labeled trials, and optionally gate adaptation with `recommend_adapt`:
 
-```bash
-pip install nimbus-bci[riemann]
-```
+    ```python
+    from nimbus_bci import NimbusLDA
 
-```python
-from nimbus_bci import NimbusLDA
-from nimbus_bci.riemann import make_riemann_nimbus_pipeline
+    clf = NimbusLDA()
+    clf.fit(X_train, y_train)
 
-# X_epochs shape: (n_trials, n_channels, n_times)
-pipe = make_riemann_nimbus_pipeline(head=NimbusLDA())
-pipe.fit(X_epochs_train, y_train)
+    X_new = np.random.randn(10, n_features)
+    y_new = np.random.randint(0, 4, 10)
+    clf.partial_fit(X_new, y_new)
 
-probs = pipe.predict_proba(X_epochs_test)
-predictions = pipe.predict(X_epochs_test)
-```
+    # Personalizer path — user-supplied tau (not an automatic cascade)
+    # dec = adapter.recommend_adapt(X_stream, tau=your_tau)
+    # if dec.should_adapt:
+    #     adapter.partial_fit(X_lab, y_lab)
+    ```
 
-<Info>
-This factory returns a standard sklearn `Pipeline`: pyRiemann computes covariance and tangent-space features, then the Nimbus head consumes the resulting feature rows. It is not a separate Riemannian Bayesian model, and the pipeline should be refit as a full pipeline rather than using pipeline-level `partial_fit()`.
-</Info>
-  </Step>
-
-  <Step title="Hyperparameter Tuning">
-Optimize classifier parameters with GridSearchCV:
-
-```python
-from sklearn.model_selection import GridSearchCV
-from nimbus_bci import NimbusLDA
-
-# Define parameter grid
-param_grid = {
-    'mu_scale': [1.0, 3.0, 5.0],
-    'class_prior_alpha': [0.5, 1.0, 2.0]
-}
-
-# Grid search
-grid = GridSearchCV(
-    NimbusLDA(),
-    param_grid,
-    cv=5,
-    scoring='accuracy',
-    n_jobs=-1
-)
-grid.fit(X_train, y_train)
-
-print(f"Best parameters: {grid.best_params_}")
-print(f"Best CV score: {grid.best_score_:.2%}")
-
-# Use best model
-best_clf = grid.best_estimator_
-```
-
-<Info>
-**Common hyperparameters:** `mu_scale` controls prior precision on class means (higher = more regularization), and `class_prior_alpha` sets the Dirichlet prior on class probabilities.
-</Info>
-  </Step>
-
-  <Step title="Online Learning">
-Update models incrementally with new data:
-
-```python
-from nimbus_bci import NimbusLDA
-
-# Initial training
-clf = NimbusLDA()
-clf.fit(X_train, y_train)
-
-# Later: update with new data (no retraining from scratch)
-X_new = np.random.randn(10, n_features)
-y_new = np.random.randint(0, 4, 10)
-clf.partial_fit(X_new, y_new)
-
-print("Model updated with new data")
-```
-
-<Info>
-`partial_fit()` enables **adaptive BCI** systems that learn from user feedback during operation.
-</Info>
-  </Step>
-
-  <Step title="Optional: Active Learning">
-Use active learning to label only the most informative calibration trials:
-
-```python
-from nimbus_bci.active_learning import CalibrationSession
-
-session = CalibrationSession(
-    clf,
-    X_pool,
-    pool_strategy="bald",
-    batch_size=4,
-    stopping_threshold=0.02,
-    num_posterior_samples=256,
-)
-
-ranked = session.suggest_next_trial()
-global_indices = session.remaining_indices[ranked.indices]
-y_new = collect_labels_for(global_indices)
-session.update(ranked.indices, y_new)
-
-status = session.calibration_sufficient()
-```
-
-<Tip>
-Active learning expects feature rows shaped `(n_trials, n_features)`. `CalibrationSession` returns indices local to the current active pool, so use `session.remaining_indices[ranked.indices]` when labels are keyed by the original pool. See [Active Learning](/python-sdk/active-learning) for strategy guidance and stopping criteria.
-</Tip>
-  </Step>
-
-  <Step title="Batch Inference with Diagnostics">
-Use batch inference for comprehensive diagnostics:
-
-```python
-from nimbus_bci import predict_batch, NimbusLDA
-from nimbus_bci.data import BCIData, BCIMetadata
-import numpy as np
-
-# Train model
-clf = NimbusLDA()
-clf.fit(X_train, y_train)
-
-# Prepare data for batch inference
-metadata = BCIMetadata(
-    sampling_rate=250.0,
-    paradigm="motor_imagery",
-    feature_type="csp",
-    n_features=16,
-    n_classes=4
-)
-
-# BCIData expects (n_features, n_samples, n_trials). predict_batch()
-# requires at least 2 time samples, so duplicate tabular features across
-# a short temporal axis for this synthetic example.
-X_test_reshaped = np.repeat(X_test.T[:, np.newaxis, :], 2, axis=1)
-data = BCIData(X_test_reshaped, metadata)
-
-# Run batch inference
-result = predict_batch(clf.model_, data)
-
-print(f"Predictions: {result.predictions}")
-print(f"Mean entropy: {result.mean_entropy:.2f} bits")
-print(f"Balance: {result.balance:.2%}")
-print(f"Latency: {result.latency_ms:.1f}ms")
-```
-
-<Info>
-**Diagnostics available:** `entropy` (prediction uncertainty), `balance` (class distribution balance), and `latency_ms` (inference time per trial).
-</Info>
-  </Step>
-
-  <Step title="Streaming Inference">
-Process data in real-time chunks:
-
-```python
-from nimbus_bci import NimbusLDA, StreamingSession
-from nimbus_bci.data import BCIMetadata
-
-# Train model
-clf = NimbusLDA()
-clf.fit(X_train, y_train)
-
-# Setup streaming session
-metadata = BCIMetadata(
-    sampling_rate=250.0,
-    paradigm="motor_imagery",
-    feature_type="csp",
-    n_features=16,
-    n_classes=4,
-    chunk_size=125,  # 500ms chunks at 250 Hz
-    temporal_aggregation="logvar"
-)
-
-session = StreamingSession(clf.model_, metadata)
-
-# Simulate streaming data (in practice, from real-time EEG)
-n_chunks = 4
-for i in range(n_chunks):
-    # Each chunk: (n_features, chunk_size)
-    chunk = np.random.randn(16, 125)
-    result = session.process_chunk(chunk)
-    print(f"Chunk {i+1}: class {result.prediction} (conf: {result.confidence:.2%})")
-
-# Finalize trial with aggregation
-final = session.finalize_trial(method="weighted_vote")
-print(f"\nFinal prediction: class {final.prediction}")
-print(f"Entropy: {final.entropy:.2f} bits")
-```
-
-<Tip>
-**Streaming inference** enables real-time BCI applications with sub-20ms latency per chunk.
-</Tip>
+    <Info>
+      Trial rejection (`BrainState.rejected` / `need_more_data`) is a different gate from adapt recommendations. See [BrainState](/personalizer/brain-state) and [Overview](/personalizer/overview).
+    </Info>
   </Step>
 </Steps>
 
 ---
 
-## Available Classifiers
+## Available heads
 
-Try different Bayesian models:
+| Model | Best for | Notes |
+| --- | --- | --- |
+| **NimbusLDA** | Motor imagery, well-separated classes | Default `Personalizer(head="lda")` |
+| **NimbusQDA** | Overlapping distributions (e.g. P300) | Class-specific covariances |
+| **NimbusSoftmax** | Multiclass nonlinear boundaries | Optional: `pip install nimbus-bci[softmax]` |
+| **NimbusSTS** | Non-stationary / long sessions | Stateful; see [Bayesian STS](/models/rxsts) |
 
-```python
-from nimbus_bci import NimbusLDA, NimbusQDA, NimbusSTS
+## Continue with
 
-# Bayesian LDA (shared covariance)
-clf_lda = NimbusLDA()
-clf_lda.fit(X_train, y_train)
-
-# Bayesian QDA (class-specific covariances)
-clf_qda = NimbusQDA()
-clf_qda.fit(X_train, y_train)
-
-# Bayesian STS (temporal state dynamics for non-stationary data)
-clf_sts = NimbusSTS(transition_cov=0.05)
-clf_sts.fit(X_train, y_train)
-
-# Compare performance
-for name, clf in [("LDA", clf_lda), ("QDA", clf_qda), ("STS", clf_sts)]:
-    score = clf.score(X_test, y_test)
-    print(f"{name}: {score:.2%}")
-```
-
-`NimbusSoftmax` is also available for non-Gaussian decision boundaries after installing the optional extra:
-
-```bash
-pip install nimbus-bci[softmax]
-```
-
-| Model | Best For | Speed | Statefulness |
-|-------|----------|-------|--------------|
-| **NimbusLDA** | Motor imagery, well-separated classes | Fastest (10-15ms) | Stateless |
-| **NimbusQDA** | P300, overlapping distributions | Fast (15-25ms) | Stateless |
-| **NimbusSoftmax** | Complex multinomial tasks | Fast (15-25ms) | Stateless |
-| **NimbusSTS** | Non-stationary data, long sessions, adaptive BCI | Real-time (20-30ms) | Stateful |
-
-<Tip>
-**New: NimbusSTS** is designed for **non-stationary data** where class distributions drift over time (e.g., due to fatigue, electrode changes). Use it for:
-- Long BCI sessions (>30 minutes)
-- Cross-day experiments  
-- Adaptive systems with continuous learning
-- Online learning with delayed feedback
-
-See [Bayesian STS Model](/models/rxsts) for complete documentation.
-</Tip>
-
-## NimbusSTS: Adaptive BCI
-
-For non-stationary data with temporal drift:
-
-```python
-from nimbus_bci import NimbusSTS
-
-# Train with moderate drift tracking
-clf = NimbusSTS(
-    transition_cov=0.05,  # Controls drift adaptation speed
-    num_steps=100
-)
-clf.fit(X_train, y_train)
-
-# Stateful prediction with time propagation
-predictions = []
-for x_t in X_stream:  # Time-ordered samples
-    # Advance state one time step
-    clf.propagate_state()
-    
-    # Predict using current state
-    pred = clf.predict(x_t.reshape(1, -1))[0]
-    predictions.append(pred)
-
-# Online learning with delayed feedback (canonical BCI paradigm)
-for trial in online_session:
-    # 1. Advance time
-    clf.propagate_state()
-    
-    # 2. Predict
-    prediction = clf.predict(trial.features.reshape(1, -1))[0]
-    
-    # 3. User performs action
-    execute_action(prediction)
-    
-    # 4. Get feedback
-    true_label = wait_for_feedback()
-    
-    # 5. Update state
-    clf.partial_fit(trial.features.reshape(1, -1), [true_label])
-
-# State inspection and transfer
-z_mean, z_cov = clf.get_latent_state()
-print(f"Current state: {z_mean}")
-
-# Save state for next session
-import pickle
-with open("model_with_state.pkl", "wb") as f:
-    pickle.dump({'model': clf, 'state': (z_mean, z_cov)}, f)
-```
-
-<Info>
-**Key Difference**: Unlike static models (LDA, QDA, Softmax), NimbusSTS maintains a **latent state** that evolves over time, allowing it to adapt to non-stationary distributions. Use `propagate_state()` to explicitly advance time.
-</Info>
-
-## MNE-Python Integration
-
-Use nimbus-bci with MNE-Python for complete EEG pipeline:
-
-```python
-import mne
-from nimbus_bci import NimbusLDA
-from nimbus_bci.compat import extract_csp_features
-
-# Load EEG data with MNE
-raw = mne.io.read_raw_gdf("motor_imagery.gdf", preload=True)
-events = mne.find_events(raw)
-epochs = mne.Epochs(raw, events, tmin=0, tmax=4, baseline=None, preload=True)
-
-# Filter to mu+beta bands
-epochs.filter(8, 30)
-
-# Extract CSP features
-csp_features, csp = extract_csp_features(epochs, n_components=8)
-
-# Train classifier
-clf = NimbusLDA()
-clf.fit(csp_features, epochs.events[:, 2])
-
-# Evaluate
-from sklearn.model_selection import cross_val_score
-scores = cross_val_score(clf, csp_features, epochs.events[:, 2], cv=5)
-print(f"Accuracy: {scores.mean():.2%} (+/- {scores.std():.2%})")
-```
-
-See [MNE Integration](/python-sdk/mne-integration) for more details.
-
-## Metrics and Diagnostics
-
-Compute BCI-specific metrics:
-
-```python
-from nimbus_bci import (
-    compute_entropy,
-    compute_calibration_metrics,
-    calculate_itr,
-    assess_trial_quality
-)
-
-# Get predictions
-probs = clf.predict_proba(X_test)
-preds = clf.predict(X_test)
-
-# Entropy (uncertainty)
-mean_entropy = compute_entropy(probs)
-trial_entropy = compute_entropy(probs[0])
-print(f"Mean entropy: {mean_entropy:.2f} bits")
-
-# Calibration metrics
-calib = compute_calibration_metrics(preds, probs.max(axis=1), y_test)
-print(f"ECE: {calib.ece:.3f}, MCE: {calib.mce:.3f}")
-
-# Information Transfer Rate
-accuracy = (preds == y_test).mean()
-itr = calculate_itr(accuracy=accuracy, n_classes=4, trial_duration=4.0)
-print(f"ITR: {itr:.1f} bits/min")
-
-# Quality assessment
-quality = assess_trial_quality(
-    X_test[0],
-    confidence=float(probs[0].max()),
-    entropy=trial_entropy
-)
-print(f"Trial accepted: {quality.is_valid}")
-```
-
-## Feature Normalization
-
-Critical for cross-session BCI performance:
-
-```python
-from nimbus_bci import estimate_normalization_params, apply_normalization
-
-# Estimate normalization from training data
-norm_params = estimate_normalization_params(X_train, method="zscore")
-
-# Apply to all data
-X_train_norm = apply_normalization(X_train, norm_params)
-X_test_norm = apply_normalization(X_test, norm_params)
-
-# Train on normalized data
-clf = NimbusLDA()
-clf.fit(X_train_norm, y_train)
-
-# Predict on normalized test data
-predictions = clf.predict(X_test_norm)
-```
-
-<Warning>
-Always use the same normalization parameters for training and testing data. Estimate from training set, then apply to test set.
-</Warning>
-
-## Save and Load Models
-
-Save trained models for later use:
-
-```python
-from nimbus_bci import nimbus_save, nimbus_load
-
-# Train model
-clf = NimbusLDA()
-clf.fit(X_train, y_train)
-
-# Save model
-nimbus_save(clf.model_, "my_bci_model.npz")
-
-# Load model later
-loaded_model = nimbus_load("my_bci_model.npz")
-
-# Use loaded model
-from nimbus_bci.models.nimbus_lda import nimbus_lda_predict
-predictions = nimbus_lda_predict(loaded_model, X_test)
-```
-
-## Next Read
-
-<CardGroup cols={2}>
-  <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
-    Complete API documentation with all functions and classes
+<Columns cols={2}>
+  <Card title="Personalizer & Middleware" icon="layers" href="/personalizer/overview">
+    Encoder contract, adapt helper, BrainState
   </Card>
-  <Card title="sklearn Integration" icon="code" href="/python-sdk/sklearn-integration">
-    Advanced sklearn pipeline patterns and best practices
+  <Card title="Active Learning" icon="target" href="/python-sdk/active-learning">
+    `CalibrationSession` and label-efficient calibration
   </Card>
   <Card title="Streaming Inference" icon="activity" href="/python-sdk/streaming-inference">
-    Real-time BCI with chunk-by-chunk processing
+    Chunk-by-chunk real-time processing
   </Card>
   <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">
-    Complete EEG preprocessing with MNE-Python
+    Epochs → features or frozen encoder
   </Card>
-</CardGroup>
-
-## Common Patterns
-
-### Motor Imagery BCI
-
-```python
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from nimbus_bci import NimbusLDA
-
-# Complete pipeline
-pipe = make_pipeline(
-    StandardScaler(),
-    NimbusLDA(mu_scale=3.0)
-)
-
-# Train on CSP features
-pipe.fit(csp_features, labels)
-
-# Real-time prediction
-prediction = pipe.predict(new_trial.reshape(1, -1))[0]
-```
-
-### P300 Speller
-
-```python
-from nimbus_bci import NimbusQDA
-
-# QDA often works well for P300 (overlapping distributions)
-clf = NimbusQDA()
-clf.fit(erp_features, labels)  # 0=non-target, 1=target
-
-# Predict with confidence
-probs = clf.predict_proba(new_erp_features)
-high_confidence = probs[:, 1] > 0.8  # Target probability > 80%
-```
-
-### Adaptive BCI
-
-```python
-from nimbus_bci import NimbusLDA
-
-# Initial training
-clf = NimbusLDA()
-clf.fit(X_calibration, y_calibration)
-
-# During use: adapt to user
-for trial in online_session:
-    trial_features = trial.features.reshape(1, -1)
-    prediction = clf.predict(trial_features)[0]
-    
-    # Get feedback (e.g., from user or task)
-    true_label = get_feedback()
-    
-    # Update model
-    clf.partial_fit(trial_features, [true_label])
-```
+  <Card title="sklearn Integration" icon="code" href="/python-sdk/sklearn-integration">
+    Pipelines, CV, and GridSearch
+  </Card>
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
+    Full symbol reference
+  </Card>
+</Columns>
 
 ## Quickstart FAQ
 
 <AccordionGroup>
   <Accordion title="Can I use nimbus-bci with raw EEG?" icon="help-circle">
-    Not directly. `nimbus-bci` expects preprocessed features (for example CSP, bandpower, or ERP features). See [Preprocessing Requirements](/inference-configuration/preprocessing-requirements).
+    Not directly. Expect embeddings or preprocessed features (CSP, bandpower, ERP). See [Preprocessing Requirements](/inference-configuration/preprocessing-requirements).
   </Accordion>
+
   <Accordion title="Which classifier should I start with?" icon="brain">
-    Start with `NimbusLDA` for fast baselines, especially motor imagery. Try `NimbusQDA` for overlapping distributions (such as P300), and `NimbusSTS` for non-stationary sessions.
+    Start with `NimbusLDA` (default Personalizer head). Try `NimbusQDA` for overlapping distributions, and `NimbusSTS` for non-stationary sessions.
   </Accordion>
-  <Accordion title="What should I do after this quickstart?" icon="arrow-right">
-    Continue with [sklearn Integration](/python-sdk/sklearn-integration), [MNE-Python Integration](/python-sdk/mne-integration), and [Streaming Inference](/python-sdk/streaming-inference).
-  </Accordion>
-</AccordionGroup>
 
-## Troubleshooting
-
-<AccordionGroup>
-  <Accordion title="Shape Mismatch Errors" icon="alert-triangle">
-    Ensure your data has the correct shape:
-    - For `fit()` and `predict()`: `(n_samples, n_features)`
-    - For `BCIData`: `(n_features, n_samples, n_trials)`
-    
-    Use `reshape()` or transpose as needed.
-  </Accordion>
-  
-  <Accordion title="Poor Performance" icon="chart-line">
-    Try these improvements:
-    - Normalize features with `estimate_normalization_params()`
-    - Tune hyperparameters with `GridSearchCV`
-    - Use appropriate model (LDA for MI, QDA for P300)
-    - Check preprocessing quality with `diagnose_preprocessing()`
-  </Accordion>
-  
-  <Accordion title="Slow Inference" icon="clock">
-    For faster inference:
-    - Use batch prediction instead of single samples
-    - Install `nimbus-bci[softmax]` only if you need the optional JAX-based Softmax model
-    - Consider using NimbusLDA (fastest) if appropriate
+  <Accordion title="Where do Riemannian pipelines live?" icon="code">
+    Optional extra: `pip install nimbus-bci[riemann]`, then `make_riemann_nimbus_pipeline(...)`. Documented under [sklearn Integration](/python-sdk/sklearn-integration) and the API reference.
   </Accordion>
 </AccordionGroup>
 
 ## Support
 
-Need help?
-
-- **Email**: hello@nimbusbci.com
+- **Email**: [hello@nimbusbci.com](mailto:hello@nimbusbci.com)
 - **GitHub**: [github.com/nimbusbci/nimbuspysdk](https://github.com/nimbusbci/nimbuspysdk)
-- **Documentation**: Browse our comprehensive guides
-
----
-
-Congratulations! You've learned the basics of nimbus-bci. Explore the [API Reference](/python-sdk/api-reference) for more advanced features.

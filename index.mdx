@@ -15,9 +15,9 @@ Nimbus owns the personalization layer: wrap any frozen trunk that emits `encode(
   style={{ width: '100%', borderRadius: 12, marginTop: 16, marginBottom: 8 }}
 />
 
-## Start Here
+## Start here
 
-<CardGroup cols={3}>
+<Columns cols={3}>
   <Card title="Personalizer & Middleware" icon="layers" href="/personalizer/overview">
     Encoder contract: `wrap` → `Personalizer` → `BrainState`.
   </Card>
@@ -27,11 +27,11 @@ Nimbus owns the personalization layer: wrap any frozen trunk that emits `encode(
   <Card title="Julia SDK" icon="code" href="/julia-sdk/quickstart">
     RxInfer-backed workflows with `NimbusSDK.jl`.
   </Card>
-</CardGroup>
+</Columns>
 
 ## Why Nimbus
 
-<CardGroup cols={2}>
+<Columns cols={2}>
   <Card title="Why Bayesian BCI Inference" icon="scale" href="/core-concepts/why-bayesian-bci">
     Compare classical LDA, SVM, and deep learning with Nimbus — including ~10× faster online updates.
   </Card>
@@ -47,7 +47,7 @@ Nimbus owns the personalization layer: wrap any frozen trunk that emits `encode(
   <Card title="Production Guardrails" icon="check" href="/inference-configuration/error-handling">
     Validation, quality gates, diagnostics, and deployment patterns.
   </Card>
-</CardGroup>
+</Columns>
 
 ## Heads (used by Personalizer)
 
@@ -75,13 +75,13 @@ EEG → preprocessing (CSP / bandpower / Riemann) → Nimbus head → confidence
 
 Nimbus expects embeddings or preprocessed features — not raw EEG. Start with [Personalizer & Middleware](/personalizer/overview) for the encoder contract, or [Preprocessing Requirements](/inference-configuration/preprocessing-requirements) for classical CSP / bandpower / ERP.
 
-## Documentation Map
+## Documentation map
 
-<CardGroup cols={2}>
+<Columns cols={2}>
   <Card title="Personalizer & Middleware" icon="layers" href="/personalizer/overview">
     Encoder contract and BrainState app surface.
   </Card>
-  <Card title="Installation And Quickstarts" icon="rocket" href="/quickstart">
+  <Card title="Installation and quickstarts" icon="rocket" href="/quickstart">
     Choose Python or Julia and run first inference.
   </Card>
   <Card title="Heads & Models" icon="brain" href="/model-specification">
@@ -90,9 +90,9 @@ Nimbus expects embeddings or preprocessed features — not raw EEG. Start with [
   <Card title="Examples" icon="play" href="/examples/basic-examples">
     Compact recipes and higher-level application patterns.
   </Card>
-</CardGroup>
+</Columns>
 
-## Common Questions
+## Common questions
 
 <AccordionGroup>
   <Accordion title="Do I need an API key?" icon="key">
@@ -106,10 +106,16 @@ Nimbus expects embeddings or preprocessed features — not raw EEG. Start with [
   </Accordion>
 </AccordionGroup>
 
-## Next Read
+## Next read
 
-<CardGroup cols={3}>
-  <Card title="Personalizer" icon="layers" href="/personalizer/overview" />
-  <Card title="Python Quickstart" icon="python" href="/python-sdk/quickstart" />
-  <Card title="Julia Quickstart" icon="code" href="/julia-sdk/quickstart" />
-</CardGroup>
+<Columns cols={3}>
+  <Card title="Personalizer" icon="layers" href="/personalizer/overview">
+    Product wedge overview
+  </Card>
+  <Card title="Python Quickstart" icon="python" href="/python-sdk/quickstart">
+    First Personalizer in minutes
+  </Card>
+  <Card title="Julia Quickstart" icon="code" href="/julia-sdk/quickstart">
+    Julia SDK first steps
+  </Card>
+</Columns>

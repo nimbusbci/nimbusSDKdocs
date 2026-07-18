@@ -4,8 +4,8 @@
   "name": "Nimbus",
   "version": "2.1.0",
   "colors": {
-    "primary": "#FFD700",
-    "light": "#FFFF66",
+    "primary": "#8B6914",
+    "light": "#FFE066",
     "dark": "#B8860B"
   },
   "modeToggle": {
@@ -33,13 +33,13 @@
     },
     {
       "name": "Changelog",
-      "url": "https://github.com/nimbusbci/NimbusSDK.jl/releases"
+      "url": "https://github.com/nimbusbci/nimbuspysdk/releases"
     }
   ],
   "tabs": [
     {
       "name": "Python SDK",
-      "url": "personalizer/overview"
+      "url": "python-sdk/introduction"
     },
     {
       "name": "Julia SDK",
@@ -127,7 +127,12 @@
         "pages": [
           "julia-sdk/quickstart",
           "julia-sdk/api-reference",
-          "julia-sdk/streaming-inference",
+          "julia-sdk/streaming-inference"
+        ]
+      },
+      {
+        "group": "Cloud API",
+        "pages": [
           "cloud-api/introduction",
           "cloud-api/authentication",
           "cloud-api/inference-endpoints"

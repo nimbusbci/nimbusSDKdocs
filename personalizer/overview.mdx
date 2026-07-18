@@ -5,23 +5,21 @@ keywords: ["Personalizer", "middleware", "BrainState", "frozen encoder", "BCI pe
 icon: "layers"
 ---
 
-# Personalizer overview
-
 Nimbus middleware is the **product wedge**: a Bayesian personalization head for **frozen neural / foundation embeddings**. Encoders stay external. Apps consume thin `BrainState` outputs.
 
 **One-liner:** anything that maps trials to embeddings plugs in; Nimbus owns personalization, uncertainty gating, and cheap online updates — not the trunk.
 
 <Tip>
-**Product takeaway (Paper 1b):** ship one Personalizer; treat fine-tune as a **priced escape hatch**, not the default integration path. Use the head where embedding capacity exists; stay cal-only when clean already wins.
+  **Product takeaway (Paper 1b):** ship one Personalizer; treat fine-tune as a **priced escape hatch**, not the default integration path. Use the head where embedding capacity exists; stay cal-only when clean already wins.
 </Tip>
 
 ![One API across many trunks: frozen trunk epochs to embeddings, Personalizer Bayesian head, app state intent + uncertainty](/images/personalizer-api.png)
 
-*One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1b).*
+_One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1b)._
 
 ![Core: L0 / Bayesian head / linear probe / full FT (severe · n=40)](/images/personalizer-ft-trunks.png)
 
-*Why the hatch stays priced: across classical trunks, stream Personalizer (L1) recovers most of the L0→L3 gain and usually beats a matched linear probe — details on [Evidence](/personalizer/evidence).*
+_Why the hatch stays priced: across classical trunks, stream Personalizer (L1) recovers most of the L0→L3 gain and usually beats a matched linear probe — details on [Evidence](/personalizer/evidence)._
 
 ## Ladder legend (plain language)
 
@@ -38,12 +36,12 @@ Blue `rec %` on the figure = how much of the **L0→L3 accuracy gain** L1 recove
 How the Paper 1 / 1b numbers were produced (datasets, bandpass, session split, synthetic stress): [Evidence → How the experiments work](/personalizer/evidence#how-the-experiments-work-data-flow).
 
 <Info>
-Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encoder=None)` or the standalone heads (`NimbusLDA`, …) documented under [Models](/model-specification).
+  Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encoder=None)` or the standalone heads (`NimbusLDA`, …) documented under [Models](/model-specification).
 </Info>
 
-## Start Here
+## Start here
 
-<CardGroup cols={2}>
+<Columns cols={2}>
   <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
     `wrap` → Personalizer → save/load rules.
   </Card>
@@ -56,7 +54,7 @@ Classical CSP / bandpower / Riemann features still work. Use `Personalizer(encod
   <Card title="Python Quickstart" icon="rocket" href="/python-sdk/quickstart">
     Fit a Personalizer in a few minutes.
   </Card>
-</CardGroup>
+</Columns>
 
 ## Minimal example
 
@@ -86,16 +84,27 @@ if dec.should_adapt:
 # state.extras.update(dec.to_extras())
 ```
 
-   Policy: stay on the current head when clean; stream-update (`partial_fit`) when shift clears `tau`; full fine-tune stays a manual escape hatch. See [Evidence](/personalizer/evidence).
+Policy: stay on the current head when clean; stream-update (`partial_fit`) when shift clears `tau`; full fine-tune stays a manual escape hatch. See [Evidence](/personalizer/evidence).
+
 2. **Trial gate (different signal)** — `preset="research"` / `"consumer"`; inspect `BrainState.rejected`, `need_more_data`, `uncertainty`. See [BrainState](/personalizer/brain-state).
+
 3. **Head stability** — after online updates, use `calibration_sufficient` on an unlabeled pool.
+
 4. **Encoder swap** — freeze trunk; match `embedding_dim`; never pass logits as embeddings; keep `model_id` consistent across `save` / `load`. See [Encoder contract](/personalizer/encoder-contract).
 
-## Next Read
+## Next read
 
-<CardGroup cols={2}>
-  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract" />
-  <Card title="BrainState" icon="brain" href="/personalizer/brain-state" />
-  <Card title="API Reference" icon="book" href="/python-sdk/api-reference#middleware" />
-  <Card title="Heads / Models" icon="box" href="/model-specification" />
-</CardGroup>
+<Columns cols={2}>
+  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
+    Wrap rules and save/load.
+  </Card>
+  <Card title="BrainState" icon="brain" href="/personalizer/brain-state">
+    App-facing intents and presets.
+  </Card>
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference#middleware">
+    Personalizer and middleware symbols.
+  </Card>
+  <Card title="Heads / Models" icon="box" href="/model-specification">
+    LDA, QDA, Softmax, STS.
+  </Card>
+</Columns>

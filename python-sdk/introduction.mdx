@@ -5,13 +5,11 @@ keywords: ["Python SDK", "nimbus-bci", "Personalizer", "BrainState", "Python BCI
 icon: "python"
 ---
 
-# Python SDK
-
 The **nimbus-bci** Python library is a Bayesian personalization head for frozen neural EEG embeddings — and sklearn-compatible classifiers for classical feature pipelines. Wrap any trunk that emits `encode(X) → Z`, adapt online with `Personalizer`, and ship apps on `BrainState`. Optional extras add `NimbusSoftmax` via JAX (`pip install nimbus-bci[softmax]`) and pyRiemann feature pipelines (`pip install nimbus-bci[riemann]`).
 
-## Start Here
+## Start here
 
-<CardGroup cols={3}>
+<Columns cols={3}>
   <Card title="Install nimbus-bci" icon="download" href="/python-sdk/installation">
     Install and verify your Python SDK environment.
   </Card>
@@ -21,7 +19,7 @@ The **nimbus-bci** Python library is a Bayesian personalization head for frozen 
   <Card title="Run Quickstart" icon="rocket" href="/python-sdk/quickstart">
     Fit your first Personalizer in minutes.
   </Card>
-</CardGroup>
+</Columns>
 
 ## Overview
 
@@ -35,9 +33,9 @@ pip install nimbus-bci
 **Product wedge:** `wrap` → `Personalizer` → `BrainState`. Also: `CalibrationSession` for active learning, and `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)` for pyRiemann + Nimbus heads. See [Personalizer & Middleware](/personalizer/overview) and [Active Learning](/python-sdk/active-learning).
 </Note>
 
-## Key Features
+## Key features
 
-<CardGroup cols={2}>
+<Columns cols={2}>
   <Card title="Personalizer Middleware" icon="layers" href="/personalizer/overview">
     Plug any frozen trunk; personalize online; ship `BrainState` to apps.
   </Card>
@@ -48,7 +46,7 @@ pip install nimbus-bci
     Real-time chunk-by-chunk processing with optional BrainState bridges.
   </Card>
   <Card title="MNE Integration" icon="brain">
-    Seamless integration with MNE-Python for EEG preprocessing and feature extraction.
+    Works with MNE-Python for EEG preprocessing and feature extraction.
   </Card>
   <Card title="Riemannian Features" icon="code">
     Optional pyRiemann covariance/tangent feature pipelines feeding Nimbus heads.
@@ -63,9 +61,9 @@ pip install nimbus-bci
     Rank unlabeled trials, request labels only when useful, and stop when the posterior stabilizes.
   </Card>
   <Card title="Fully Local" icon="lock">
-    No API keys required. All processing happens on your machine for maximum privacy.
+    No API keys required. All processing happens on your machine.
   </Card>
-</CardGroup>
+</Columns>
 
 ## Quick Example
 
@@ -131,27 +129,27 @@ Both SDKs implement the same Bayesian models but with different design philosoph
 | **Performance** | Fast local Python implementation; optional JAX Softmax | Fastest (native Julia) |
 | **API Key** | Not required | Required |
 | **Use Case** | Production ML pipelines | Research, custom models |
-| **License** | Proprietary (free evaluation) | Commercial tiers |
+| **License** | Proprietary (Non-Commercial free + paid Commercial) | Commercial tiers |
 
-### When to Use Python SDK
+### When to use the Python SDK
 
 Choose the Python SDK if you:
-<br/>
-✅ Work primarily in Python<br/>
-✅ Use sklearn pipelines and MNE-Python<br/>
-✅ Want immediate installation without API keys<br/>
-✅ Need sklearn-compatible API for easy integration<br/>
-✅ Prefer fully local processing
 
-### When to Use Julia SDK
+- Work primarily in Python
+- Use sklearn pipelines and MNE-Python
+- Want installation without API keys
+- Need a sklearn-compatible API
+- Prefer fully local processing
+
+### When to use the Julia SDK
 
 Choose the Julia SDK if you:
-<br/>
-✅ Need maximum performance (native Julia)<br/>
-✅ Want to build custom Bayesian models<br/>
-✅ Work with RxInfer.jl ecosystem<br/>
-✅ Need pre-trained model distribution<br/>
-✅ Require enterprise support
+
+- Need native Julia performance
+- Want to build custom Bayesian models
+- Work with the RxInfer.jl ecosystem
+- Need pre-trained model distribution
+- Require enterprise support
 
 ## Architecture
 
@@ -176,9 +174,9 @@ EEG → MNE / CSP / Riemann → Nimbus head → Your Application
 - **sklearn Compatible**: Heads work with existing ML workflows
 - **Uncertainty Aware**: Full Bayesian posterior distributions
 
-## Use Cases
+## Use cases
 
-<CardGroup cols={2}>
+<Columns cols={2}>
   <Card title="Frozen Encoder Personalization" icon="layers">
     Plug EEGNet / BrainDecode / partner trunks into Personalizer
   </Card>
@@ -191,7 +189,7 @@ EEG → MNE / CSP / Riemann → Nimbus head → Your Application
   <Card title="Real-time Neurofeedback" icon="activity">
     Streaming inference for live brain state monitoring
   </Card>
-</CardGroup>
+</Columns>
 
 ## What's Included
 
@@ -243,9 +241,9 @@ The `nimbus-bci` package provides:
 **Optional Riemannian Features:**
 - `make_riemann_nimbus_pipeline()` - Build an EEG-epoch pipeline from pyRiemann covariance/tangent transforms to a Nimbus classifier head
 
-## Next Read
+## Next read
 
-<CardGroup cols={2}>
+<Columns cols={2}>
   <Card title="Installation" icon="download" href="/python-sdk/installation">
     Install nimbus-bci and verify your setup
   </Card>
@@ -264,20 +262,16 @@ The `nimbus-bci` package provides:
   <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">
     Use nimbus-bci with MNE-Python
   </Card>
-</CardGroup>
+</Columns>
 
 ## Support
 
-Need help? We're here for you:
-
-- **Email**: hello@nimbusbci.com
-- **Documentation**: Browse our comprehensive guides
+- **Email**: [hello@nimbusbci.com](mailto:hello@nimbusbci.com)
 - **GitHub**: [github.com/nimbusbci/nimbuspysdk](https://github.com/nimbusbci/nimbuspysdk)
-- **Examples**: Check out working code samples in the package
 
 ---
 
-Ready to get started? Head to the [Installation Guide](/python-sdk/installation) to install nimbus-bci.
+Ready to get started? Head to the [Installation Guide](/python-sdk/installation).
 
 <script
   type="application/ld+json"
