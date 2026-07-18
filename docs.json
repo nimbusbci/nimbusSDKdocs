@@ -61,13 +61,7 @@
           "personalizer/overview",
           "personalizer/encoder-contract",
           "personalizer/brain-state",
-          {
-            "group": "Evidence",
-            "expanded": false,
-            "pages": [
-              "personalizer/evidence"
-            ]
-          }
+          "personalizer/evidence"
         ]
       },
       {
