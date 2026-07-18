@@ -5,15 +5,13 @@ keywords: ["streaming inference", "chunk processing", "temporal aggregation", "s
 icon: "play"
 ---
 
-# Streaming Inference Configuration
-
-This page is the cross-SDK configuration overview for streaming inference. It explains the shared concepts: when to stream, how to choose chunk sizes, and how to aggregate chunk predictions.
+This page is the cross-SDK configuration overview for streaming inference: when to stream, chunk sizes, aggregation policy, and quality gates.
 
 <Note>
-For implementation-specific APIs, use the SDK pages:
-- **Python**: [Python Streaming Inference](/python-sdk/streaming-inference) documents `StreamingSession`, `StreamingSessionSTS`, and the `BrainState` bridge.
-- **Python apps on frozen encoders**: prefer [Personalizer & Middleware](/personalizer/overview) for app-facing decisions.
-- **Julia**: [Julia Streaming Inference](/julia-sdk/streaming-inference) documents `init_streaming`, `process_chunk`, and `finalize_trial`.
+  For implementation APIs:
+  - **Python**: [Python Streaming Inference](/python-sdk/streaming-inference) — `StreamingSession`, `StreamingSessionSTS`, BrainState bridge
+  - **Frozen-encoder apps**: [Personalizer](/personalizer/overview) for app-facing decisions
+  - **Julia**: [Julia Streaming Inference](/julia-sdk/streaming-inference)
 </Note>
 
 ## Streaming vs Batch
@@ -54,13 +52,13 @@ Streaming produces one posterior per chunk. Trial-level decisions combine those 
 
 | Method | Use when |
 | --- | --- |
-| `weighted_vote` | You want confidence-weighted decisions across chunks |
-| `posterior_mean` | You want smooth posterior averaging across chunks |
-| `max_confidence` | You trust the single most confident chunk |
-| `unanimous` | You need conservative decisions only when chunks agree |
+| `weighted_vote` | Default — confidence-weighted decisions across chunks |
+| `majority_vote` | Equal weight per chunk |
+| `posterior_mean` | Smooth posterior averaging across chunks |
+| `max_confidence` | Trust the single most confident chunk |
 
 <Tip>
-Use `weighted_vote` as the default. Switch to `posterior_mean` when you want smoother probabilities, or `max_confidence` when the task has short high-signal windows.
+  Start with `weighted_vote`. Use `posterior_mean` for smoother probabilities, or `max_confidence` when the task has short high-signal windows.
 </Tip>
 
 ## Quality Gates
@@ -75,19 +73,19 @@ Streaming systems should monitor:
 
 For Python rejection and quality APIs, see [Python SDK API Reference](/python-sdk/api-reference). For end-to-end real-time setup, see [Real-Time BCI Setup](/inference-configuration/real-time-setup).
 
-## Next Read
+## Next read
 
-<CardGroup cols={2}>
+<Columns cols={2}>
   <Card title="Python Streaming Inference" icon="activity" href="/python-sdk/streaming-inference">
-    Python `StreamingSession` examples and STS state handling.
+    Python `StreamingSession` API and STS state handling
   </Card>
   <Card title="Julia Streaming Inference" icon="rss" href="/julia-sdk/streaming-inference">
-    Julia streaming API for local chunk processing.
+    Julia streaming API for local chunk processing
   </Card>
   <Card title="Real-Time BCI Setup" icon="settings" href="/inference-configuration/real-time-setup">
-    Hardware, LSL, BrainFlow, and acquisition-loop guidance.
+    Hardware, LSL, BrainFlow, and acquisition loops
   </Card>
   <Card title="Batch Processing" icon="list" href="/inference-configuration/batch-processing">
-    Offline trial processing and diagnostics.
+    Offline trial processing and diagnostics
   </Card>
-</CardGroup>
+</Columns>
