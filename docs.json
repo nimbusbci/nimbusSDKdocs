@@ -33,7 +33,7 @@
     },
     {
       "name": "Changelog",
-      "url": "https://github.com/nimbusbci/nimbuspysdk/releases"
+      "url": "https://pypi.org/project/nimbus-bci/#history"
     }
   ],
   "tabs": [
@@ -246,7 +246,7 @@
           },
           {
             "label": "Changelog",
-            "href": "https://github.com/nimbusbci/nimbuspysdk/releases"
+            "href": "https://pypi.org/project/nimbus-bci/#history"
           }
         ]
       },
