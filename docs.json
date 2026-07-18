@@ -61,13 +61,8 @@
           "personalizer/overview",
           "personalizer/encoder-contract",
           "personalizer/brain-state",
+          "python-sdk/active-learning",
           "personalizer/evidence"
-        ]
-      },
-      {
-        "group": "Calibration & adaptation",
-        "pages": [
-          "python-sdk/active-learning"
         ]
       },
       {
