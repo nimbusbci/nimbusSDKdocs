@@ -1,25 +1,23 @@
 ---
 title: "Advanced Applications"
-description: "Advanced Nimbus BCI patterns for cross-subject training, hybrid systems, adaptive learning, multi-session experiments, and robust deployment."
-keywords: ["advanced applications", "BCI applications", "cross-subject", "adaptive BCI", "hybrid BCI", "multi-session", "NimbusSTS"]
+description: "Advanced Nimbus BCI patterns for Personalizer personalization, cross-subject training, hybrid systems, adaptive learning, multi-session experiments, and robust deployment."
+keywords: ["advanced applications", "BCI applications", "Personalizer", "cross-subject", "adaptive BCI", "hybrid BCI", "multi-session", "NimbusSTS"]
 icon: "rocket"
 ---
 
-# Advanced BCI Applications
-
-This page summarizes advanced BCI patterns without duplicating full SDK walkthroughs. Use it as an implementation checklist, then follow the linked SDK guides for exact APIs.
+Advanced BCI patterns without duplicating full SDK walkthroughs. Use this as an implementation checklist, then follow the linked guides for exact APIs.
 
 <Note>
-For frozen-encoder personalization, see [Personalizer & Middleware](/personalizer/overview). For Python-specific streaming and sklearn patterns, see [Python Streaming Inference](/python-sdk/streaming-inference) and [sklearn Integration](/python-sdk/sklearn-integration). For Julia streaming, see [Julia Streaming Inference](/julia-sdk/streaming-inference).
+  Frozen-encoder personalization: [Personalizer](/personalizer/overview). Python streaming / sklearn: [Python Streaming Inference](/python-sdk/streaming-inference), [sklearn Integration](/python-sdk/sklearn-integration). Julia streaming: [Julia Streaming Inference](/julia-sdk/streaming-inference).
 </Note>
 
 <Tip>
-When adapting a frozen neural trunk under deployment stress, prefer `Personalizer` + small labeled calibration over full fine-tuning. Classical cross-subject / multi-session recipes below still apply to feature pipelines and standalone heads.
+  Under deployment stress on a frozen trunk, prefer `Personalizer` + small labeled calibration over full fine-tuning. Classical cross-subject / multi-session recipes still apply to feature pipelines and standalone heads.
 </Tip>
 
-## Cross-Subject Training
+## Cross-subject training
 
-Cross-subject models combine calibration data from multiple users and then adapt to a new user with a small amount of labeled data. When a frozen trunk already transfers, prefer [`Personalizer`](/personalizer/overview) + small per-user calibration over full fine-tuning.
+Combine calibration data from multiple users, then personalize to a new user with a small labeled set. When a frozen trunk already transfers, prefer [`Personalizer`](/personalizer/overview) + per-user calibration over full fine-tuning.
 
 Core workflow:
 
@@ -32,20 +30,29 @@ Core workflow:
 <Tabs>
   <Tab title="Python">
 ```python
-from nimbus_bci import NimbusLDA, estimate_normalization_params, apply_normalization
+from nimbus_bci import Personalizer, wrap, estimate_normalization_params, apply_normalization
 from sklearn.model_selection import LeaveOneGroupOut
 
-X, y, groups = load_multi_subject_features()
+# Frozen trunk path — same encoder for all subjects
+enc = wrap(model.encode, model_id="shared-trunk", embedding_dim=64)
 
+X, y, groups = load_multi_subject_features()  # or embeddings from enc
 logo = LeaveOneGroupOut()
+
 for train_idx, test_idx in logo.split(X, y, groups):
     norm = estimate_normalization_params(X[train_idx], method="zscore")
     X_train = apply_normalization(X[train_idx], norm)
     X_test = apply_normalization(X[test_idx], norm)
 
-    clf = NimbusLDA(mu_scale=5.0)
-    clf.fit(X_train, y[train_idx])
-    score = clf.score(X_test, y[test_idx])
+    adapter = Personalizer(
+        encoder=None,  # features/embeddings already prepared
+        head="lda",
+        classes=["left", "right"],
+        preset="research",
+    )
+    adapter.fit(X_train, y[train_idx])
+    states = adapter.predict(X_test)
+    # score from labels when available; gate on states[*].confidence in apps
 ```
   </Tab>
   <Tab title="Julia">
@@ -76,23 +83,24 @@ Hybrid BCIs combine evidence from multiple paradigms, such as motor imagery plus
 
 Recommended pattern:
 
-- Keep one model per paradigm.
+- Keep one Personalizer / head per paradigm (or one frozen trunk + head).
 - Normalize each feature family separately.
 - Combine posterior probabilities or confidence-weighted decisions.
 - Log disagreement between paradigms for later review.
 
 ```python
-mi_proba = mi_model.predict_proba(mi_features)
-p300_proba = p300_model.predict_proba(p300_features)
+mi_states = mi_adapter.predict(mi_features)
+p300_states = p300_adapter.predict(p300_features)
 
+# Or combine head posteriors for research fusion
+mi_proba = mi_adapter.head.predict_proba(mi_features)
+p300_proba = p300_adapter.head.predict_proba(p300_features)
 combined = 0.6 * mi_proba + 0.4 * p300_proba
-prediction = combined.argmax(axis=1)
-confidence = combined.max(axis=1)
 ```
 
-Use conservative thresholds for high-stakes actions and require confirmation when paradigms disagree.
+Use conservative thresholds for high-stakes actions and require confirmation when paradigms disagree. App gates: [BrainState](/personalizer/brain-state).
 
-## Continuous Control
+## Continuous control
 
 Continuous control maps repeated predictions into a smoothed command stream.
 
@@ -100,42 +108,43 @@ Continuous control maps repeated predictions into a smoothed command stream.
 alpha = 0.3
 smoothed = None
 
-for posterior in posterior_stream:
-    command = posterior_to_velocity(posterior)
+for state in brain_state_stream:  # or posterior_stream from a head
+    command = posterior_to_velocity(state.posterior)
     smoothed = command if smoothed is None else alpha * command + (1 - alpha) * smoothed
-    send_control(smoothed)
+    if not state.rejected:
+        send_control(smoothed)
 ```
 
-Keep smoothing outside the classifier. The model should report uncertainty; the control layer should decide how aggressively to act on it.
+Keep smoothing outside the classifier. The model reports uncertainty; the control layer decides how aggressively to act.
 
-## Adaptive Learning
+## Adaptive learning
 
 Adaptation is useful when signal distributions drift during long sessions or across days.
 
-Choose the adaptation mechanism by feedback type:
-
-| Feedback Available | Pattern |
+| Signal | Pattern |
 | --- | --- |
-| Immediate labels | `partial_fit` or retraining on recent labeled trials. |
-| Delayed labels | Buffer predictions and update when labels arrive. |
-| No labels | Use active learning or calibration sufficiency checks. |
-| Non-stationary state | Use `NimbusSTS` in Python. |
+| Which trials to label | [Active Learning](/python-sdk/active-learning) / `CalibrationSession` |
+| Whether to stream-update | `Personalizer.recommend_adapt(..., tau=...)` then `partial_fit` |
+| Trial accept / reject | `BrainState.rejected` / `need_more_data` |
+| Non-stationary state | `NimbusSTS` / `StreamingSessionSTS` |
 
 ```python
-prediction = clf.predict(trial_features)
+dec = adapter.recommend_adapt(X_stream, tau=your_tau)
+if dec.should_adapt:
+    adapter.partial_fit(X_lab, y_lab)
 
-if label_available:
-    clf.partial_fit(trial_features, [true_label])
+states = adapter.predict(X_eval)
+# optional: state.extras.update(dec.to_extras())
 ```
 
-For Python active learning, see [Active Learning](/python-sdk/active-learning).
+See [Personalizer overview](/personalizer/overview) for adapt vs trial gates, and [Active Learning](/python-sdk/active-learning) for label selection.
 
-## Multi-Session Experiments
+## Multi-session experiments
 
 For experiments that span days or weeks:
 
-- Use a stable preprocessing pipeline and save its parameters.
-- Save normalization parameters with each trained model.
+- Use a stable preprocessing / encoder pipeline and save its parameters (`model_id`, `embedding_dim`).
+- Save normalization parameters with each trained profile (`Personalizer.save` / head artifacts).
 - Track hardware, montage, impedance, session time, and participant state.
 - Evaluate same-session and cross-session performance separately.
 - Compare adaptation against a no-adaptation baseline.
@@ -147,48 +156,50 @@ Suggested metadata to log:
   "subject_id": "S001",
   "session_id": "2026-04-25-AM",
   "paradigm": "motor_imagery",
-  "feature_type": "csp",
-  "model": "NimbusLDA",
+  "model_id": "partner-encoder",
+  "head": "lda",
+  "feature_type": "embedding",
   "normalization": "zscore",
   "sampling_rate": 250
 }
 ```
 
-## Robust Deployment
+## Robust deployment
 
-Production systems should separate personalization / classification, control, and safety policy:
+Production systems should separate personalization, control, and safety policy:
 
-1. Personalizer / head returns `BrainState` (or prediction, posterior, and confidence).
+1. Personalizer returns `BrainState` (intent, posterior, confidence, gates).
 2. Quality gate accepts, rejects, or asks for more data (`need_more_data`).
 3. Control layer maps accepted intents to actions.
 4. Monitoring logs confidence, latency, rejection rate, and drift.
 
-Use fallback behavior when confidence is low:
-
 ```python
-if confidence >= 0.9:
-    execute(prediction)
-elif confidence >= 0.7:
-    request_confirmation(prediction)
-else:
-    reject_trial("low confidence")
+for state in adapter.predict(X_online):
+    if state.rejected or state.need_more_data:
+        reject_or_ask_more(state)
+    elif state.confidence >= 0.9:
+        execute(state.intent)
+    elif state.confidence >= 0.7:
+        request_confirmation(state.intent)
+    else:
+        reject_or_ask_more(state)
 ```
 
-For detailed safeguards, see [Error Handling](/inference-configuration/error-handling).
+For detailed safeguards, see [Error Handling](/inference-configuration/error-handling) and [BrainState](/personalizer/brain-state).
 
-## Next Read
+## Next read
 
-<CardGroup cols={2}>
+<Columns cols={2}>
+  <Card title="Personalizer" icon="layers" href="/personalizer/overview">
+    Encoder contract, adapt helper, BrainState
+  </Card>
   <Card title="Basic Examples" icon="play" href="/examples/basic-examples">
-    Compact starter recipes.
+    Compact starter recipes
   </Card>
-  <Card title="Model Specification" icon="brain" href="/model-specification">
-    Compare models before choosing an architecture.
+  <Card title="Active Learning" icon="target" href="/python-sdk/active-learning">
+    Label-efficient calibration
   </Card>
-  <Card title="Python Active Learning" icon="lightbulb" href="/python-sdk/active-learning">
-    Query strategy and calibration stopping guidance.
+  <Card title="Streaming configuration" icon="activity" href="/inference-configuration/streaming-inference">
+    Chunking and aggregation decisions
   </Card>
-  <Card title="Streaming Configuration" icon="activity" href="/inference-configuration/streaming-inference">
-    Chunking and aggregation decisions.
-  </Card>
-</CardGroup>
+</Columns>

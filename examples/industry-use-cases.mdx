@@ -1,89 +1,91 @@
 ---
 title: "Industry Use Cases"
-description: "Real-world BCI use-case patterns across healthcare, assistive technology, research, and productivity using Nimbus Bayesian models."
-keywords: ["industry use cases", "BCI applications", "assistive technology", "neurofeedback", "research", "medical BCI", "real-world BCI"]
+description: "Real-world BCI use-case patterns across healthcare, assistive technology, research, and productivity using Nimbus Personalizer and Bayesian heads."
+keywords: ["industry use cases", "BCI applications", "Personalizer", "assistive technology", "neurofeedback", "research", "medical BCI", "real-world BCI"]
 icon: "briefcase"
 ---
 
-# Industry Use Cases
-
-This page maps common BCI product scenarios to Nimbus model and workflow choices. It is intentionally pattern-focused; use [Basic Examples](/examples/basic-examples) and [Advanced Applications](/examples/advanced-applications) for implementation recipes.
+Maps common BCI product scenarios to Nimbus Personalizer and head choices. Pattern-focused — use [Basic Examples](/examples/basic-examples) and [Advanced Applications](/examples/advanced-applications) for implementation recipes.
 
 <Tip>
-Shipping an app on a frozen partner / foundation encoder? Lead with [Personalizer → BrainState](/personalizer/overview). The head choices below (`NimbusLDA`, …) are what Personalizer uses under the hood (`head="lda"|...`) and also work standalone on classical features.
+  Shipping an app on a frozen partner / foundation encoder? Lead with [Personalizer → BrainState](/personalizer/overview). Heads (`NimbusLDA`, …) power Personalizer (`head="lda"|...`) and also work standalone on classical features.
 </Tip>
 
-## Healthcare And Rehabilitation
+## Healthcare and rehabilitation
 
 **Scenario:** motor imagery rehabilitation after stroke or injury.
 
 Recommended pattern:
 
-- Prefer Personalizer when a frozen trunk is available; otherwise use CSP features from motor imagery sessions.
-- Start with `NimbusLDA` / `Personalizer(head="lda")` for fast baseline feedback.
-- Use confidence thresholds / `BrainState.need_more_data` to decide whether feedback should be shown.
+- Prefer Personalizer when a frozen trunk is available; otherwise `Personalizer(encoder=None)` on CSP / bandpower features.
+- Start with `head="lda"` for fast baseline feedback.
+- Use `BrainState.need_more_data` / `rejected` to decide whether feedback should be shown.
 - Track session-level accuracy, confidence, fatigue indicators, and rejection rate.
 - Keep a clinician-visible audit trail for model version, calibration data, and session metrics.
 
 Key docs:
 
+- [Personalizer](/personalizer/overview)
+- [BrainState](/personalizer/brain-state)
 - [Real-Time BCI Setup](/inference-configuration/real-time-setup)
 - [Error Handling](/inference-configuration/error-handling)
-- [Bayesian LDA](/models/rxlda)
 
-## Assistive Communication
+## Assistive communication
 
 **Scenario:** P300 or event-related communication interfaces.
 
 Recommended pattern:
 
-- Use ERP amplitude features in a consistent post-stimulus window.
-- Prefer `NimbusQDA` when target and non-target distributions overlap.
-- Use posterior confidence to decide between accept, confirm, or repeat.
+- Use ERP amplitude features in a consistent post-stimulus window (or a frozen encoder that emits trial embeddings).
+- Prefer `Personalizer(encoder=None, head="qda")` when target and non-target distributions overlap.
+- Use `BrainState` confidence / rejection to decide between accept, confirm, or repeat.
 - Log rejected selections separately from incorrect selections.
 
 Key docs:
 
-- [Basic Examples: P300 Detection](/examples/basic-examples#p300-detection)
+- [Basic Examples: P300 detection](/examples/basic-examples#p300-detection)
+- [BrainState](/personalizer/brain-state)
 - [Bayesian QDA](/models/rxgmm)
 - [Feature Normalization](/inference-configuration/feature-normalization)
 
-## Wheelchair Or Device Control
+## Wheelchair or device control
 
 **Scenario:** safety-critical control from motor imagery or hybrid BCI commands.
 
 Recommended pattern:
 
-- Separate classifier output from command execution.
+- Separate Personalizer / head output (`BrainState`) from command execution.
 - Require higher confidence for movement than for UI navigation.
-- Add a confirmation state for ambiguous commands.
-- Stop the control loop after repeated low-quality chunks.
-- Monitor latency budget end to end: acquisition, preprocessing, inference, and action.
+- Add a confirmation state for ambiguous commands (`need_more_data` / mid confidence).
+- Stop the control loop after repeated rejected trials.
+- Monitor latency budget end to end: acquisition, preprocess / encode, inference, and action.
 
 Key docs:
 
+- [BrainState](/personalizer/brain-state)
 - [Streaming Inference Configuration](/inference-configuration/streaming-inference)
-- [Julia Streaming Inference](/julia-sdk/streaming-inference)
 - [Python Streaming Inference](/python-sdk/streaming-inference)
+- [Julia Streaming Inference](/julia-sdk/streaming-inference)
 
-## Neurofeedback And Training
+## Neurofeedback and training
 
 **Scenario:** live feedback for attention, motor imagery, or cognitive training.
 
 Recommended pattern:
 
-- Use streaming inference with smoothing in the application layer.
-- Keep the classifier probabilistic and expose confidence.
+- Prefer Personalizer for frozen trunks; use streaming sessions when chunk-level latency matters.
+- Keep outputs probabilistic and expose confidence / `BrainState`.
 - Adapt difficulty based on recent performance, not a single prediction.
-- Use `NimbusSTS` for Python workflows with long-session drift.
+- Use `recommend_adapt` + `partial_fit` for stream updates; `NimbusSTS` for long-session drift.
 
 Key docs:
 
+- [Personalizer overview](/personalizer/overview)
 - [Bayesian STS](/models/rxsts)
 - [Advanced Applications](/examples/advanced-applications)
 - [Probabilistic AI & Uncertainty](/core-concepts/probabilistic-ai)
 
-## Research Studies
+## Research studies
 
 **Scenario:** offline experiments, multi-subject evaluation, or model comparison.
 
@@ -91,52 +93,53 @@ Recommended pattern:
 
 - Use batch processing for reproducible offline analysis.
 - Evaluate with subject-wise or session-wise splits when studying generalization.
-- Save preprocessing and normalization parameters with every experiment.
-- Compare `NimbusLDA` against `NimbusQDA` before moving to more specialized models.
+- Save preprocessing / encoder ids and normalization parameters with every experiment.
+- Compare Personalizer heads (`lda` / `qda` / `softmax`) before moving to specialized models; report vs fine-tune when relevant ([Evidence](/personalizer/evidence)).
 
 Key docs:
 
+- [Personalizer Evidence](/personalizer/evidence)
 - [Batch Inference Configuration](/inference-configuration/batch-processing)
 - [Model Specification](/model-specification)
 - [External Preprocessing Integration](/development/preprocessing-integration)
 
-## Product Analytics
+## Product analytics
 
 For deployed BCI systems, monitor:
 
-| Metric | Why It Matters |
+| Metric | Why it matters |
 | --- | --- |
-| Accuracy | Measures task success when labels are available. |
-| Mean confidence | Tracks model certainty and signal quality. |
-| Rejection rate | Shows whether thresholds or preprocessing are too strict. |
-| Latency | Protects real-time user experience. |
-| Calibration age | Indicates when retraining may be needed. |
-| Drift indicators | Flags electrode, fatigue, or session changes. |
+| Accuracy | Task success when labels are available |
+| Mean confidence | Model certainty and signal quality |
+| Rejection / `need_more_data` rate | Whether gates or preprocessing are too strict |
+| Latency | Real-time user experience |
+| Calibration age | When retraining / recalibration may be needed |
+| Drift / adapt score | Electrode, fatigue, or session changes |
 
-## Choosing A Starting Point
+## Choosing a starting point
 
-| Use Case | First Model | Workflow |
+| Use case | First choice | Workflow |
 | --- | --- | --- |
-| Frozen encoder product | `Personalizer(head="lda")` | `wrap` → calibrate → `BrainState` gates. |
-| Motor imagery rehab | `NimbusLDA` / Personalizer | Streaming with confidence / `need_more_data` gates. |
-| P300 communication | `NimbusQDA` | Batch calibration, then confidence-gated selection. |
-| Long neurofeedback | `NimbusSTS` | Stateful Python streaming. |
-| Julia multinomial tasks | `NimbusProbit` | Julia training and streaming workflows. |
-| Cross-subject research | `NimbusLDA` baseline | Batch evaluation with strict normalization. |
+| Frozen encoder product | `Personalizer(head="lda")` | `wrap` → calibrate → `BrainState` gates |
+| Motor imagery rehab | Personalizer (`head="lda"`) | Streaming or batch + confidence gates |
+| P300 communication | Personalizer (`head="qda"`) | Batch calibration, then confidence-gated selection |
+| Long neurofeedback | Personalizer or `NimbusSTS` | Adapt helper and/or stateful streaming |
+| Julia multinomial tasks | `NimbusProbit` | Julia training and streaming |
+| Cross-subject research | Personalizer / `NimbusLDA` baseline | Batch evaluation with strict normalization |
 
-## Next Read
+## Next read
 
-<CardGroup cols={2}>
+<Columns cols={2}>
+  <Card title="Personalizer" icon="layers" href="/personalizer/overview">
+    Product wedge and BrainState
+  </Card>
   <Card title="Basic Examples" icon="play" href="/examples/basic-examples">
-    Compact recipes for common BCI tasks.
+    Compact recipes for common BCI tasks
   </Card>
   <Card title="Advanced Applications" icon="rocket" href="/examples/advanced-applications">
-    Cross-subject, hybrid, adaptive, and robust deployment patterns.
+    Cross-subject, hybrid, adaptive, and robust deployment
   </Card>
   <Card title="Model Specification" icon="brain" href="/model-specification">
-    Choose a model family for your use case.
+    Choose a head family for your use case
   </Card>
-  <Card title="Development Workflow" icon="code" href="/development">
-    Production project structure and guardrails.
-  </Card>
-</CardGroup>
+</Columns>

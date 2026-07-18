@@ -1,28 +1,25 @@
 ---
 title: "Basic Examples"
-description: "Compact Nimbus BCI recipes for motor imagery, P300, streaming, calibration, diagnostics, and model comparison."
-keywords: ["basic examples", "BCI examples", "motor imagery", "P300", "streaming", "calibration", "NimbusSDK", "nimbus-bci"]
+description: "Compact Nimbus BCI recipes for Personalizer, motor imagery, P300, streaming, calibration, diagnostics, and model comparison."
+keywords: ["basic examples", "BCI examples", "Personalizer", "BrainState", "motor imagery", "P300", "streaming", "calibration", "NimbusSDK", "nimbus-bci"]
 icon: "play"
 ---
 
-# Basic BCI Examples
-
-Use these recipes after installation and preprocessing are complete. They show the smallest useful pattern for each workflow and link to deeper SDK-specific guides instead of repeating full setup instructions.
+Use these recipes after installation and preprocessing are complete. Python examples lead with `Personalizer` → `BrainState`; classical heads remain available for research CV and Julia.
 
 <Note>
-- Python product path: [Personalizer & Middleware](/personalizer/overview)
-- Python quickstart: [Python SDK Quickstart](/python-sdk/quickstart)
-- Julia quickstart: [Julia SDK Quickstart](/julia-sdk/quickstart)
-- Feature preparation: [Preprocessing Requirements](/inference-configuration/preprocessing-requirements)
+  - Product path: [Personalizer](/personalizer/overview)
+  - Python quickstart: [Python SDK Quickstart](/python-sdk/quickstart)
+  - Julia quickstart: [Julia SDK Quickstart](/julia-sdk/quickstart)
+  - Feature preparation: [Preprocessing Requirements](/inference-configuration/preprocessing-requirements)
 </Note>
 
 ## Personalizer (frozen encoder)
 
-Product path: wrap any `encode(X) → Z`, personalize online, consume `BrainState`.
+Wrap any `encode(X) → Z`, personalize online, consume `BrainState`.
 
 ```python
 from nimbus_bci import Personalizer, wrap
-import numpy as np
 
 # Toy identity encoder — replace with partner / foundation encode(X) → Z
 enc = wrap(lambda X: X, model_id="demo-encoder", embedding_dim=16)
@@ -37,11 +34,11 @@ states = adapter.predict(X_test)
 print(states[0].intent, states[0].confidence, states[0].need_more_data)
 ```
 
-Already have CSP / bandpower features? Use `Personalizer(encoder=None)` or the classical heads below. Full contract: [Personalizer & Middleware](/personalizer/overview).
+Already have CSP / bandpower features? Use `Personalizer(encoder=None, head="lda"|...)` — same app surface. Full contract: [Personalizer](/personalizer/overview).
 
-## Motor Imagery
+## Motor imagery
 
-Motor imagery workflows usually use CSP or bandpower features from 8-30 Hz EEG — or embeddings from a frozen trunk.
+Motor imagery workflows usually use CSP or bandpower features from 8–30 Hz EEG — or embeddings from a frozen trunk.
 
 <Tabs>
   <Tab title="Python">
@@ -97,16 +94,16 @@ println("Accuracy: $(round(accuracy * 100, digits=1))%")
   </Tab>
 </Tabs>
 
-Use `NimbusLDA` first for a fast baseline. Try `NimbusQDA` when class covariance differs substantially or P300-like target/non-target distributions overlap.
+Default head is LDA (`Personalizer(head="lda")`). Try `head="qda"` when class covariances differ substantially.
 
-## P300 Detection
+## P300 detection
 
 P300 examples usually use ERP amplitude features from a post-stimulus time window.
 
 <Tabs>
   <Tab title="Python">
 ```python
-from nimbus_bci import NimbusQDA
+from nimbus_bci import Personalizer
 
 # epochs: target/non-target MNE epochs
 sfreq = epochs.info["sfreq"]
@@ -116,11 +113,15 @@ stop = int(0.5 * sfreq)
 X = epochs.get_data()[:, :, start:stop].mean(axis=2)
 y = epochs.events[:, 2]
 
-clf = NimbusQDA()
-clf.fit(X, y)
-
-proba = clf.predict_proba(X[:10])
-predictions = clf.predict(X[:10])
+adapter = Personalizer(
+    encoder=None,
+    head="qda",
+    classes=["nontarget", "target"],
+    preset="research",
+)
+adapter.fit(X, y)
+states = adapter.predict(X[:10])
+print(states[0].intent, states[0].confidence)
 ```
   </Tab>
   <Tab title="Julia">
@@ -148,12 +149,17 @@ results = predict_batch(model, data)
 
 ## Streaming
 
-Streaming uses short feature chunks and aggregates chunk predictions into a trial decision.
+Streaming uses short feature chunks and aggregates chunk predictions into a trial decision. Bridge to `BrainState` for apps.
 
 <Tabs>
   <Tab title="Python">
 ```python
-from nimbus_bci import NimbusLDA, StreamingSession, BCIMetadata
+from nimbus_bci import (
+    NimbusLDA,
+    StreamingSession,
+    brain_state_from_streaming_result,
+)
+from nimbus_bci.data import BCIMetadata
 
 clf = NimbusLDA().fit(X_train, y_train)
 
@@ -169,9 +175,12 @@ metadata = BCIMetadata(
 session = StreamingSession(clf.model_, metadata)
 
 for chunk in feature_stream:
-    chunk_result = session.process_chunk(chunk)
+    session.process_chunk(chunk)
 
 final = session.finalize_trial(method="weighted_vote")
+state = brain_state_from_streaming_result(final, classes=["left", "right"])
+print(state.intent, state.confidence, state.need_more_data)
+session.reset()
 ```
   </Tab>
   <Tab title="Julia">
@@ -187,9 +196,9 @@ final = finalize_trial(session; method=:weighted_vote)
   </Tab>
 </Tabs>
 
-For detailed streaming APIs, use [Python Streaming Inference](/python-sdk/streaming-inference), [Julia Streaming Inference](/julia-sdk/streaming-inference), and [Streaming Inference Configuration](/inference-configuration/streaming-inference).
+For frozen-encoder product apps, prefer [Personalizer](/personalizer/overview) (batch `predict` → `BrainState`) over a raw streaming session. API detail: [Python Streaming Inference](/python-sdk/streaming-inference), [Streaming inference configuration](/inference-configuration/streaming-inference).
 
-## Calibration And Normalization
+## Calibration and normalization
 
 Estimate normalization parameters from calibration or training data only, then reuse them for test and deployment data.
 
@@ -228,33 +237,39 @@ end
 println("Quality score: $(round(report.quality_score * 100, digits=1))%")
 ```
 
-For Python trial-level quality checks, see the [Python SDK API Reference](/python-sdk/api-reference#metrics).
+For Python trial-level quality checks, see the [Python SDK API Reference](/python-sdk/api-reference#metrics) and [BrainState](/personalizer/brain-state) gates.
 
-## Choosing A Model
+## Choosing a starting point
 
-| Model | Use First When | Notes |
+| Path | Use first when | Notes |
 | --- | --- | --- |
-| `NimbusLDA` | You need a fast baseline | Best default for many motor imagery workflows. |
-| `NimbusQDA` | Classes have different covariance | Often useful for P300 and overlapping distributions. |
-| `NimbusSoftmax` | Python, nonlinear class boundaries | Requires the optional softmax extra. |
-| `NimbusProbit` | Julia, multinomial regression | Best for Julia multinomial workflows. |
-| `NimbusSTS` | Python, non-stationary sessions | Tracks latent state over time. |
+| `Personalizer` + `wrap` | Frozen / foundation encoder | Product wedge → `BrainState` |
+| `Personalizer(encoder=None)` | Classical CSP / bandpower / ERP features | Same app surface; pick `head=` |
+| Standalone `NimbusLDA` / … | Research CV, sklearn pipelines | Heads power Personalizer under the hood |
+| Julia `NimbusLDA` / `NimbusQDA` | Julia SDK workflows | No Personalizer yet |
 
-For a full comparison, see [Model Specification](/model-specification).
+| Head | Typical use |
+| --- | --- |
+| `lda` | Fast motor-imagery baseline |
+| `qda` | Overlapping distributions (e.g. P300) |
+| `softmax` | Nonlinear multinomial (Python extra) |
+| STS / Probit | Long-session drift (Python) / Julia multinomial |
 
-## Next Read
+Full comparison: [Model Specification](/model-specification).
 
-<CardGroup cols={2}>
-  <Card title="Python SDK Quickstart" icon="python" href="/python-sdk/quickstart">
-    First Python workflow from install to inference.
+## Next read
+
+<Columns cols={2}>
+  <Card title="Personalizer" icon="layers" href="/personalizer/overview">
+    Encoder contract and BrainState
   </Card>
-  <Card title="Julia SDK Quickstart" icon="code" href="/julia-sdk/quickstart">
-    First Julia workflow with NimbusSDK.jl.
+  <Card title="Python SDK Quickstart" icon="python" href="/python-sdk/quickstart">
+    First Python workflow from install to inference
   </Card>
   <Card title="Advanced Applications" icon="rocket" href="/examples/advanced-applications">
-    Higher-level deployment patterns.
+    Higher-level deployment patterns
   </Card>
   <Card title="Error Handling" icon="shield" href="/inference-configuration/error-handling">
-    Production safeguards and failure modes.
+    Production safeguards and failure modes
   </Card>
-</CardGroup>
+</Columns>
