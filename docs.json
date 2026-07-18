@@ -234,6 +234,23 @@
     },
     "links": [
       {
+        "header": "Product",
+        "items": [
+          {
+            "label": "Website",
+            "href": "https://nimbusbci.com"
+          },
+          {
+            "label": "Python SDK",
+            "href": "/python-sdk/introduction"
+          },
+          {
+            "label": "Changelog",
+            "href": "https://github.com/nimbusbci/nimbuspysdk/releases"
+          }
+        ]
+      },
+      {
         "header": "Legal",
         "items": [
           {
