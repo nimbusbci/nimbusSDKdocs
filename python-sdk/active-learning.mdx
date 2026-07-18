@@ -5,13 +5,15 @@ keywords: ["active learning", "BCI calibration", "BALD", "label-efficient calibr
 icon: "target"
 ---
 
-# Active Learning
-
-Use active learning to collect labels for the trials that are most likely to improve your BCI model. The Python SDK exposes `CalibrationSession` for full calibration loops, plus stateless helpers for custom pool ranking, streaming label requests, and label-free stopping.
+Use active learning to collect labels for the trials that are most likely to improve your BCI model. The Python SDK exposes `CalibrationSession` for full calibration loops, plus helpers for pool ranking, streaming label requests, and label-free stopping.
 
 <Info>
-Active learning operates on **preprocessed feature rows** (or already-encoded embeddings), not raw EEG. Use arrays shaped `(n_trials, n_features)` for pools and `(n_features,)` or `(1, n_features)` for single streaming trials. With Personalizer, run AL on the head (`adapter.head`) or feed encoded pools into `partial_fit` — see [Personalizer & Middleware](/personalizer/overview).
+  Active learning answers **which trials to label**. That is different from `Personalizer.recommend_adapt` (whether to spend labels on stream `partial_fit`) and from `BrainState` trial rejection. See [Personalizer overview](/personalizer/overview) for the adapt helper.
 </Info>
+
+<Note>
+  Active learning operates on **preprocessed feature rows** (or already-encoded embeddings), not raw EEG. Use arrays shaped `(n_trials, n_features)` for pools and `(n_features,)` or `(1, n_features)` for single streaming trials. With Personalizer, run AL on the head (`adapter.head`) or feed encoded pools into `partial_fit`.
+</Note>
 
 ## With Personalizer
 

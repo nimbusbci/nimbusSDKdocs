@@ -5,13 +5,15 @@ keywords: ["streaming inference", "real-time BCI", "chunk processing", "Python S
 icon: "activity"
 ---
 
-# Streaming Inference
-
 Process EEG data in real-time with chunk-by-chunk inference for online BCI applications.
+
+<Note>
+  This page covers the **Python API** (`StreamingSession`, aggregation, BrainState bridges). For shared chunk-size and aggregation concepts across SDKs, see [Streaming inference configuration](/inference-configuration/streaming-inference).
+</Note>
 
 ## Overview
 
-Streaming inference allows you to process EEG data as it arrives, making predictions on partial trials before the full trial is complete. This is essential for real-time BCI applications where low latency is critical.
+Streaming inference lets you process EEG as it arrives and predict on partial trials before a full trial finishes — useful when latency matters.
 
 **Supported models:** `NimbusLDA`, `NimbusQDA`, `NimbusSoftmax`, and `NimbusSTS`.
 

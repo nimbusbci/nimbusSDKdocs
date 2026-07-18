@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "palm",
   "name": "Nimbus",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "colors": {
     "primary": "#8B6914",
     "light": "#FFE066",
@@ -49,19 +49,31 @@
   "navigation": {
     "groups": [
       {
-        "group": "Getting Started",
+        "group": "Getting started",
         "pages": [
           "index",
           "quickstart"
         ]
       },
       {
-        "group": "Personalizer & Middleware",
+        "group": "Personalizer",
         "pages": [
           "personalizer/overview",
           "personalizer/encoder-contract",
           "personalizer/brain-state",
-          "personalizer/evidence"
+          {
+            "group": "Evidence",
+            "expanded": false,
+            "pages": [
+              "personalizer/evidence"
+            ]
+          }
+        ]
+      },
+      {
+        "group": "Calibration & adaptation",
+        "pages": [
+          "python-sdk/active-learning"
         ]
       },
       {
@@ -70,34 +82,14 @@
           "python-sdk/introduction",
           "python-sdk/installation",
           "python-sdk/quickstart",
-          "python-sdk/api-reference",
-          "python-sdk/active-learning",
-          "python-sdk/streaming-inference",
           "python-sdk/mne-integration",
-          "python-sdk/sklearn-integration"
+          "python-sdk/sklearn-integration",
+          "python-sdk/streaming-inference",
+          "python-sdk/api-reference"
         ]
       },
       {
-        "group": "Core Concepts",
-        "pages": [
-          "core-concepts/why-bayesian-bci",
-          "core-concepts/probabilistic-ai",
-          "core-concepts/message-passing"
-        ]
-      },
-      {
-        "group": "Heads & Models",
-        "pages": [
-          "model-specification",
-          "models/rxlda",
-          "models/rxgmm",
-          "models/rxpolya",
-          "models/nimbusprobit",
-          "models/rxsts"
-        ]
-      },
-      {
-        "group": "Configuration & Setup",
+        "group": "Inference & pipelines",
         "pages": [
           "inference-configuration/preprocessing-requirements",
           "inference-configuration/feature-normalization",
@@ -108,18 +100,21 @@
         ]
       },
       {
-        "group": "Examples",
+        "group": "Heads & models",
         "pages": [
-          "examples/basic-examples",
-          "examples/advanced-applications",
-          "examples/industry-use-cases"
+          "model-specification",
+          "models/rxlda",
+          "models/rxgmm",
+          "models/rxpolya",
+          "models/nimbusprobit",
+          "models/rxsts"
         ]
       },
       {
-        "group": "Development",
+        "group": "Concepts",
         "pages": [
-          "development",
-          "development/preprocessing-integration"
+          "core-concepts/why-bayesian-bci",
+          "core-concepts/probabilistic-ai"
         ]
       },
       {
@@ -127,7 +122,8 @@
         "pages": [
           "julia-sdk/quickstart",
           "julia-sdk/api-reference",
-          "julia-sdk/streaming-inference"
+          "julia-sdk/streaming-inference",
+          "core-concepts/message-passing"
         ]
       },
       {
@@ -136,6 +132,16 @@
           "cloud-api/introduction",
           "cloud-api/authentication",
           "cloud-api/inference-endpoints"
+        ]
+      },
+      {
+        "group": "Examples",
+        "pages": [
+          "examples/basic-examples",
+          "examples/advanced-applications",
+          "examples/industry-use-cases",
+          "development",
+          "development/preprocessing-integration"
         ]
       }
     ]
