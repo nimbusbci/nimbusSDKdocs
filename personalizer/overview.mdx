@@ -10,12 +10,12 @@ Nimbus middleware is the **product wedge**: a Bayesian personalization head for 
 **One-liner:** anything that maps trials to embeddings plugs in; Nimbus owns personalization, uncertainty gating, and cheap online updates — not the trunk.
 
 <Tip>
-  **Product takeaway (Paper 1b):** ship one Personalizer; treat fine-tune as a **priced escape hatch**, not the default integration path. Use the head where embedding capacity exists; stay cal-only when clean already wins.
+  **Product takeaway (Paper 1):** ship one Personalizer; treat fine-tune as a **priced escape hatch**, not the default integration path. Use the head where embedding capacity exists; stay cal-only when clean already wins.
 </Tip>
 
 ![One API across many trunks: frozen trunk epochs to embeddings, Personalizer Bayesian head, app state intent + uncertainty](/images/personalizer-api.png)
 
-_One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1b)._
+_One Personalizer API across trunks — from the Universal Personalizer manuscript (Paper 1)._
 
 ![Core: L0 / Bayesian head / linear probe / full FT (severe · n=40)](/images/personalizer-ft-trunks.png)
 

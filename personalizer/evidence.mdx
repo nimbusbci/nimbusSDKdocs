@@ -9,12 +9,12 @@ icon: "chart-line"
 
 Figures and tables below come from two exploratory manuscripts:
 
-1. **Resource ladder** — *When Should a Deployed BCI Decoder Spend Adaptation Resources?* (Paper 1)
-2. **Universal Personalizer** — *One Personalizer Across Many Trunks* (Paper 1b)
+1. **Universal Personalizer** — *Universal BCI Personalization: One API for Frozen EEG Trunks and Foundation Models* (Paper 1)
+2. **Resource Ladder** — *When Should a Deployed BCI Decoder Spend Adaptation Resources? A Resource Ladder for Frozen Encoders* (Paper 1b)
 
 All numbers are **exploratory**, protocol-local, and locked to the evaluation suite CSVs. Do not treat them as suite-wide constants.
 
-**Headline (Paper 1b):** ship one Personalizer; treat fine-tune as a priced escape hatch. Use the head where capacity exists; stay cal-only when clean wins.
+**Headline (Paper 1):** ship one Personalizer; treat fine-tune as a priced escape hatch. Use the head where capacity exists; stay cal-only when clean wins.
 
 Labels **L0 / L1 / LP / L2 / L3** — see the [plain-language legend](/personalizer/overview#ladder-legend-plain-language). **Shipped path = L0/L1**; LP is a bench control; L2 is protocol/bench (affine); L3 is the FT hatch.
 
@@ -33,18 +33,18 @@ Before the numbers: this is the shared Paper 1 / 1b experimental pipeline.
 | **Sessions** | **Calibration** = first → **adaptation** = middle → **evaluation** = last |
 | **Encoder** | Train on clean calibration only, freeze, map trials to embeddings |
 | **Stress** | Optional synthetic **channel-mix** on concatenated adaptation + evaluation raw EEG (not on embeddings): mix toward a random channel permutation + signed bias at levels `{0, 0.25, 0.5, 0.75}`. Level 0 = no synthetic stress (natural session layout may still differ). Calibration stays clean |
-| **Adapt** | L0 calibration-only head (Paper 1b) / frozen trunk softmax (Paper 1); L1 online head updates (~40 labels, Shin ~20); linear probe = control; L2 affine map (bench); L3 warm-start fine-tune |
+| **Adapt** | L0 calibration-only head (Paper 1) / frozen trunk softmax (Paper 1b); L1 online head updates (~40 labels, Shin ~20); linear probe = control; L2 affine map (bench); L3 warm-start fine-tune |
 | **Score** | Evaluation accuracy + adaptation fit time under utility = accuracy − fit-time and label costs |
 
 Not claimed as covered by this stress: physical electrode displacement, SNR drop, or every clinical shift type — only controlled synthetic channel mixing.
 
 ## Core: L0 / Bayesian head / linear probe / full FT
 
-Main multi-trunk accuracy–cost block (Paper 1b): under the same transfer cells (severe channel-mix stress, n=40, CUDA), calibration-only Personalizer (L0), stream Personalizer (L1), a matched linear probe on the same frozen embeddings, and warm-start full fine-tune (L3).
+Main multi-trunk accuracy–cost block (Paper 1): under the same transfer cells (severe channel-mix stress, n=40, CUDA), calibration-only Personalizer (L0), stream Personalizer (L1), a matched linear probe on the same frozen embeddings, and warm-start full fine-tune (L3).
 
 ![Core: L0 / Bayesian head / linear probe / full FT (severe · n=40)](/images/personalizer-ft-trunks.png)
 
-*Paper 1b — top: L0 / L1 / linear probe / L3 accuracy; blue `rec` labels = (acc_L1 − acc_L0) / (acc_L3 − acc_L0), or “≥FT” when L1 matches or beats L3. Bottom: adapt fit wall (L0 stream wall = 0) with L3/L1 ratios.*
+*Paper 1 — top: L0 / L1 / linear probe / L3 accuracy; blue `rec` labels = (acc_L1 − acc_L0) / (acc_L3 − acc_L0), or “≥FT” when L1 matches or beats L3. Bottom: adapt fit wall (L0 stream wall = 0) with L3/L1 ratios.*
 
 | Dataset | Trunk | Acc L0 | Acc L1 | Acc LP | Acc L3 | Recovery | Wall L3/L1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -65,11 +65,11 @@ Recovery = (acc_L1 − acc_L0) / (acc_L3 − acc_L0). On most trunks the Bayesia
 
 ## Which head? (LDA vs QDA vs Softmax)
 
-The multi-trunk map locks **LDA** for comparability. On the EEGNet path, Paper 1b also compares QDA and Softmax under the same bake-off geometry (severe and clean, n=40).
+The multi-trunk map locks **LDA** for comparability. On the EEGNet path, Paper 1 also compares QDA and Softmax under the same bake-off geometry (severe and clean, n=40).
 
 ![EEGNet Personalizer head family: LDA vs QDA vs Softmax under severe shift](/images/personalizer-heads.png)
 
-*Paper 1b — top: accuracy (Δacc vs LDA). Bottom: adapt fit wall with mean utility labels.*
+*Paper 1 — top: accuracy (Δacc vs LDA). Bottom: adapt fit wall with mean utility labels.*
 
 | Dataset | Sev | Head | Acc | Wall (s) | ΔU vs LDA |
 | --- | --- | --- | --- | --- | --- |
@@ -103,7 +103,7 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
 
     ![Personalizer head across severities: cells with positive L1−L0 utility and per-dataset mean gain](/images/personalizer-severity-sweep.png)
 
-    *Paper 1b — mid shift already recovers; severe is a detailed slice, not the only supporting point. Kumar stays near zero (boundary).*
+    *Paper 1 — mid shift already recovers; severe is a detailed slice, not the only supporting point. Kumar stays near zero (boundary).*
 
     At severity 0.75, which ladder level wins by mean utility (L0 / L1 / **L2 protocol affine+head** — L2 is bench-only):
 
@@ -118,11 +118,11 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
   </Accordion>
 
   <Accordion title="Spotlight: EEGNet denser baselines" icon="flask">
-    Controlled bake-off on one classical reference trunk (BNCI primary, Paper 1). Under severe shift with n=40 labeled stream trials, the Bayesian head can **beat** full FT on BNCI in this protocol; Zhou is the honest softer boundary.
+    Controlled bake-off on one classical reference trunk (BNCI primary, Paper 1b). Under severe shift with n=40 labeled stream trials, the Bayesian head can **beat** full FT on BNCI in this protocol; Zhou is the honest softer boundary.
 
     ![BNCI2014-004 cost bake-off: Bayesian head accuracy vs adaptation fit time compared to frozen, linear probe, LoRA, last-layer FT, and full FT](/images/personalizer-cost.png)
 
-    *Paper 1 — BNCI2014-004, severity 0.75, n=40 (mean over 9 subjects).*
+    *Paper 1b — BNCI2014-004, severity 0.75, n=40 (mean over 9 subjects).*
 
     | Arm | Acc | ECE | Fit time (s) | Recovery vs full FT |
     | --- | --- | --- | --- | --- |
@@ -135,7 +135,7 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
 
     Recovery = Δacc / Δacc_fullFT (values > 1 mean the head beats FT). Treat head-beats-FT as **BNCI-primary** in this protocol, not a suite-wide constant. On Zhou2016 (supporting, 4 subjects): frozen 0.317 → head 0.462 → full FT 0.540 (~0.43× of FT gain at ~5.5× lower fit time).
 
-    Paper 1b EEGNet arm zoo (same denser grammar; bake-off walls ~5× ≠ ladder CUDA L3/L1 ~20–30×):
+    Paper 1 EEGNet arm zoo (same denser grammar; bake-off walls ~5× ≠ ladder CUDA L3/L1 ~20–30×):
 
     ![EEGNet denser baselines from the cost bake-off (severe · n=40)](/images/personalizer-ft.png)
 
@@ -150,7 +150,7 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
 
     ![REVE Personalizer versus short fine-tune: Δacc and adapt fit time on Zhou and Kumar](/images/personalizer-reve-ft.png)
 
-    *Paper 1b — REVE severe n=40; accuracy × price.*
+    *Paper 1 — REVE severe n=40; accuracy × price.*
 
     | Dataset | Acc frozen | Acc head | Acc LoRA | Acc last | Acc full | Wall LoRA/head | Wall full/head |
     | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -175,7 +175,7 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
 
     ![Transfer map for the Personalizer adaptation ladder across 18 trunk×dataset cells](/images/personalizer-transfer-map.png)
 
-    *Paper 1b — cal-only-when-clean transfers often (12/18); strict ordinal (clean→L0 and severe→L2) is conditional (5/18) — boundary, not the product headline.*
+    *Paper 1 — cal-only-when-clean transfers often (12/18); strict ordinal (clean→L0 and severe→L2) is conditional (5/18) — boundary, not the product headline.*
   </Accordion>
 </AccordionGroup>
 
