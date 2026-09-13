@@ -62,6 +62,8 @@
           "personalizer/encoder-contract",
           "personalizer/brain-state",
           "personalizer/paradigms",
+          "personalizer/transforms",
+          "personalizer/research-peft",
           "python-sdk/active-learning",
           "personalizer/evidence"
         ]
@@ -73,6 +75,7 @@
           "python-sdk/installation",
           "python-sdk/quickstart",
           "python-sdk/migration-0.6",
+          "python-sdk/changelog-0.6",
           "python-sdk/mne-integration",
           "python-sdk/sklearn-integration",
           "python-sdk/streaming-inference",

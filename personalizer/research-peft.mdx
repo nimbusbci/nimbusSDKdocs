@@ -1,0 +1,93 @@
+---
+title: "Research / PEFT"
+description: "Opt-in BaLoRA, LoRA/FiLM trunk arms, and research-only adaptation behind nimbus-bci[train]."
+sidebarTitle: "Research / PEFT"
+icon: "flask"
+keywords:
+  - "BaLoRA"
+  - "LoRA"
+  - "PEFT"
+  - "FiLM"
+  - "train extra"
+  - "adapt_pseudo"
+  - "research"
+---
+
+<Warning>
+  Everything on this page is an **opt-in research surface**. No certified accuracy claims. Production default remains frozen trunk + Bayesian head (`for_deployment`).
+</Warning>
+
+Install:
+
+```bash
+pip install nimbus-bci[train]   # torch >= 2.14
+```
+
+## BaLoRA + composed uncertainty
+
+Bayesian LoRA on the trunk with composed trunk+head BALD sampling:
+
+```python
+from nimbus_bci import Personalizer, Recipe, MCSamplingConfig
+
+# Auto-wraps a raw torch trunk (rank=4 default)
+p = Personalizer.for_balora(torch_model, ["left", "right"], rank=4)
+p.fit(X_cal, y_cal)
+# Escalate trunk adaptation when your protocol calls for it:
+# p.adapt_trunk(...)  # see API / AdaptArm registry
+
+# Or Recipe.BALORA_COMPOSED / MCSamplingConfig.balora() presets:
+# MCSamplingConfig.balora(n_trunk=8, n_head=32)
+# MCSamplingConfig.balora_fast() / .balora_standard()
+```
+
+`mc_samples=(n_trunk, n_head)` marginalises over the BaLoRA α-posterior and the Bayesian head.
+
+## Trunk-arm PEFT
+
+| Tool | Role |
+| --- | --- |
+| `wrap_lora` | LoRA on Linear + Conv2d |
+| FiLM rung | Feature-wise linear modulation arm |
+| `AdaptArm` registry | Named arms with measured cost estimates |
+| `Personalizer.for_lora(...)` | Convenience factory when the trunk already has / needs LoRA |
+
+```python
+from nimbus_bci.middleware.adapters.lora import wrap_lora
+from nimbus_bci import Personalizer, available_arms
+
+enc = wrap_lora(torch_model, ...)
+p = Personalizer.for_research(enc, ["left", "right"])
+print(available_arms())  # cost estimates for trainer arms
+```
+
+Trainer arms accept hyperparameter overrides. Prefer measuring cost on your hardware before comparing to head-only `partial_fit`.
+
+## Other research-only mechanisms
+
+| API | Role |
+| --- | --- |
+| `adapt_pseudo` | Gated self-training on an unlabeled stream |
+| `fit_tent` | Entropy minimization over trunk norm affine params |
+| `T3APrototypeChannel` | Optimization-free recalibration on verified labels |
+| `adapt_errp` | Soft-negative conjugate update from an external ErrP probability |
+| `fit_population` | Warm-start from pooled LOSO posteriors + prior-predictive gate |
+
+These ship for experimentation — confirmation-drift and protocol risks apply.
+
+## Next read
+
+<Columns cols={2}>
+  <Card title="Evidence" icon="chart-line" href="/personalizer/evidence">
+    When head-only beats FT on cost
+  </Card>
+  <Card title="Transforms" icon="sliders" href="/personalizer/transforms">
+    Embedding-space alignment
+  </Card>
+  <Card title="Migration to 0.6" icon="arrow-right" href="/python-sdk/migration-0.6">
+    Breaking changes and adoption map
+  </Card>
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
+    Personalizer methods and configs
+  </Card>
+</Columns>

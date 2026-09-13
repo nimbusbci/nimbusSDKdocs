@@ -1,0 +1,64 @@
+---
+title: "Changelog 0.6"
+description: "Release notes for nimbus-bci 0.6 — factories, profiles, paradigm recipes, breaking preset renames."
+sidebarTitle: "Changelog 0.6"
+icon: "scroll"
+keywords:
+  - "changelog"
+  - "0.6"
+  - "release notes"
+  - "nimbus-bci"
+---
+
+Public release notes for **nimbus-bci 0.6.0** (2026-09-13). The package ships a full `CHANGELOG.md` in the PyPI sdist; this page is the docs mirror for the product surface.
+
+Upgrading from 0.5? Start with [Migration to 0.6](/python-sdk/migration-0.6).
+
+## Highlights
+
+- Cheap online adaptation: head `partial_fit` ~**8–10×** vs sklearn batch refit; ~**22–131×** vs trunk retrain at matched n
+- Factories: `for_deployment`, `for_research`, `for_features`, `for_riemann`, `for_p300`, `for_balora`
+- Portable profiles + MI / P300 session bundles
+- Embedding transforms + opt-in `[train]` PEFT / BaLoRA
+
+## Added
+
+- `fit_calibrated(...)` — fit + pin decision-gate accept rate
+- `adapt(...)` / `adapt_async(...)` — adaptation gateway; `BrainStateBatch`
+- `export_profile` / `from_profile` / `UserProfile`
+- Transforms: `standardize` / `whiten` / `coral` / `affine` / `rpa` / `euclidean_alignment`
+- P300 / Riemann / MI recipes — see [Paradigms & profiles](/personalizer/paradigms)
+- Session-bundle trust: `trusted=True` + `sidecar_sha256`
+- `calibration_status` / `suggest_calibration_trials`
+- BaLoRA + trunk PEFT behind `[train]` — see [Research / PEFT](/personalizer/research-peft)
+- Metrics: `cohen_kappa`, `roc_auc_score`, `brier_score`, `temperature_scale_logits`
+- Optional forgetting `λ\<1` and `prior_fraction=` on LDA/QDA
+- `adapt_errp`, `adapt_pseudo`, `fit_tent`, T3A, `fit_population` (research)
+
+## Changed (breaking)
+
+- Presets: `research` → `strict`, `consumer` → `permissive`
+- Middleware imports regrouped under `policies/` / `alignment/` / `techniques/` (no shims)
+- `scikit-learn >= 1.6`; Python `>=3.11,<3.14`; `[train]` torch `>=2.14`
+- sfreq never-declared warning when encoder has `training_sfreq`
+
+## Evidence integrity
+
+Update **cost** is the robust claim (held even where accuracy gates failed). Cite wall-time ratios — details on [Evidence](/personalizer/evidence).
+
+## Next read
+
+<Columns cols={2}>
+  <Card title="Migration to 0.6" icon="arrow-right" href="/python-sdk/migration-0.6">
+    What to change in your code
+  </Card>
+  <Card title="Paradigms & profiles" icon="route" href="/personalizer/paradigms">
+    MI / P300 / profiles
+  </Card>
+  <Card title="Installation" icon="download" href="/python-sdk/installation">
+    Extras and verify 0.6.0
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/python-sdk/quickstart">
+    Factory-first path
+  </Card>
+</Columns>
