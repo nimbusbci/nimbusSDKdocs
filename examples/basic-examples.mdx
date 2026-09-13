@@ -9,6 +9,7 @@ Use these recipes after installation and preprocessing are complete. Python exam
 
 <Note>
   - Product path: [Personalizer](/personalizer/overview)
+  - Paradigms: [Paradigms & profiles](/personalizer/paradigms)
   - Python quickstart: [Python SDK Quickstart](/python-sdk/quickstart)
   - Julia quickstart: [Julia SDK Quickstart](/julia-sdk/quickstart)
   - Feature preparation: [Preprocessing Requirements](/inference-configuration/preprocessing-requirements)
@@ -23,18 +24,13 @@ from nimbus_bci import Personalizer, wrap
 
 # Toy identity encoder — replace with partner / foundation encode(X) → Z
 enc = wrap(lambda X: X, model_id="demo-encoder", embedding_dim=16)
-adapter = Personalizer(
-    encoder=enc,
-    head="lda",
-    classes=["left", "right"],
-    preset="research",
-)
+adapter = Personalizer.for_deployment(enc, ["left", "right"])
 adapter.fit(X_cal, y_cal)
 states = adapter.predict(X_test)
 print(states[0].intent, states[0].confidence, states[0].need_more_data)
 ```
 
-Already have CSP / bandpower features? Use `Personalizer(encoder=None, head="lda"|...)` — same app surface. Full contract: [Personalizer](/personalizer/overview).
+Already have CSP / bandpower features? Use `Personalizer.for_features(["left", "right"])` — same app surface. Full contract: [Personalizer](/personalizer/overview).
 
 ## Motor imagery
 
@@ -51,12 +47,7 @@ from sklearn.model_selection import cross_val_score
 X, csp = extract_csp_features(epochs, n_components=8)
 y = epochs.events[:, 2]
 
-adapter = Personalizer(
-    encoder=None,
-    head="lda",
-    classes=["left", "right"],
-    preset="research",
-)
+adapter = Personalizer.for_features(["left", "right"], head="lda")
 adapter.fit(X, y)
 states = adapter.predict(X[:5])
 
@@ -98,31 +89,40 @@ Default head is LDA (`Personalizer(head="lda")`). Try `head="qda"` when class co
 
 ## P300 detection
 
-P300 examples usually use ERP amplitude features from a post-stimulus time window.
+Preferred product path (`pip install nimbus-bci[riemann]`): xDAWN → tangent via `Personalizer.for_p300`. Classical ERP amplitude features still work with `for_features`.
 
 <Tabs>
-  <Tab title="Python">
+  <Tab title="Python (for_p300)">
 ```python
 from nimbus_bci import Personalizer
 
-# epochs: target/non-target MNE epochs
-sfreq = epochs.info["sfreq"]
-start = int(0.3 * sfreq)
-stop = int(0.5 * sfreq)
-
-X = epochs.get_data()[:, :, start:stop].mean(axis=2)
-y = epochs.events[:, 2]
-
-adapter = Personalizer(
-    encoder=None,
-    head="qda",
-    classes=["nontarget", "target"],
-    preset="research",
+# epochs: target/non-target MNE epochs (raw-ish ERP windows)
+p = Personalizer.for_p300(
+    ["NonTarget", "Target"],
+    tracking_alpha=0.05,  # opt-in geodesic tracking
 )
-adapter.fit(X, y)
-states = adapter.predict(X[:10])
+p.fit(epochs_cal, y_cal)  # see fit_p300_session for day-2 bundles
+states = p.predict(epochs_test)
 print(states[0].intent, states[0].confidence)
 ```
+  </Tab>
+  <Tab title="Python (ERP features)">
+    ```python
+    from nimbus_bci import Personalizer
+    
+    # epochs: target/non-target MNE epochs
+    sfreq = epochs.info["sfreq"]
+    start = int(0.3 * sfreq)
+    stop = int(0.5 * sfreq)
+    
+    X = epochs.get_data()[:, :, start:stop].mean(axis=2)
+    y = epochs.events[:, 2]
+    
+    adapter = Personalizer.for_features(["nontarget", "target"], head="qda")
+    adapter.fit(X, y)
+    states = adapter.predict(X[:10])
+    print(states[0].intent, states[0].confidence)
+    ```
   </Tab>
   <Tab title="Julia">
 ```julia
@@ -243,8 +243,9 @@ For Python trial-level quality checks, see the [Python SDK API Reference](/pytho
 
 | Path | Use first when | Notes |
 | --- | --- | --- |
-| `Personalizer` + `wrap` | Frozen / foundation encoder | Product wedge → `BrainState` |
-| `Personalizer(encoder=None)` | Classical CSP / bandpower / ERP features | Same app surface; pick `head=` |
+| `Personalizer.for_deployment` + `wrap` | Frozen / foundation encoder | Product wedge → `BrainState` |
+| `Personalizer.for_features` | Classical CSP / bandpower / ERP features | Same app surface; pick `head=` |
+| `Personalizer.for_riemann` / `for_p300` | Weak-Z / P300 geometry (`[riemann]`) | Geodesic tracking + session bundles |
 | Standalone `NimbusLDA` / … | Research CV, sklearn pipelines | Heads power Personalizer under the hood |
 | Julia `NimbusLDA` / `NimbusQDA` | Julia SDK workflows | No Personalizer yet |
 
@@ -263,13 +264,13 @@ Full comparison: [Model Specification](/model-specification).
   <Card title="Personalizer" icon="layers" href="/personalizer/overview">
     Encoder contract and BrainState
   </Card>
+  <Card title="Paradigms & profiles" icon="route" href="/personalizer/paradigms">
+    MI / P300 session bundles and day-2 profiles
+  </Card>
   <Card title="Python SDK Quickstart" icon="python" href="/python-sdk/quickstart">
     First Python workflow from install to inference
   </Card>
   <Card title="Advanced Applications" icon="rocket" href="/examples/advanced-applications">
     Higher-level deployment patterns
-  </Card>
-  <Card title="Error Handling" icon="shield" href="/inference-configuration/error-handling">
-    Production safeguards and failure modes
   </Card>
 </Columns>

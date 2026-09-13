@@ -29,13 +29,8 @@ enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
 Z_train = enc.encode(X_train)
 Z_test = enc.encode(X_test)
 
-# App path — BrainState
-adapter = Personalizer(
-    encoder=None,  # already encoded
-    head="lda",
-    classes=["left", "right"],
-    preset="research",
-)
+# App path — BrainState on already-encoded embeddings
+adapter = Personalizer.for_features(["left", "right"], head="lda")
 adapter.fit(Z_train, y_train)
 states = adapter.predict(Z_test)
 
@@ -648,4 +643,3 @@ test_score = grid.score(X_test, y_test)
     Complete API documentation
   </Card>
 </CardGroup>
-

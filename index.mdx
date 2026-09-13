@@ -33,7 +33,7 @@ Nimbus owns the personalization layer: wrap any frozen trunk that emits `encode(
 
 <Columns cols={2}>
   <Card title="Why Bayesian BCI Inference" icon="scale" href="/core-concepts/why-bayesian-bci">
-    Compare classical LDA, SVM, and deep learning with Nimbus — including ~10× faster online updates.
+    Compare classical LDA, SVM, and deep learning with Nimbus — including ~8–10× cheaper online head updates vs batch refit.
   </Card>
   <Card title="Probabilistic Outputs" icon="shield" href="/core-concepts/probabilistic-ai">
     Predictions include posterior probabilities and confidence scores.
@@ -83,6 +83,9 @@ Nimbus expects embeddings or preprocessed features — not raw EEG. Start with [
   </Card>
   <Card title="Installation and quickstarts" icon="rocket" href="/quickstart">
     Choose Python or Julia and run first inference.
+  </Card>
+  <Card title="Migration to 0.6" icon="arrow-right" href="/python-sdk/migration-0.6">
+    Breaking changes when upgrading nimbus-bci.
   </Card>
   <Card title="Heads & Models" icon="brain" href="/model-specification">
     LDA, QDA, Softmax, Probit, STS as Personalizer heads.

@@ -1,0 +1,80 @@
+---
+title: "Embedding transforms"
+description: "Align frozen embeddings before the Bayesian head: standardize, whiten, CORAL, RPA, affine, and Euclidean alignment."
+sidebarTitle: "Transforms"
+icon: "sliders"
+keywords:
+  - "transform"
+  - "whiten"
+  - "CORAL"
+  - "affine"
+  - "RPA"
+  - "euclidean alignment"
+  - "Personalizer"
+---
+
+The Personalizer can apply an **embedding-space transform** on `Z` before the head. Use this when cal and stream embeddings shift, without retraining the trunk.
+
+## Families
+
+| Family | Names | When |
+| --- | --- | --- |
+| **Cal-fitted (unsupervised)** | `standardize`, `whiten`, `euclidean_alignment` | Fit at `fit()` from calibration embeddings |
+| **Two-distribution / supervised** | `coral`, `rpa`, `affine` | Need a stream (or second) slice after fit — **offline/research**, not deployment defaults |
+
+```python
+from nimbus_bci import Personalizer, wrap
+
+enc = wrap(model.encode, model_id="partner", embedding_dim=64)
+
+# Cal-fitted — common research path
+p = Personalizer.for_research(enc, ["left", "right"], transform="whiten")
+p.fit(X_cal, y_cal)
+
+# Two-distribution maps — after fit, pass a shifted stream slice
+p2 = Personalizer.for_research(enc, ["left", "right"], transform="coral")
+p2.fit(X_cal, y_cal)
+p2.fit_coral(X_stream)           # real two-distribution CORAL (Sun & Saenko 2016)
+# p2.fit_rpa(X_stream, trim_windows=...) 
+# p2.fit_affine(X_stream, y_stream)  # supervised L2 ridge toward identity
+```
+
+Or pass a stream at fit time when supported: `fit(..., X_stream=...)`.
+
+## Quick guidance
+
+| Transform | Intent |
+| --- | --- |
+| `standardize` | Per-dim mean/std from cal |
+| `whiten` | Decorrelate + unit variance from cal |
+| `euclidean_alignment` | EA-style recentering in embedding space |
+| `coral` | Align second-order stats to a target distribution |
+| `rpa` | Re-centering with optional `trim_windows=` robustness |
+| `affine` | Supervised affine map; ridge toward identity |
+
+EMA-damped label-free CORAL refits use `ema_beta=` on supported paths.
+
+<Warning>
+  Prefer **no transform** (or cal-fitted only) for deployment. Treat `coral` / `rpa` / `affine` as research / offline alignment — they are not the product default.
+</Warning>
+
+## Types
+
+Public types: `StandardizeTransform`, `WhitenTransform`, `CoralTransform`, `RpaTransform`, `EuclideanAlignment` (also importable from `nimbus_bci`).
+
+## Next read
+
+<Columns cols={2}>
+  <Card title="Paradigms & profiles" icon="route" href="/personalizer/paradigms">
+    MI / P300 recipes and day-2 profiles
+  </Card>
+  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
+    wrap → Personalizer → save/load
+  </Card>
+  <Card title="Research / PEFT" icon="flask" href="/personalizer/research-peft">
+    BaLoRA and trunk-arm adaptation
+  </Card>
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
+    Full symbol list
+  </Card>
+</Columns>

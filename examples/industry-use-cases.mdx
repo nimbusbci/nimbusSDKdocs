@@ -37,7 +37,7 @@ Key docs:
 Recommended pattern:
 
 - Use ERP amplitude features in a consistent post-stimulus window (or a frozen encoder that emits trial embeddings).
-- Prefer `Personalizer(encoder=None, head="qda")` when target and non-target distributions overlap.
+- Prefer `Personalizer.for_p300(...)` (`[riemann]`) or `Personalizer.for_features(..., head="qda")` when target/non-target distributions overlap.
 - Use `BrainState` confidence / rejection to decide between accept, confirm, or repeat.
 - Log rejected selections separately from incorrect selections.
 

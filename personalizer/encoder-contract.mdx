@@ -1,7 +1,14 @@
 ---
 title: "Encoder contract"
 description: "The encode(X)→Z product boundary: wrap, FrozenEncoder, Personalizer fit/partial_fit/save/load, and optional trunk shortcuts."
-keywords: ["encoder contract", "wrap", "FrozenEncoder", "Personalizer", "wrap_braindecode", "wrap_eegnet", "embedding_dim"]
+keywords:
+  - "encoder contract"
+  - "wrap"
+  - "FrozenEncoder"
+  - "Personalizer"
+  - "wrap_braindecode"
+  - "wrap_eegnet"
+  - "embedding_dim"
 icon: "plug"
 ---
 
@@ -13,35 +20,39 @@ The encode hook is not a gap — it **is** the product boundary. Nimbus does not
 | --- | --- | --- |
 | Frozen trunk | You / partner / bench | `encode(X) → (n, d)` pre-classifier features |
 | Wrap | Nimbus | `wrap` / `FrozenEncoder` (+ optional named shortcuts) |
-| Head | Nimbus | `Personalizer` — LDA / QDA / Softmax, `fit` / `partial_fit` |
-| App | You | `BrainState` + presets (`research` / `consumer`) |
+| Head | Nimbus | `Personalizer` — LDA / QDA / Softmax, `fit` / `adapt` / `partial_fit` |
+| App | You | `BrainState` + presets (`strict` / `permissive`) |
 
 **Rules:**
 
 - Freeze the trunk before personalizing
 - Feed **embeddings**, never class logits
-- `Personalizer.load` requires **re-attaching** the encoder
+- `Personalizer.load` / `from_profile` require **re-attaching** the encoder
 - Optional `embedding_dim=` validates embedding width
+- Prefer factories (`for_deployment`, `for_features`, …) over raw constructors
 
 ## Canonical recipe
 
 ```python
 from nimbus_bci import Personalizer, wrap
 
-enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
-adapter = Personalizer(
-    encoder=enc,
-    head="lda",
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64,
+           training_sfreq=250.0)  # declare trunk rate when known
+adapter = Personalizer.for_deployment(
+    enc, ["left", "right"],
     user="subject_001",
-    classes=["left", "right"],
-    preset="research",
-    # Optional: MC epistemic → Prediction.uncertainty for upstream gating
-    # mc_samples=64,
+    paradigm="motor_imagery",
 )
-adapter.fit(X_cal, y_cal)
-states = adapter.predict(X_test)  # list[BrainState]
+# Pin accept rate for your trunk (optional):
+# adapter.fit_calibrated(X_cal, y_cal, X_val, y_val, target_accept=0.7)
+adapter.fit(X_cal, y_cal, input_sfreq=250.0)
+states = adapter.predict(X_test, input_sfreq=250.0)  # list[BrainState] / BrainStateBatch
 adapter.save("subject_001_profile")
 loaded = Personalizer.load("subject_001_profile", encoder=enc)
+
+# Portable \<50 KB profile (head + transform + thresholds; no raw EEG):
+profile = adapter.export_profile()
+warm = Personalizer.from_profile(profile, encoder=enc)
 ```
 
 Already have features / CSP / Riemann vectors? Skip the trunk:
@@ -49,14 +60,21 @@ Already have features / CSP / Riemann vectors? Skip the trunk:
 ```python
 from nimbus_bci import Personalizer
 
-adapter = Personalizer(encoder=None, classes=["left", "right"], preset="consumer")
+adapter = Personalizer.for_features(["left", "right"])
 adapter.fit(X_cal, y_cal)
 states = adapter.predict(X_test)
 ```
 
-<Warning>
-`partial_fit` is **cumulative** (no forgetting / decay). That matches session calibration and short stream budgets. Do not treat unbounded lifetime accumulation as a shipped product guarantee until a forgetting mechanism exists.
-</Warning>
+Riemann / P300 paradigms (`pip install nimbus-bci[riemann]`):
+
+```python
+p = Personalizer.for_riemann(["left", "right"])  # geodesic tracking α=0.05 default
+# p = Personalizer.for_p300(["NonTarget", "Target"], tracking_alpha=0.05)
+```
+
+<Info>
+  Online head updates default to cumulative (`λ=1`, byte-identical to 0.5). Optional forgetting on LDA/QDA uses `λ\<1` (recency factor). Prefer session calibration and short stream budgets unless you intentionally enable forgetting.
+</Info>
 
 **Foundation pooling:** REVE / EEGPT adapters mean-pool (or flatten) token / patch features to flat `(n, d)` so LDA/QDA heads can consume them. Spatial/temporal structure is collapsed at the encoder boundary, not inside the Bayesian head.
 
@@ -69,12 +87,12 @@ states = adapter.predict(X_test)
 | **L0 — cal-only** | Bayesian head fit on calibration embeddings only; no stream labels | Default when clean already transfers (cal-only-when-clean) |
 | **L1 — stream head** | L0 + stream `partial_fit` | Mid / severe shift when head capacity exists |
 
-**Not a Personalizer knob (yet):**
+**Opt-in / priced (not deployment defaults):**
 
 | Level | What it is | Where it lives |
 | --- | --- | --- |
-| **L2 — affine-Z + head** | Supervised affine map on embeddings, then the same head | Paper 1 / NimbusBench ladder protocol — mid-tier in *evaluations*, not `Personalizer(...)` |
-| **L3 — full fine-tune** | Warm-start fine-tune of the encoder | Escape hatch (outside Personalizer; priced) |
+| **L2 — affine-Z + head** | Supervised affine map on embeddings, then the same head | `transform="affine"` / `fit_affine()` (research / offline); also Paper 1 / NimbusBench protocol |
+| **L3 — full fine-tune** | Warm-start fine-tune of the encoder | Escape hatch (outside Personalizer; priced); `[train]` PEFT / BaLoRA opt-in |
 
 Linear probe (**LP**) in Evidence is a matched sklearn control on the same frozen `Z`, not a ladder level. Plain-language legend: [Overview](/personalizer/overview#ladder-legend-plain-language). Evidence for when L1 helps and how L3 is priced: [Evidence](/personalizer/evidence).
 
@@ -106,27 +124,12 @@ Claim for second trunks: **API interchangeability** under the same `Personalizer
 
 ## Active learning → personalization
 
-Use `CalibrationSession` (or `suggest_next_trial`) to choose labels, then:
+Prefer Personalizer wrappers (encode for you), or `CalibrationSession` on the head:
 
 ```python
-adapter.partial_fit(X_queried, y_queried)
-```
-
-Label-free stopping on the head:
-
-```python
-from copy import deepcopy
-from nimbus_bci import calibration_sufficient
-
-previous = deepcopy(adapter.head)
-adapter.partial_fit(X_new, y_new)
-status = calibration_sufficient(
-    adapter.head,
-    Z_pool,  # already-encoded pool, or identity-encoder features
-    previous=previous,
-    criterion="posterior_stability",
-    threshold=0.05,
-)
+ranked = adapter.suggest_calibration_trials(X_pool, n=4, strategy="bald")
+adapter.partial_fit(X_pool[ranked.indices], y_new)
+status = adapter.calibration_status(X_probe, criterion="posterior_stability")
 ```
 
 See [Active Learning](/python-sdk/active-learning).
@@ -134,8 +137,15 @@ See [Active Learning](/python-sdk/active-learning).
 ## Next Read
 
 <CardGroup cols={2}>
-  <Card title="BrainState" icon="brain" href="/personalizer/brain-state" />
-  <Card title="Evidence" icon="chart-line" href="/personalizer/evidence" />
-  <Card title="Overview" icon="layers" href="/personalizer/overview" />
-  <Card title="API Reference" icon="book" href="/python-sdk/api-reference#middleware" />
+  <Card title="BrainState" icon="brain" href="/personalizer/brain-state">
+  </Card>
+
+  <Card title="Evidence" icon="chart-line" href="/personalizer/evidence">
+  </Card>
+
+  <Card title="Overview" icon="layers" href="/personalizer/overview">
+  </Card>
+
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference#middleware">
+  </Card>
 </CardGroup>

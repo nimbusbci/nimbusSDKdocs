@@ -5,7 +5,9 @@ keywords: ["Python SDK", "nimbus-bci", "Personalizer", "BrainState", "Python BCI
 icon: "python"
 ---
 
-The **nimbus-bci** Python library is a Bayesian personalization head for frozen neural EEG embeddings — and sklearn-compatible classifiers for classical feature pipelines. Wrap any trunk that emits `encode(X) → Z`, adapt online with `Personalizer`, and ship apps on `BrainState`. Optional extras add `NimbusSoftmax` via JAX (`pip install nimbus-bci[softmax]`) and pyRiemann feature pipelines (`pip install nimbus-bci[riemann]`).
+The **nimbus-bci** Python library is a Bayesian personalization head for frozen neural EEG embeddings — and sklearn-compatible classifiers for classical feature pipelines. Wrap any trunk that emits `encode(X) → Z`, adapt online with `Personalizer`, and ship apps on `BrainState`.
+
+Optional extras: `[softmax]` (JAX), `[riemann]` (pyRiemann + `for_riemann` / `for_p300`), `[train]` (torch PEFT / BaLoRA), `[mne]`, `[viz]`, or `[all]`.
 
 ## Start here
 
@@ -76,12 +78,7 @@ def encode(X):
     return X  # already embeddings or CSP features
 
 enc = wrap(encode, model_id="demo-encoder", embedding_dim=16)
-adapter = Personalizer(
-    encoder=enc,
-    head="lda",
-    classes=["left", "right"],
-    preset="research",
-)
+adapter = Personalizer.for_deployment(enc, ["left", "right"])
 adapter.fit(X_cal, y_cal)
 states = adapter.predict(X_test)  # list[BrainState]
 print(states[0].intent, states[0].confidence)
@@ -196,11 +193,14 @@ EEG → MNE / CSP / Riemann → Nimbus head → Your Application
 The `nimbus-bci` package provides:
 
 **Middleware (product surface):**
-- `Personalizer` - Bayesian personalization head over a frozen encoder
-- `wrap` / `FrozenEncoder` / `EncoderProtocol` - encoder contract
-- `BrainState` / `Prediction` / `IntentHypothesis` - app contracts
-- `decide` / `brain_states_from_batch` / `brain_state_from_streaming_result` - bridges
-- `wrap_eegnet` / `wrap_braindecode` - optional named adapters
+- `Personalizer` — Bayesian personalization head over a frozen encoder
+- Factories — `for_deployment`, `for_research`, `for_features`, `for_riemann`, `for_p300`, `for_balora`
+- `Recipe` / `UserProfile` — paradigm recipes and portable profiles (`export_profile` / `from_profile`)
+- `wrap` / `FrozenEncoder` / `EncoderProtocol` — encoder contract
+- `BrainState` / `BrainStateBatch` / `Prediction` / `IntentHypothesis` — app contracts
+- `decide` / `brain_states_from_batch` / `brain_state_from_streaming_result` — bridges
+- `wrap_eegnet` / `wrap_braindecode` — optional named adapters
+- Transforms — `StandardizeTransform`, `WhitenTransform`, `CoralTransform`, `RpaTransform`, `EuclideanAlignment`
 
 **Heads (classifiers):**
 - `NimbusLDA` - Bayesian Linear Discriminant Analysis
@@ -267,7 +267,8 @@ The `nimbus-bci` package provides:
 ## Support
 
 - **Email**: [hello@nimbusbci.com](mailto:hello@nimbusbci.com)
-- **GitHub**: [github.com/nimbusbci/nimbuspysdk](https://github.com/nimbusbci/nimbuspysdk)
+- **Docs**: [docs.nimbusbci.com](https://docs.nimbusbci.com)
+- **PyPI**: [pypi.org/project/nimbus-bci](https://pypi.org/project/nimbus-bci/)
 
 ---
 
@@ -276,26 +277,25 @@ Ready to get started? Head to the [Installation Guide](/python-sdk/installation)
 <script
   type="application/ld+json"
   dangerouslySetInnerHTML={{
-    __html: JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'TechArticle',
-      headline: 'Python SDK',
-      description:
-        'Overview of the nimbus-bci Python SDK: Personalizer middleware for frozen encoders, BrainState app outputs, and sklearn-compatible Bayesian heads.',
-      author: {
-        '@type': 'Organization',
-        name: 'Nimbus BCI',
-        url: 'https://nimbusbci.com',
-      },
-      publisher: {
-        '@type': 'Organization',
-        name: 'Nimbus BCI',
-        url: 'https://nimbusbci.com',
-      },
-      inLanguage: 'en-US',
-      isAccessibleForFree: true,
-      url: 'https://docs.nimbusbci.com/python-sdk/introduction',
-    }),
-  }}
+__html: JSON.stringify({
+'@context': 'https://schema.org',
+'@type': 'TechArticle',
+headline: 'Python SDK',
+description:
+'Overview of the nimbus-bci Python SDK: Personalizer middleware for frozen encoders, BrainState app outputs, and sklearn-compatible Bayesian heads.',
+author: {
+'@type': 'Organization',
+name: 'Nimbus BCI',
+url: 'https://nimbusbci.com',
+},
+publisher: {
+'@type': 'Organization',
+name: 'Nimbus BCI',
+url: 'https://nimbusbci.com',
+},
+inLanguage: 'en-US',
+isAccessibleForFree: true,
+url: 'https://docs.nimbusbci.com/python-sdk/introduction',
+}),
+}}
 />
-

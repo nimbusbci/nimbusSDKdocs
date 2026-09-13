@@ -23,7 +23,7 @@ Core workflow:
 
 1. Extract the same feature type (or freeze the same encoder) for every subject.
 2. Normalize using training subjects only.
-3. Train a conservative baseline (`Personalizer(head="lda")` or `NimbusLDA`).
+3. Train a conservative baseline (`Personalizer.for_features(..., head="lda")` or `NimbusLDA`).
 4. Evaluate with subject-wise splits, not random trial splits.
 5. Personalize with a small calibration set for the target subject.
 
@@ -144,7 +144,7 @@ See [Personalizer overview](/personalizer/overview) for adapt vs trial gates, an
 For experiments that span days or weeks:
 
 - Use a stable preprocessing / encoder pipeline and save its parameters (`model_id`, `embedding_dim`).
-- Save normalization parameters with each trained profile (`Personalizer.save` / head artifacts).
+- Save profiles / normalization with each subject (`Personalizer.save`, `export_profile()`, head artifacts).
 - Track hardware, montage, impedance, session time, and participant state.
 - Evaluate same-session and cross-session performance separately.
 - Compare adaptation against a no-adaptation baseline.

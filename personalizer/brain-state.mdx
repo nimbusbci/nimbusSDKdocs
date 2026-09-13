@@ -30,9 +30,10 @@ These are **different** signals:
 | Signal | API | Question |
 | --- | --- | --- |
 | **Trial gate** | `rejected`, `need_more_data`, presets | Accept this intent for the app? |
-| **Adapt recommendation** | `Personalizer.recommend_adapt(..., tau=...)` → `AdaptDecision` | Spend labels / call `partial_fit`? |
+| **Adapt gateway** | `Personalizer.adapt(...)` / `partial_fit` | Update the head / transform / trunk? |
+| **Adapt recommendation** | `Personalizer.recommend_adapt(..., tau=...)` → `AdaptDecision` | Spend labels on a stream update? |
 
-`recommend_adapt` is a thin mean-shift helper against a user-supplied `tau` (L0 stay vs L1 stream update only). It does **not** auto-escalate to affine maps or full fine-tune. Optional session metadata:
+Prefer `Personalizer.adapt(...)` as the label-agnostic adaptation gateway (head update, unsupervised transform alignment, or trunk PEFT). `recommend_adapt` remains a thin mean-shift helper against a user-supplied `tau` (L0 stay vs L1 stream update only). It does **not** auto-escalate to affine maps or full fine-tune. Optional session metadata:
 
 ```python
 dec = adapter.recommend_adapt(X_stream, tau=0.25)
@@ -47,8 +48,13 @@ After `Personalizer.load`, pass `X_ref=` (calibration embeddings are not seriali
 
 | Preset | Intent |
 | --- | --- |
-| `research` | Lower confidence bar; more accepts |
-| `consumer` | Stricter gating; prefer `need_more_data` when unsure |
+| `strict` | Stricter gating; prefer `need_more_data` / reject when unsure (deployment default via `for_deployment`) |
+| `permissive` | Lower confidence bar; more accepts (research / classical defaults) |
+| `aggressive` | Lowest bar — accept almost everything |
+
+<Warning>
+  **0.6 rename:** `"research"` → `"strict"`, `"consumer"` → `"permissive"`. Old strings raise `ValueError`.
+</Warning>
 
 Uncertainty fusion: `BrainState.uncertainty` is `max(normalized_entropy, upstream)` when upstream is set. Gating checks entropy and upstream thresholds independently.
 
@@ -82,7 +88,7 @@ from nimbus_bci import Prediction, decide
 
 state = decide(
     Prediction(classes=["left", "right"], probabilities=[0.7, 0.3], uncertainty=0.2),
-    preset="research",
+    preset="strict",
     user_id="subject_001",
 )
 ```
@@ -92,8 +98,12 @@ See also [Python Streaming Inference](/python-sdk/streaming-inference) for the s
 ## Next Read
 
 <CardGroup cols={2}>
-  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract" />
-  <Card title="Evidence" icon="chart-line" href="/personalizer/evidence" />
-  <Card title="Overview" icon="layers" href="/personalizer/overview" />
-  <Card title="Streaming" icon="activity" href="/python-sdk/streaming-inference" />
+  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
+  </Card>
+  <Card title="Evidence" icon="chart-line" href="/personalizer/evidence">
+  </Card>
+  <Card title="Overview" icon="layers" href="/personalizer/overview">
+  </Card>
+  <Card title="Streaming" icon="activity" href="/python-sdk/streaming-inference">
+  </Card>
 </CardGroup>

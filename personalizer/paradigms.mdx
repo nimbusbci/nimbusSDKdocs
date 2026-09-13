@@ -1,0 +1,148 @@
+---
+title: "Paradigms & profiles"
+description: "Motor imagery, P300, and Riemannian recipes plus portable UserProfile day-2 warm-start for nimbus-bci 0.6."
+sidebarTitle: "Paradigms & profiles"
+icon: "route"
+keywords:
+  - "paradigms"
+  - "P300"
+  - "motor imagery"
+  - "Riemann"
+  - "UserProfile"
+  - "fit_mi_session"
+  - "for_p300"
+  - "MISessionBundle"
+---
+
+0.6 ships **paradigm factories** and **portable profiles** so you can go from calibration epochs to a deployable Personalizer without owning a deep trunk — and warm-start day 2 without raw EEG.
+
+Requires `pip install nimbus-bci[riemann]` for Riemann / P300 geometry paths.
+
+## Choose a path
+
+| Goal | Entry point | Notes |
+| --- | --- | --- |
+| Frozen neural trunk | `Personalizer.for_deployment(enc, classes)` | Strict gating; pin accept rate with `fit_calibrated` |
+| Classical features | `Personalizer.for_features(classes)` | CSP / bandpower / ERP vectors |
+| Weak-Z / MI geometry | `Personalizer.for_riemann(classes)` or `fit_mi_session` | Default geodesic tracking `α=0.05` |
+| P300 speller | `Personalizer.for_p300(classes)` or `fit_p300_session` | xDAWN→tangent; tracking **opt-in** (`α=0.05` when enabling) |
+| Day-2 warm-start | `export_profile` / `from_profile` | \<50 KB; no raw EEG |
+| Session portability | `MISessionBundle` / `P300SessionBundle` | Profile + trunk sidecar; trust contract |
+
+## Portable profiles
+
+```python
+from nimbus_bci import Personalizer, wrap
+
+enc = wrap(model.encode, model_id="partner", embedding_dim=64)
+p = Personalizer.for_deployment(enc, ["left", "right"])
+p.fit(X_cal, y_cal)
+
+profile = p.export_profile()          # head + transform + thresholds + cal Z
+warm = Personalizer.from_profile(profile, encoder=enc)
+warm.partial_fit(X_day2[:40], y_day2[:40])  # optional top-up
+```
+
+Day-2 warm-start (profile + `partial_fit` with n≈40) beats frozen day-1 in the locked readout (**+1.03 pp**, CI [+0.11, +2.33], 0/9 no-regret). Re-attach the same encoder on `from_profile` / `load`.
+
+Also: `Personalizer.save` / `load` for the full artifact layout.
+
+## Motor imagery
+
+### Quick factory
+
+```python
+from nimbus_bci import Personalizer
+
+# OAS / tangent features from epochs — needs [riemann]
+p = Personalizer.for_riemann(["left", "right"])  # tracking_alpha=0.05 default
+p.fit(X_cal, y_cal)  # epochs (n, ch, t) or already-mapped features per API
+p.adapt(epoch)       # label-free reference update when tracking is on
+```
+
+### Session recipe (geometry gateway)
+
+```python
+from nimbus_bci.middleware.mi_session import fit_mi_session, MISessionBundle
+
+bundle = fit_mi_session(X_cal, y_cal, classes=["left", "right"], sfreq=250.0)
+# bundle.personalizer is fitted; bundle.path is deployment_z (CSP) or features_riemann
+
+bundle.save("subject_mi")
+# Day 2 — pickle sidecars require trust + digest check:
+loaded = MISessionBundle.load("subject_mi", trusted=True)
+```
+
+Optional BALD cal shrink: `calibrate_mi_bald(...)` — **do not default** it for production cal-time claims (EP-CAL-TIME NO-GO).
+
+## P300
+
+```python
+from nimbus_bci import Personalizer
+from nimbus_bci.middleware.p300_session import fit_p300_session, P300SessionBundle
+
+# Factory — tracking off by default; enable with tracking_alpha=0.05
+p = Personalizer.for_p300(["NonTarget", "Target"], tracking_alpha=0.05)
+
+# Or one-call session fit (xDAWN→tangent → LDA)
+bundle = fit_p300_session(
+    X_cal, y_cal,
+    classes=["NonTarget", "Target"],
+    tracking_alpha=0.05,  # recommend 0.05 when enabling; 0.02 not stability-cleared
+)
+bundle.save("subject_p300")
+loaded = P300SessionBundle.load("subject_p300", trusted=True)
+```
+
+Claim framing for BNCI2014_008: **parity + delivered ITR**, not accuracy superiority.
+
+## Session-bundle trust contract
+
+`MISessionBundle` / `P300SessionBundle` joblib sidecars are **pickle** payloads:
+
+- `load(..., trusted=True)` is required
+- `save` records `sidecar_sha256`; `load` verifies before unpickle
+- Tampered sidecars are refused even with `trusted=True`
+- Riemann `.npz` path never unpickles
+
+## Embedding transforms (brief)
+
+Full guide: [Embedding transforms](/personalizer/transforms).
+
+| Transform | Role |
+| --- | --- |
+| `standardize` / `whiten` / `euclidean_alignment` | Unsupervised; fit from cal |
+| `coral` / `rpa` / `affine` | Two-distribution / supervised maps — **offline/research**, not deployment defaults |
+
+```python
+p = Personalizer.for_research(enc, ["left", "right"], transform="whiten")
+p.fit(X_cal, y_cal)
+# coral / affine need a stream slice after fit:
+# p.fit_coral(X_stream) / p.fit_affine(X_stream, y_stream)
+```
+
+## Gate calibration
+
+Default decision gates accept **7–78%** of trials across trunks. Pin the accept rate:
+
+```python
+p = Personalizer.for_deployment(enc, ["left", "right"])
+p.fit_calibrated(X_cal, y_cal, X_val, y_val, target_accept=0.7)
+```
+
+## Next read
+
+<Columns cols={2}>
+  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
+    wrap, sfreq, save/load, profiles
+  </Card>
+  <Card title="BrainState" icon="brain" href="/personalizer/brain-state">
+    strict / permissive gates
+  </Card>
+  <Card title="Migration to 0.6" icon="arrow-right" href="/python-sdk/migration-0.6">
+    Breaking changes from 0.5
+  </Card>
+  <Card title="Basic examples" icon="play" href="/examples/basic-examples">
+    Compact MI / P300 recipes
+  </Card>
+</Columns>
