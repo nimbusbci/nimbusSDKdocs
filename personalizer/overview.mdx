@@ -51,6 +51,9 @@ How the Paper 1 / 1b numbers were produced (datasets, bandpass, session split, s
   <Card title="Evidence" icon="chart-line" href="/personalizer/evidence">
     Head vs probe vs FT, LDA/QDA/Softmax, REVE, transfer map.
   </Card>
+  <Card title="Paradigms & profiles" icon="route" href="/personalizer/paradigms">
+    MI / P300 / Riemann recipes and day-2 profiles.
+  </Card>
   <Card title="Python Quickstart" icon="rocket" href="/python-sdk/quickstart">
     Fit a Personalizer in a few minutes.
   </Card>
@@ -71,7 +74,7 @@ adapter.fit(X_cal, y_cal)
 states = adapter.predict(X_test)  # list[BrainState] or BrainStateBatch
 ```
 
-Other factories: `for_research` (permissive + knobs), `for_features` (no trunk), `for_riemann` / `for_p300` (`nimbus-bci[riemann]`), `for_balora` (`nimbus-bci[train]`).
+Other factories: `for_research` (permissive + knobs), `for_features` (no trunk), `for_riemann` / `for_p300` (`nimbus-bci[riemann]`), `for_balora` (`nimbus-bci[train]`). Paradigm recipes and day-2 profiles: [Paradigms & profiles](/personalizer/paradigms).
 
 ## Integrator checklist
 

@@ -61,6 +61,7 @@
           "personalizer/overview",
           "personalizer/encoder-contract",
           "personalizer/brain-state",
+          "personalizer/paradigms",
           "python-sdk/active-learning",
           "personalizer/evidence"
         ]

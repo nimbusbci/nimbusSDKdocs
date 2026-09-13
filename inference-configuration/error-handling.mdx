@@ -14,7 +14,7 @@ Python SDK workflows are local and focus on validation, inference, and preproces
 </Note>
 
 <Tip>
-Python product path: map thresholds to [`BrainState`](/personalizer/brain-state) fields (`confidence`, `uncertainty`, `need_more_data`, `rejected`) instead of inventing a parallel gate on raw class indices. Prefer presets `research` / `consumer` on `Personalizer`.
+Python product path: map thresholds to [`BrainState`](/personalizer/brain-state) fields (`confidence`, `uncertainty`, `need_more_data`, `rejected`) instead of inventing a parallel gate on raw class indices. Prefer presets `strict` / `permissive` on `Personalizer` (0.6 rename; was `research` / `consumer`), or factories like `Personalizer.for_deployment`.
 </Tip>
 
 ## Common Failure Modes

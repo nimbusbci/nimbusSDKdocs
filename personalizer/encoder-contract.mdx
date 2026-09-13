@@ -124,27 +124,12 @@ Claim for second trunks: **API interchangeability** under the same `Personalizer
 
 ## Active learning → personalization
 
-Use `CalibrationSession` (or `suggest_next_trial`) to choose labels, then:
+Prefer Personalizer wrappers (encode for you), or `CalibrationSession` on the head:
 
 ```python
-adapter.partial_fit(X_queried, y_queried)
-```
-
-Label-free stopping on the head:
-
-```python
-from copy import deepcopy
-from nimbus_bci import calibration_sufficient
-
-previous = deepcopy(adapter.head)
-adapter.partial_fit(X_new, y_new)
-status = calibration_sufficient(
-    adapter.head,
-    Z_pool,  # already-encoded pool, or identity-encoder features
-    previous=previous,
-    criterion="posterior_stability",
-    threshold=0.05,
-)
+ranked = adapter.suggest_calibration_trials(X_pool, n=4, strategy="bald")
+adapter.partial_fit(X_pool[ranked.indices], y_new)
+status = adapter.calibration_status(X_probe, criterion="posterior_stability")
 ```
 
 See [Active Learning](/python-sdk/active-learning).

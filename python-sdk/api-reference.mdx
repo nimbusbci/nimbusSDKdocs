@@ -60,6 +60,12 @@ adapter = Personalizer.for_deployment(enc, ["left", "right"], paradigm="motor_im
 
 Also exported: `Recipe`, `UserProfile`, `BrainStateBatch`, `recommend_adapt`, `embedding_mean_shift`, `AdaptDecision`, transform types.
 
+**Paradigm helpers** (see [Paradigms & profiles](/personalizer/paradigms)):
+
+- `fit_mi_session` / `calibrate_mi_bald` / `MISessionBundle` — MI geometry gateway + day-2 bundle
+- `fit_p300_session` / `P300SessionBundle` — xDAWN→tangent + day-2 bundle (`trusted=True` on load)
+- Session bundles verify `sidecar_sha256` before unpickling joblib sidecars
+
 **Notes:**
 - Prefer factories over raw constructors for common cases
 - Decision presets: `"strict"` / `"permissive"` / `"aggressive"` (0.6 rename; was `research` / `consumer`)

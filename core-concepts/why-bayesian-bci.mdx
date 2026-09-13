@@ -106,6 +106,10 @@ The **Online update** row above is benchmarked on Nimbus's checked-in online-upd
 Reproduce these numbers from the checked-in benchmark CSV via `notebooks/s3_update_latency_head_vs_sklearn.ipynb`. Full context, plots, and the sklearn / pyRiemann workflow comparison are in the [blog post](https://www.nimbusbci.com/blog/why-nimbus-sdk-bci-scikit-learn-pyriemann).
 </Tip>
 
+<Info>
+  **0.6 product cost claim (separate experiments):** head-only `partial_fit` is ~**8–10×** cheaper than sklearn batch refit; Personalizer vs EEGNet retrain wall-time ≈**131×** (n=9) and **22–34×** at n=20. Cite wall-time ratios, not accuracy wins — see [Evidence](/personalizer/evidence) and the package `CHANGELOG.md`.
+</Info>
+
 This latency advantage compounds in cued-calibration loops: faster updates mean shorter sessions, more trials accepted per minute, and smoother real-time feedback without blocking the EEG stream.
 
 ## Composing With Other Tools
