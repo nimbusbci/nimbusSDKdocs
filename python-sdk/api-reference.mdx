@@ -66,6 +66,8 @@ Also exported: `Recipe`, `UserProfile`, `BrainStateBatch`, `recommend_adapt`, `e
 - `fit_p300_session` / `P300SessionBundle` — xDAWN→tangent + day-2 bundle (`trusted=True` on load)
 - Session bundles verify `sidecar_sha256` before unpickling joblib sidecars
 
+**Also see:** [Transforms](/personalizer/transforms) · [Research / PEFT](/personalizer/research-peft) · [Changelog 0.6](/python-sdk/changelog-0.6)
+
 **Notes:**
 - Prefer factories over raw constructors for common cases
 - Decision presets: `"strict"` / `"permissive"` / `"aggressive"` (0.6 rename; was `research` / `consumer`)
@@ -145,8 +147,7 @@ clf = NimbusLDA(
     mu_scale=3.0,
     wishart_df=None,
     class_prior_alpha=1.0,
-    # 0.6: prior_fraction=0.05 (default) — conjugate prior worth prior_fraction × n
-    # optional forgetting λ<1 on online updates (λ=1 default is byte-identical)
+    # 0.6: prior_fraction= / forgetting= on LDA/QDA — see parameters below
 )
 ```
 
