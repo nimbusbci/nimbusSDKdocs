@@ -87,12 +87,12 @@ p = Personalizer.for_riemann(["left", "right"])  # geodesic tracking α=0.05 def
 | **L0 — cal-only** | Bayesian head fit on calibration embeddings only; no stream labels | Default when clean already transfers (cal-only-when-clean) |
 | **L1 — stream head** | L0 + stream `partial_fit` | Mid / severe shift when head capacity exists |
 
-**Not a Personalizer knob (yet):**
+**Opt-in / priced (not deployment defaults):**
 
 | Level | What it is | Where it lives |
 | --- | --- | --- |
-| **L2 — affine-Z + head** | Supervised affine map on embeddings, then the same head | Paper 1 / NimbusBench ladder protocol — mid-tier in _evaluations_, not `Personalizer(...)` |
-| **L3 — full fine-tune** | Warm-start fine-tune of the encoder | Escape hatch (outside Personalizer; priced) |
+| **L2 — affine-Z + head** | Supervised affine map on embeddings, then the same head | `transform="affine"` / `fit_affine()` (research / offline); also Paper 1 / NimbusBench protocol |
+| **L3 — full fine-tune** | Warm-start fine-tune of the encoder | Escape hatch (outside Personalizer; priced); `[train]` PEFT / BaLoRA opt-in |
 
 Linear probe (**LP**) in Evidence is a matched sklearn control on the same frozen `Z`, not a ladder level. Plain-language legend: [Overview](/personalizer/overview#ladder-legend-plain-language). Evidence for when L1 helps and how L3 is priced: [Evidence](/personalizer/evidence).
 

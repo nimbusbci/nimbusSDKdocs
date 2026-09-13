@@ -68,12 +68,7 @@ y = epochs.events[:, 2]
 classes = ["left", "right"]
 
 enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
-adapter = Personalizer(
-    encoder=enc,
-    head="lda",
-    classes=classes,
-    preset="research",
-)
+adapter = Personalizer.for_deployment(enc, classes)
 adapter.fit(X_cal, y_cal)
 states = adapter.predict(X_test)
 print(states[0].intent, states[0].confidence, states[0].need_more_data)
@@ -131,12 +126,7 @@ from sklearn.model_selection import cross_val_score
 labels = epochs.events[:, 2]
 
 # Product-style on classical features
-adapter = Personalizer(
-    encoder=None,
-    head="lda",
-    classes=["left", "right"],
-    preset="research",
-)
+adapter = Personalizer.for_features(["left", "right"], head="lda")
 adapter.fit(csp_features, labels)
 states = adapter.predict(csp_features[:5])
 
@@ -184,16 +174,13 @@ X_train, X_test, y_train, y_test = train_test_split(
     csp_features, labels, test_size=0.2, stratify=labels, random_state=42
 )
 
-# 7. Scale + Personalizer (encoder=None on classical features)
+# 7. Scale + Personalizer on classical features
 scaler = StandardScaler()
 Z_train = scaler.fit_transform(X_train)
 Z_test = scaler.transform(X_test)
 
-adapter = Personalizer(
-    encoder=None,
-    head="lda",
-    classes=["left", "right", "feet", "tongue"],
-    preset="research",
+adapter = Personalizer.for_features(
+    ["left", "right", "feet", "tongue"], head="lda"
 )
 adapter.fit(Z_train, y_train)
 states = adapter.predict(Z_test)
@@ -726,4 +713,3 @@ print(f"Warnings: {report.warnings}")
     Complete API documentation
   </Card>
 </CardGroup>
-

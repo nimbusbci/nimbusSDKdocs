@@ -163,7 +163,7 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
   </Accordion>
 
   <Accordion title="Transfer across trunks" icon="diagram-project">
-    Soft operational default vs strict ordinal schedule (18 cells; exploratory). “Severe → L2” means the **protocol** affine+head winner — not a shipped Personalizer API call.
+    Soft operational default vs strict ordinal schedule (18 cells; exploratory). “Severe → L2” means the **protocol** affine+head winner — in 0.6 affine is available as an opt-in `transform=` / `fit_affine()`, not a deployment default.
 
     | Slice | Clean → L0 | Severe → L2 | Strict ordinal |
     | --- | --- | --- | --- |
@@ -188,13 +188,17 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
 | Full retrain unnecessary | Same budgets as stress recovery | Classical: L1 recovers most of L3 at ~14–40× wall; EEGNet BNCI head can beat FT (~5× bake-off wall); REVE ~20–40× vs short FT |
 | Head choice | Same Personalizer API | Default LDA; QDA optional under severe shift (BNCI); Softmax optional for UQ |
 
-Not claimed: L1 always beats L0 or LP; QDA always beats LDA; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic channel mixing); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG”; shipped affine map (L2) as a Personalizer API.
+Not claimed: L1 always beats L0 or LP; QDA always beats LDA; universal ordinal severity→level law; coverage of session / electrode / SNR shift (evidence is synthetic channel mixing); foundation SOTA; suite-wide 30× ratios from other protocols; shipped “Active Inference for EEG”; affine maps as a **deployment default** (they remain opt-in / research via `transform=`).
 
 ## Next Read
 
 <CardGroup cols={2}>
-  <Card title="Overview" icon="layers" href="/personalizer/overview" />
-  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract" />
-  <Card title="BrainState" icon="brain" href="/personalizer/brain-state" />
-  <Card title="Python Quickstart" icon="rocket" href="/python-sdk/quickstart" />
+  <Card title="Overview" icon="layers" href="/personalizer/overview">
+  </Card>
+  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
+  </Card>
+  <Card title="BrainState" icon="brain" href="/personalizer/brain-state">
+  </Card>
+  <Card title="Python Quickstart" icon="rocket" href="/python-sdk/quickstart">
+  </Card>
 </CardGroup>
