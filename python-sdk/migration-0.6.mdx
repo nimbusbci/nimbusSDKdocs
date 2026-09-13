@@ -1,0 +1,118 @@
+---
+title: "Migration to 0.6"
+description: "Breaking changes and new Personalizer APIs when upgrading nimbus-bci from 0.5 to 0.6."
+sidebarTitle: "Migration to 0.6"
+icon: "arrow-right"
+keywords:
+  - "migration"
+  - "0.6"
+  - "nimbus-bci"
+  - "breaking changes"
+  - "presets"
+  - "Personalizer"
+---
+
+Upgrade guide for **nimbus-bci 0.6** — the personalization release (factories, profiles, paradigm recipes, cheaper online adaptation).
+
+```bash
+pip install --upgrade nimbus-bci
+```
+
+Confirm:
+
+```python
+import nimbus_bci
+assert nimbus_bci.__version__.startswith("0.6")
+```
+
+## Breaking changes
+
+### Decision presets renamed
+
+| 0.5 | 0.6 |
+| --- | --- |
+| `"research"` | `"strict"` |
+| `"consumer"` | `"permissive"` |
+
+Old strings raise `ValueError`. Also available: `"aggressive"`.
+
+```python
+# Before
+Personalizer(..., preset="research")
+decide(pred, preset="consumer")
+
+# After
+Personalizer(..., preset="strict")
+decide(pred, preset="permissive")
+# Or prefer factories (recommended):
+Personalizer.for_deployment(enc, classes)  # strict gating
+Personalizer.for_research(enc, classes)    # permissive + knobs
+```
+
+### Middleware import paths regrouped
+
+Flat middleware modules moved into subpackages — **no compatibility shims**:
+
+| 0.5 | 0.6 |
+| --- | --- |
+| `nimbus_bci.middleware.adapt_gate` | `nimbus_bci.middleware.policies.adapt_gate` |
+| `nimbus_bci.middleware.decision` | `nimbus_bci.middleware.policies.decision` |
+| transforms | `nimbus_bci.middleware.alignment` |
+| PEFT / TTA | `nimbus_bci.middleware.techniques` |
+
+The public top-level API (`from nimbus_bci import Personalizer, …`) is unchanged.
+
+### Dependency floors
+
+- `scikit-learn >= 1.6` (was `>= 1.4`)
+- `requires-python`: `>=3.11,<3.14`
+- Optional `[train]` / `[all]`: `torch >= 2.14.0`
+
+### Compiled extensions
+
+After upgrading from source, rebuild extensions (`scripts/build_extensions.py`) — a stale `learning.*.so` can shadow new source.
+
+## What to adopt (new in 0.6)
+
+| Feature | API |
+| --- | --- |
+| Factory entry points | `for_deployment`, `for_research`, `for_features`, `for_riemann`, `for_p300`, `for_balora` |
+| Gate calibration | `fit_calibrated(..., target_accept=...)` |
+| Adaptation gateway | `adapt(...)` / `adapt_async(...)` |
+| Portable profiles | `export_profile()` / `from_profile(...)` / `UserProfile` |
+| Paradigm recipes | `Recipe`, `fit_mi_session`, `MISessionBundle` / `P300SessionBundle` |
+| Embedding transforms | `transform="standardize"\|"whiten"\|"coral"\|"affine"\|"rpa"\|…` |
+| Optional forgetting | LDA/QDA `λ\<1` (default `λ=1` is byte-identical to 0.5) |
+
+Session-bundle sidecars require `trusted=True` on load; `save` records `sidecar_sha256` verified before unpickle.
+
+## Recommended rewrite
+
+```python
+from nimbus_bci import Personalizer, wrap
+
+enc = wrap(model.encode, model_id="partner", embedding_dim=64)
+adapter = Personalizer.for_deployment(enc, ["left", "right"], paradigm="motor_imagery")
+# adapter.fit_calibrated(X_cal, y_cal, X_val, y_val, target_accept=0.7)
+adapter.fit(X_cal, y_cal)
+states = adapter.predict(X_test)
+adapter.adapt(X_new, y_new)
+profile = adapter.export_profile()
+```
+
+## Next read
+
+<Columns cols={2}>
+  <Card title="Installation" icon="download" href="/python-sdk/installation">
+    Verify 0.6 and optional extras
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/python-sdk/quickstart">
+    Factory-first Personalizer path
+  </Card>
+  <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
+    Profiles, sfreq, save/load
+  </Card>
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
+    Full Personalizer surface
+  </Card>
+</Columns>

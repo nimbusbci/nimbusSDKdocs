@@ -71,6 +71,7 @@
           "python-sdk/introduction",
           "python-sdk/installation",
           "python-sdk/quickstart",
+          "python-sdk/migration-0.6",
           "python-sdk/mne-integration",
           "python-sdk/sklearn-integration",
           "python-sdk/streaming-inference",

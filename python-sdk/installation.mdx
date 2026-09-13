@@ -30,8 +30,10 @@ pip install nimbus-bci
 This installs the core package with all required dependencies:
 
 - NumPy ≥ 1.26
-- scikit-learn ≥ 1.4
+- scikit-learn ≥ 1.6
 - SciPy ≥ 1.17.1
+
+Requires Python `>=3.11,<3.14` (CPython 3.11–3.13 wheels).
 
 ## Optional Dependencies
 
@@ -75,7 +77,7 @@ This adds:
 
 ### Riemannian Feature Pipelines
 
-For pyRiemann covariance and tangent-space feature extraction with Nimbus classifier heads:
+For pyRiemann covariance / tangent-space features, plus `Personalizer.for_riemann` / `for_p300`:
 
 ```bash
 pip install nimbus-bci[riemann]
@@ -83,11 +85,25 @@ pip install nimbus-bci[riemann]
 
 This adds:
 
-- pyRiemann ≥ 0.11
+- pyRiemann ≥ 0.11, \< 0.12
 
 <Note>
-  The `riemann` extra enables `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)`. This is a feature-extraction bridge from EEG epochs to Nimbus heads, not a separate Riemannian Bayesian model family.
+  The `riemann` extra enables `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)` and the paradigm factories. This is a feature-extraction / geometry bridge to Nimbus heads, not a separate Riemannian Bayesian model family.
 </Note>
+
+### Trunk PEFT / BaLoRA (research)
+
+For opt-in trunk adaptation (`wrap_lora`, FiLM, `Personalizer.for_balora`):
+
+```bash
+pip install nimbus-bci[train]
+```
+
+This adds:
+
+- torch ≥ 2.14.0
+
+Research surface only — no certified accuracy claims.
 
 ### All Optional Dependencies
 
@@ -99,14 +115,9 @@ pip install nimbus-bci[all]
 
 ## Development Installation
 
-For development or contributing:
+For development or contributing, install from a source tree you have access to:
 
 ```bash
-# Clone repository
-git clone https://github.com/nimbusbci/nimbuspysdk.git
-cd nimbuspysdk
-
-# Install in editable mode with dev dependencies
 pip install -e ".[dev,all]"
 ```
 
@@ -115,6 +126,8 @@ This includes:
 - pytest for testing
 - Cython for building extensions
 - build and twine for packaging
+
+Published installs use PyPI — you do not need a Git clone for normal use.
 
 ## Verify Installation
 
@@ -135,7 +148,7 @@ X = np.random.randn(100, 10)
 y = np.random.randint(0, 2, 100)
 
 enc = wrap(lambda Z: Z, model_id="verify-encoder", embedding_dim=10)
-adapter = Personalizer(encoder=enc, head="lda", classes=["a", "b"])
+adapter = Personalizer.for_deployment(enc, ["a", "b"])
 adapter.fit(X, y)
 states = adapter.predict(X[:5])
 assert isinstance(states[0], BrainState)
@@ -145,7 +158,7 @@ print("Personalizer smoke test works")
 Expected output:
 
 ```text
-nimbus-bci version: 0.5.0
+nimbus-bci version: 0.6.0
 Personalizer / wrap / BrainState imported successfully
 Core heads imported successfully
 Personalizer smoke test works
@@ -229,6 +242,8 @@ Upgrade to the latest version:
 pip install --upgrade nimbus-bci
 ```
 
+Upgrading from 0.5? See [Migration to 0.6](/python-sdk/migration-0.6) — decision presets and some middleware import paths changed.
+
 Check your version:
 
 ```python
@@ -246,7 +261,7 @@ pip uninstall nimbus-bci
 
 ## License
 
-The nimbus-bci Python SDK is **proprietary**, with two tracks under [LICENSE.txt](https://github.com/nimbusbci/nimbuspysdk/blob/main/LICENSE.txt) (v2.1):
+The nimbus-bci Python SDK is **proprietary**, with two tracks under `LICENSE.txt` (v2.1) shipped in the PyPI package:
 
 | Track | Use case | Cost |
 | --- | --- | --- |
@@ -272,14 +287,14 @@ Email [hello@nimbusbci.com](mailto:hello@nimbusbci.com) with your use case.
   <Card title="Quickstart" icon="rocket" href="/python-sdk/quickstart">
     Build your first Personalizer in minutes
   </Card>
+  <Card title="Migration to 0.6" icon="arrow-right" href="/python-sdk/migration-0.6">
+    Breaking changes from 0.5
+  </Card>
   <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
     Explore the complete API documentation
   </Card>
   <Card title="sklearn Integration" icon="code" href="/python-sdk/sklearn-integration">
     Use nimbus-bci with sklearn pipelines
-  </Card>
-  <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">
-    Preprocess EEG data with MNE-Python
   </Card>
 </Columns>
 
@@ -288,7 +303,8 @@ Email [hello@nimbusbci.com](mailto:hello@nimbusbci.com) with your use case.
 Need help with installation?
 
 - **Email**: [hello@nimbusbci.com](mailto:hello@nimbusbci.com)
-- **GitHub Issues**: [github.com/nimbusbci/nimbuspysdk/issues](https://github.com/nimbusbci/nimbuspysdk/issues)
+- **Docs**: [docs.nimbusbci.com](https://docs.nimbusbci.com)
+- **PyPI**: [pypi.org/project/nimbus-bci](https://pypi.org/project/nimbus-bci/)
 
 ---
 

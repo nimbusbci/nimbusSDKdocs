@@ -35,36 +35,38 @@ Bayesian personalization head over an optional frozen encoder.
 from nimbus_bci import Personalizer, wrap
 
 enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
-adapter = Personalizer(
-    encoder=enc,          # FrozenEncoder | callable | None
-    head="lda",           # "lda" | "qda" | "softmax" | sklearn-like object
-    user="subject_001",
-    classes=["left", "right"],
-    preset="research",    # "research" | "consumer" | None
-    confidence_threshold=0.6,
-    uncertainty_threshold=0.55,
-    paradigm=None,
-    mc_samples=None,      # >=2 → posterior sampling (BALD)
-    mc_rng_seed=0,
-)
+# Preferred entry points (0.6):
+adapter = Personalizer.for_deployment(enc, ["left", "right"], paradigm="motor_imagery")
+# adapter = Personalizer.for_research(enc, ["left", "right"], transform="whiten")
+# adapter = Personalizer.for_features(["left", "right"])
+# adapter = Personalizer.for_riemann(["left", "right"])   # needs [riemann]
+# adapter = Personalizer.for_p300(["NonTarget", "Target"])  # needs [riemann]
 ```
 
+**Factories:** `for_deployment`, `for_research`, `for_features`, `for_riemann`, `for_p300`, `for_balora` (needs `[train]`).
+
 **Methods:**
-- `fit(X, y)` — calibrate on labeled trials (encodes then fits head)
-- `partial_fit(X, y, classes=None)` — cumulative online update
-- `predict(X)` → `list[BrainState]`
+- `fit(X, y, *, input_sfreq=None)` — calibrate on labeled trials
+- `fit_calibrated(X, y, X_val, y_val, *, target_accept=...)` — fit + pin decision-gate accept rate
+- `partial_fit(X, y, classes=None)` — cumulative online head update
+- `adapt(X, y=None, level=...)` — label-agnostic adaptation gateway
+- `adapt_async(...)` — shadow trunk adaptation with atomic commit
+- `predict(X)` → `list[BrainState]` or `BrainStateBatch`
 - `predict_one(x)` → `BrainState`
-- `recommend_adapt(X_stream, *, tau, X_ref=None)` → `AdaptDecision` — thin mean-shift helper (L0 vs L1 only; **user-supplied** `tau`; not a multi-level cascade)
+- `export_profile()` / `Personalizer.from_profile(profile, encoder=...)` — portable profile
+- `recommend_adapt(X_stream, *, tau, X_ref=None)` → `AdaptDecision` — thin mean-shift helper (L0 vs L1 only; **user-supplied** `tau`)
 - `update_from_prediction(...)` — optional feedback path
 - `save(path)` / `Personalizer.load(path, encoder=...)` — persist head; **re-attach encoder on load**
 
-Also exported: `recommend_adapt`, `embedding_mean_shift`, `AdaptDecision` (standalone; same thin helper).
+Also exported: `Recipe`, `UserProfile`, `BrainStateBatch`, `recommend_adapt`, `embedding_mean_shift`, `AdaptDecision`, transform types.
 
 **Notes:**
-- `encoder=None` uses classical features / embeddings already shaped `(n, d)`
+- Prefer factories over raw constructors for common cases
+- Decision presets: `"strict"` / `"permissive"` / `"aggressive"` (0.6 rename; was `research` / `consumer`)
+- `encoder=None` / `for_features` uses classical features already shaped `(n, d)`
 - `head="softmax"` requires `pip install nimbus-bci[softmax]`
-- `partial_fit` is cumulative (no forgetting / decay)
-- After `load`, pass `X_ref=` to `recommend_adapt` (cal embeddings are not serialized)
+- Default `partial_fit` is cumulative (`λ=1`); optional forgetting uses `λ\<1` on LDA/QDA
+- After `load` / `from_profile`, pass `X_ref=` to `recommend_adapt` when needed
 - Trial rejection (`BrainState.rejected`) ≠ adapt recommendation (`should_adapt`)
 
 ### wrap / FrozenEncoder
@@ -101,7 +103,7 @@ state = decide(
         probabilities=[0.7, 0.3],
         uncertainty=0.2,
     ),
-    preset="research",
+    preset="strict",
     user_id="subject_001",
 )
 ```
@@ -1385,4 +1387,3 @@ def train_classifier(
     Working code examples
   </Card>
 </CardGroup>
-
