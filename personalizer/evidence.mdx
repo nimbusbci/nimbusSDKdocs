@@ -115,7 +115,7 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
     Zhou: head helps on every trunk. BNCI: often useful, not automatic (ATCNet stays L0). Kumar/Shin: boundaries — Personalizer is the default *integration* path, not a guarantee that L1 beats L0 everywhere.
   </Accordion>
 
-  <Accordion title="Spotlight: EEGNet denser baselines" icon="flask">
+  <Accordion title="Spotlight: EEGNet denser baselines" icon="flask-conical">
     Controlled bake-off on one classical reference trunk (BNCI primary, Paper 1b). Under severe shift with n=40 labeled stream trials, the Bayesian head can **beat** full FT on BNCI in this protocol; Zhou is the honest softer boundary.
 
     ![BNCI2014-004 cost bake-off: Bayesian head accuracy vs adaptation fit time compared to frozen, linear probe, LoRA, last-layer FT, and full FT](/images/personalizer-cost.png)
@@ -160,7 +160,7 @@ API knobs: [Encoder contract](/personalizer/encoder-contract).
     - **Not claimed:** frozen REVE + Personalizer matches cal-trained EEGNet absolute accuracy. BNCI REVE cost is a 3-subject smoke — not a headline.
   </Accordion>
 
-  <Accordion title="Transfer across trunks" icon="diagram-project">
+  <Accordion title="Transfer across trunks" icon="waypoints">
     Soft operational default vs strict ordinal schedule (18 cells; exploratory). “Severe → L2” means the **protocol** affine+head winner — in 0.6 affine is available as an opt-in `transform=` / `fit_affine()`, not a deployment default.
 
     | Slice | Clean → L0 | Severe → L2 | Strict ordinal |

@@ -15,7 +15,7 @@ For Python SDK installation, see [Python SDK Installation](/python-sdk/installat
 
 ## Getting Your API Key
 
-<Card title="Request API Access" icon="envelope" href="mailto:hello@nimbusbci.com">
+<Card title="Request API Access" icon="mail" href="mailto:hello@nimbusbci.com">
   Contact **hello@nimbusbci.com** to request your API key and discuss your BCI use case.
 </Card>
 
@@ -453,13 +453,13 @@ To upgrade your license tier, contact **hello@nimbusbci.com** with:
 ## Authentication FAQ
 
 <AccordionGroup>
-  <Accordion title="Do Python SDK users need Cloud API authentication?" icon="help-circle">
+  <Accordion title="Do Python SDK users need Cloud API authentication?" icon="circle-question-mark">
     No. The Python SDK runs locally and does not require API authentication. Cloud API authentication is primarily for Julia SDK installation, licensing, and model registry workflows.
   </Accordion>
   <Accordion title="How often do I need to run install_core?" icon="clock">
     `NimbusSDK.install_core()` is typically a one-time setup per machine. After the core is installed and credentials are cached, normal SDK usage does not require repeated setup.
   </Accordion>
-  <Accordion title="What causes authentication failures most often?" icon="alert-triangle">
+  <Accordion title="What causes authentication failures most often?" icon="triangle-alert">
     Common causes are invalid key format, expired or revoked keys, quota/rate limits, and missing environment-variable configuration in deployment environments.
   </Accordion>
 </AccordionGroup>
@@ -476,7 +476,7 @@ To upgrade your license tier, contact **hello@nimbusbci.com** with:
   <Card title="Julia SDK Quickstart" icon="code" href="/julia-sdk/quickstart">
     End-to-end install and first-inference setup path.
   </Card>
-  <Card title="Python SDK Quickstart" icon="python" href="/python-sdk/quickstart">
+  <Card title="Python SDK Quickstart" icon="braces" href="/python-sdk/quickstart">
     Local-only Python workflow without API authentication.
   </Card>
 </CardGroup>
