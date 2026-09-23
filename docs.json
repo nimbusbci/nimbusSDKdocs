@@ -185,12 +185,12 @@
   "anchors": [
     {
       "name": "Website",
-      "url": "https://nimbusbci.com",
+      "url": "https://www.nimbusbci.com",
       "icon": "globe"
     },
     {
       "name": "Book a Demo",
-      "url": "https://nimbusbci.com",
+      "url": "https://www.nimbusbci.com",
       "icon": "calendar"
     },
     {
@@ -221,15 +221,15 @@
   },
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {
@@ -276,7 +276,7 @@
   },
   "seo": {
     "title": "Nimbus BCI Engine - Bayesian Personalization for Brain-Computer Interfaces",
-    "description": "Documentation for Nimbus BCI: wrap frozen EEG encoders, personalize with Personalizer, ship BrainState — plus classical Bayesian heads in Python and Julia.",
+    "description": "Documentation for Nimbus BCI: wrap frozen EEG encoders, personalize with Personalizer, ship BrainState \u2014 plus classical Bayesian heads in Python and Julia.",
     "og": {
       "image": "/images/hero.png",
       "type": "website",
