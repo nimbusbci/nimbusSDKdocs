@@ -216,7 +216,7 @@
     "primary": {
       "type": "button",
       "label": "Book Demo",
-      "href": "https://nimbusbci.com"
+      "href": "https://www.nimbusbci.com"
     }
   },
   "contextual": {
@@ -243,7 +243,7 @@
         "items": [
           {
             "label": "Website",
-            "href": "https://nimbusbci.com"
+            "href": "https://www.nimbusbci.com"
           },
           {
             "label": "Python SDK",
@@ -260,15 +260,15 @@
         "items": [
           {
             "label": "Privacy",
-            "href": "https://nimbusbci.com/privacy"
+            "href": "https://www.nimbusbci.com/privacy"
           },
           {
             "label": "Terms",
-            "href": "https://nimbusbci.com/terms"
+            "href": "https://www.nimbusbci.com/terms"
           },
           {
             "label": "Cookies",
-            "href": "https://nimbusbci.com/cookies"
+            "href": "https://www.nimbusbci.com/cookies"
           }
         ]
       }
