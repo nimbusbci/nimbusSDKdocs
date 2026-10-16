@@ -45,10 +45,12 @@ adapter = Personalizer.for_deployment(enc, ["left", "right"], paradigm="motor_im
 
 **Methods:**
 - `fit(X, y, *, input_sfreq=None)` — calibrate on labeled trials
-- `fit_calibrated(X, y, X_val, y_val, *, target_accept=...)` — fit + pin decision-gate accept rate
-- `partial_fit(X, y, classes=None)` — cumulative online head update
+- `fit_calibrated(X, y, X_val, y_val, *, target_accept=...)` — fit + pin joint decision-gate accept rate
+- `partial_fit(X, y, classes=None)` — cumulative online head update (governed when `safety=` is configured)
 - `adapt(X, y=None, level=...)` — label-agnostic adaptation gateway
 - `adapt_async(...)` — shadow trunk adaptation with atomic commit
+- `snapshot_head() -> HeadSnapshot` — capture immutable byte-exact snapshot of fitted head parameters
+- `restore_head(snapshot: HeadSnapshot)` — restore head parameters from snapshot on performance alert
 - `predict(X)` → `list[BrainState]` or `BrainStateBatch`
 - `predict_one(x)` → `BrainState`
 - `export_profile()` / `Personalizer.from_profile(profile, encoder=...)` — portable profile
@@ -56,19 +58,24 @@ adapter = Personalizer.for_deployment(enc, ["left", "right"], paradigm="motor_im
 - `update_from_prediction(...)` — optional feedback path
 - `save(path)` / `Personalizer.load(path, encoder=...)` — persist head; **re-attach encoder on load**
 
-Also exported: `Recipe`, `UserProfile`, `BrainStateBatch`, `recommend_adapt`, `embedding_mean_shift`, `AdaptDecision`, transform types.
+Also exported: `Recipe`, `UserProfile`, `BrainStateBatch`, `HeadSnapshot`, `PersonalizerInputError`, `DecisionConfig`, `MCSamplingConfig`, `recommend_adapt`, `embedding_mean_shift`, `AdaptDecision`, transform types.
+
+**Constructor Configuration (0.8):**
+- `x_kind` (`"epochs"` | `"embeddings"`, default `"epochs"`): Set to `"embeddings"` when inputs are already pre-encoded feature vectors. Trunk adaptation and reference tracking raise `PersonalizerInputError` under `"embeddings"`.
+- `safety` (`SafetyConfig` or `None`, default `None`): Opt-in governance for online adaptation (`LabelBudget`, `AdaptationGovernor`, `DriftMonitor`, `SafetyMonitor`).
+- `decision` (`DecisionConfig`): Presets `"strict"` (default for deployment), `"permissive"`, or `"aggressive"`.
 
 **Paradigm helpers** (see [Paradigms & profiles](/personalizer/paradigms)):
 
 - `fit_mi_session` / `calibrate_mi_bald` / `MISessionBundle` — MI geometry gateway + day-2 bundle
 - `fit_p300_session` / `P300SessionBundle` — xDAWN→tangent + day-2 bundle (`trusted=True` on load)
-- Session bundles verify `sidecar_sha256` before unpickling joblib sidecars
+- Session bundles verify `sidecar_sha256` before unpickling joblib sidecars (format 2)
 
-**Also see:** [Transforms](/personalizer/transforms) · [Research / PEFT](/personalizer/research-peft) · [Changelog 0.6](/python-sdk/changelog-0.6)
+**Also see:** [Online Safety Layer](/personalizer/safety) · [Transforms](/personalizer/transforms) · [Research / PEFT](/personalizer/research-peft) · [Migration to 0.8](/python-sdk/migration-0.8)
 
 **Notes:**
 - Prefer factories over raw constructors for common cases
-- Decision presets: `"strict"` / `"permissive"` / `"aggressive"` (0.6 rename; was `research` / `consumer`)
+- Decision presets: `"strict"` / `"permissive"` / `"aggressive"`
 - `encoder=None` / `for_features` uses classical features already shaped `(n, d)`
 - `head="softmax"` requires `pip install nimbus-bci[softmax]`
 - Default `partial_fit` is cumulative (`λ=1`); optional forgetting uses `λ\<1` on LDA/QDA
@@ -128,6 +135,122 @@ state = brain_state_from_streaming_result(final, classes=["left", "right"])
 ```
 
 Also exported: `fuse_uncertainty`, `resolve_preset`, `DecisionPreset`, `IntentHypothesis`, `EncoderProtocol`.
+
+## Safety & Governance (nimbus_bci.safety)
+
+State machines that gate online personalization and prevent performance degradation. Narrative guide: [Online Safety Layer](/personalizer/safety).
+
+Importable via `from nimbus_bci import safety` or directly from `nimbus_bci.safety`.
+
+```python
+from nimbus_bci.safety import (
+    SafetyConfig,
+    LabelBudget,
+    AdaptationGovernor,
+    GovernorDecision,
+    DriftMonitor,
+    DriftStatus,
+    SafetyMonitor,
+    SafetyVerdict,
+    AdaptationRefusedError,
+)
+```
+
+### SafetyConfig
+
+Configuration object assembling online safety components for `Personalizer(safety=...)`.
+
+```python
+from nimbus_bci.safety import SafetyConfig, LabelBudget
+
+safety = SafetyConfig(
+    burn_in=50,                  # Min trials before first adaptation
+    cooldown_trials=10,          # Min trials between consecutive adaptations
+    max_adaptations=200,         # Max adaptations per session
+    budget=LabelBudget(per_session_cap=500),  # Shared label spend ledger
+    enabled=True,                # Master kill-switch
+)
+```
+
+### LabelBudget
+
+Label-spend ledger enforcing per-session limits, lifetime hard caps, and monitoring floor exemptions.
+
+```python
+budget = LabelBudget(
+    per_session_cap=1_000,       # Session limit (cleared on reset())
+    hard_cap=5_000,              # Lifetime limit (never restored by reset())
+    floor_exempt=10,             # Labels reserved for diagnostic queries
+)
+
+budget.spend(count=10)           # Deducts labels or raises AdaptationRefusedError
+budget.spend_monitoring(count=2) # Uses floor_exempt without drawing down session cap
+budget.reset()                   # Clears session spend; preserves lifetime spend
+```
+
+**Properties:**
+- `remaining_session`: Int or `None` if uncapped
+- `remaining_lifetime`: Int or `None` if uncapped
+- `total_spent_lifetime`: Cumulative spend across resets
+
+### AdaptationGovernor
+
+State machine checking burn-in, cooldown, and adaptation count limits.
+
+```python
+governor = AdaptationGovernor(
+    burn_in=50,
+    cooldown_trials=10,
+    max_adaptations=200,
+    budget=budget,
+)
+
+# Pure check (returns decision without mutating state)
+decision: GovernorDecision = governor.check(requested_labels=10)
+if decision.allowed:
+    governor.commit(labels_spent=10)
+else:
+    for control in decision.refusing_controls:
+        print(f"Blocked by {control.name}: {control.state}")
+```
+
+### DriftMonitor
+
+Surveillance over mean and covariance drift statistics with alarm level thresholds.
+
+```python
+drift = DriftMonitor(tau_mean=0.35, tau_cov=1.20)
+status: DriftStatus = drift.step(z_mean_stat=0.45, z_cov_stat=1.10)
+# status.alarm_mean, status.alarm_cov, status.run_mean, status.run_cov
+```
+
+### SafetyMonitor
+
+Single-arm regret CUSUM watchdog over verified classification outcomes with Monte-Carlo calibrated thresholds.
+
+```python
+monitor = SafetyMonitor(
+    p_null=0.85,                 # Baseline target accuracy
+    regret_delta=0.10,           # Critical accuracy drop to detect
+    fa=0.05,                     # Target false-alarm rate (re-measured at 0.0510)
+    miss=0.20,                   # Target miss rate
+    min_window=10,
+    max_window=40,
+)
+
+verdict: SafetyVerdict = monitor.step(is_correct=False)
+if verdict.should_revert:
+    adapter.restore_head(saved_snapshot)
+```
+
+### AdaptationRefusedError
+
+Exception raised when an adaptation site is blocked by a safety control.
+
+**Fields:**
+- `control`: Name of the binding control (e.g. `'burn_in'`, `'cooldown'`, `'budget'`, `'max_adaptations'`)
+- `state`: Current state dict explaining the restriction
+- `remedy`: Human-readable remediation advice
 
 ## Classifiers
 
@@ -662,16 +785,30 @@ Result from batch inference.
 
 ## Metrics
 
-### New in 0.6
+### balanced_accuracy()
+
+Macro-averaged recall across all active classes (MOABB / BNCI convention). The honest headline metric for rare-target paradigms (P300 / RSVP) where standard accuracy is dominated by the non-target class.
+
+```python
+from nimbus_bci.metrics import balanced_accuracy
+
+bacc = balanced_accuracy(y_true, y_pred)
+```
+
+Reported by default on `EvaluationResult.balanced_accuracy` and `CrossValResult.balanced_accuracy`.
+
+### Classification & Calibration Metrics
 
 ```python
 from nimbus_bci.metrics import (
+    balanced_accuracy,
     cohen_kappa,
     roc_auc_score,
     brier_score,
     temperature_scale_logits,
 )
 
+bacc = balanced_accuracy(y_true, y_pred)
 kappa = cohen_kappa(y_true, y_pred)
 auc = roc_auc_score(y_true, y_score)  # see docstring for multi-class shapes
 brier = brier_score(y_true, y_proba)

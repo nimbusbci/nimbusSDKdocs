@@ -43,7 +43,10 @@ How the Paper 1 / 1b numbers were produced (datasets, bandpass, session split, s
 
 <Columns cols={2}>
   <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
-    `wrap` → Personalizer → save/load rules.
+    `wrap` → Personalizer → save/load rules & precomputed embeddings.
+  </Card>
+  <Card title="Online Safety Layer" icon="shield-check" href="/personalizer/safety">
+    Label budgets, adaptation governors, drift monitors, and rollback.
   </Card>
   <Card title="BrainState" icon="brain" href="/personalizer/brain-state">
     App-facing intents, presets, and bridges.
@@ -56,9 +59,6 @@ How the Paper 1 / 1b numbers were produced (datasets, bandpass, session split, s
   </Card>
   <Card title="Transforms" icon="sliders-horizontal" href="/personalizer/transforms">
     Embedding-space alignment before the head.
-  </Card>
-  <Card title="Python Quickstart" icon="rocket" href="/python-sdk/quickstart">
-    Fit a Personalizer in a few minutes.
   </Card>
 </Columns>
 
@@ -99,21 +99,23 @@ Policy: stay on the current head when clean; stream-update when shift clears `ta
 
 3. **Head stability** — after online updates, use `calibration_sufficient` / `calibration_status` on an unlabeled pool.
 
-4. **Encoder swap** — freeze trunk; match `embedding_dim`; never pass logits as embeddings; keep `model_id` consistent across `save` / `load` / profiles. See [Encoder contract](/personalizer/encoder-contract).
+4. **Encoder swap & precomputed embeddings** — freeze trunk; match `embedding_dim`; never pass logits as embeddings; keep `model_id` consistent across `save` / `load` / profiles. If consuming pre-extracted vectors, declare `x_kind="embeddings"`. See [Encoder contract](/personalizer/encoder-contract).
+
+5. **Governed adaptation & rollback** — wrap online adaptation in `safety=SafetyConfig(budget=LabelBudget(...), ...)` to enforce burn-in, cooldown, and label budgets; use `snapshot_head()` / `restore_head()` for exact rollback on regret alerts. See [Online Safety Layer](/personalizer/safety).
 
 ## Next read
 
 <Columns cols={2}>
+  <Card title="Online Safety Layer" icon="shield-check" href="/personalizer/safety">
+    Govern online adaptation with budgets, monitors, and rollback.
+  </Card>
   <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
-    Wrap rules and save/load.
+    Wrap rules, save/load, and precomputed embeddings.
   </Card>
   <Card title="BrainState" icon="brain" href="/personalizer/brain-state">
     App-facing intents and presets.
   </Card>
   <Card title="API Reference" icon="book" href="/python-sdk/api-reference#middleware">
-    Personalizer and middleware symbols.
-  </Card>
-  <Card title="Heads / Models" icon="box" href="/model-specification">
-    LDA, QDA, Softmax, STS.
+    Personalizer and safety symbols.
   </Card>
 </Columns>

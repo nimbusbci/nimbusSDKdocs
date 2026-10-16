@@ -105,9 +105,25 @@ This adds:
 
 Research surface only — no certified accuracy claims.
 
+### Lab Streaming Layer (LSL)
+
+For real-time streaming ingest from lab amplifiers and headsets:
+
+```bash
+pip install nimbus-bci[lsl]
+```
+
+This adds:
+
+- pylsl ≥ 1.5
+
+<Note>
+  The `lsl` extra is deliberately separate from `[all]` because `pylsl` binary wheel availability varies across platforms. Where wheels are unavailable, install `liblsl` per the LabStreamingLayer documentation.
+</Note>
+
 ### All Optional Dependencies
 
-Install everything:
+Install everything (except `lsl`):
 
 ```bash
 pip install nimbus-bci[all]
@@ -158,7 +174,7 @@ print("Personalizer smoke test works")
 Expected output:
 
 ```text
-nimbus-bci version: 0.6.0
+nimbus-bci version: 0.8.2
 Personalizer / wrap / BrainState imported successfully
 Core heads imported successfully
 Personalizer smoke test works
@@ -242,7 +258,7 @@ Upgrade to the latest version:
 pip install --upgrade nimbus-bci
 ```
 
-Upgrading from 0.5? See [Migration to 0.6](/python-sdk/migration-0.6) — decision presets and some middleware import paths changed. Release notes: [Changelog 0.6](/python-sdk/changelog-0.6).
+Upgrading from 0.6 or 0.7? See [Migration to 0.8](/python-sdk/migration-0.8). For legacy 0.5 codebases, see [Migration to 0.6](/python-sdk/migration-0.6). Full release notes: [Changelog 0.8](/python-sdk/changelog-0.8).
 
 Check your version:
 

@@ -141,17 +141,43 @@ Before you begin:
     X_new = np.random.randn(10, n_features)
     y_new = np.random.randint(0, 4, 10)
     clf.partial_fit(X_new, y_new)
-    
-    # Personalizer path
-    # adapter.adapt(X_lab, y_lab)           # preferred gateway
-    # adapter.partial_fit(X_lab, y_lab)     # head-only conjugate update
-    # dec = adapter.recommend_adapt(X_stream, tau=your_tau)
-    # if dec.should_adapt:
-    #     adapter.partial_fit(X_lab, y_lab)
     ```
 
     <Info>
-      Trial rejection (`BrainState.rejected` / `need_more_data`) is a different gate from adapt recommendations. Presets are `strict` / `permissive` (0.6 rename). See [BrainState](/personalizer/brain-state) and [Migration to 0.6](/python-sdk/migration-0.6).
+      Trial rejection (`BrainState.rejected` / `need_more_data`) is a different gate from adapt recommendations. Presets are `strict` / `permissive`. See [BrainState](/personalizer/brain-state).
+    </Info>
+  </Step>
+
+  <Step title="Governed adaptation (safety & rollback)">
+    Prevent label overspending and roll back regressions with `nimbus_bci.safety`:
+
+    ```python
+    from nimbus_bci import DecisionConfig, Personalizer
+    from nimbus_bci.safety import LabelBudget, SafetyConfig
+
+    p = Personalizer(
+        encoder=enc,
+        classes=["left", "right"],
+        decision=DecisionConfig(preset="strict"),
+        safety=SafetyConfig(
+            burn_in=20,
+            budget=LabelBudget(per_session_cap=100),
+        ),
+    )
+    p.fit(X_cal, y_cal)
+
+    # 1. Snapshot head parameters before adapting
+    snap = p.snapshot_head()
+
+    # 2. Governed online update (raises AdaptationRefusedError if budget exhausted)
+    p.partial_fit(X_new, y_new)
+
+    # 3. Exact rollback if diagnostic checks flag degradation
+    p.restore_head(snap)
+    ```
+
+    <Info>
+      See [Online Safety Layer](/personalizer/safety) for full details on budgets, governors, and drift surveillance.
     </Info>
   </Step>
 </Steps>
@@ -170,6 +196,9 @@ Before you begin:
 ## Continue with
 
 <Columns cols={2}>
+  <Card title="Online Safety Layer" icon="shield-check" href="/personalizer/safety">
+    Budgets, governors, drift surveillance, and rollback
+  </Card>
   <Card title="Personalizer & Middleware" icon="layers" href="/personalizer/overview">
     Encoder contract, adapt helper, BrainState
   </Card>
@@ -178,9 +207,6 @@ Before you begin:
   </Card>
   <Card title="Streaming Inference" icon="activity" href="/python-sdk/streaming-inference">
     Chunk-by-chunk real-time processing
-  </Card>
-  <Card title="MNE Integration" icon="brain" href="/python-sdk/mne-integration">
-    Epochs → features or frozen encoder
   </Card>
   <Card title="sklearn Integration" icon="code" href="/python-sdk/sklearn-integration">
     Pipelines, CV, and GridSearch

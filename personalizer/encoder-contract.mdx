@@ -76,6 +76,32 @@ p = Personalizer.for_riemann(["left", "right"])  # geodesic tracking α=0.05 def
 
 **Foundation pooling:** REVE / EEGPT adapters mean-pool (or flatten) token / patch features to flat `(n, d)` so LDA/QDA heads can consume them. Spatial/temporal structure is collapsed at the encoder boundary, not inside the Bayesian head.
 
+## Precomputed embeddings (`x_kind="embeddings"`)
+
+When embeddings are generated upstream — for example, served by an inference microservice, extracted in batch, or streamed from an external feature store — you do not need to wrap an encoder function. Pass `x_kind="embeddings"`:
+
+```python
+from nimbus_bci import DecisionConfig, Personalizer
+
+# Z is already (n, d) embeddings from the trunk
+p = Personalizer(
+    x_kind="embeddings",
+    classes=["left", "right"],
+    decision=DecisionConfig(preset="strict"),
+)
+p.fit(Z_cal, y_cal)
+states = p.predict(Z_test)
+```
+
+**Contract Rules:**
+- `encoder.encode()` is never invoked.
+- Head fitting, online `partial_fit()`, and embedding transforms (`transform="standardize"`, etc.) operate directly on `Z`.
+- Operations that require raw EEG or encoder access raise `PersonalizerInputError`:
+  - Trunk adaptation (`adapt(level="trunk")`, `adapt_trunk`, `adapt_async`, `fit_tent`)
+  - Trunk MC sampling (`mc_samples` with `n_trunk >= 2`)
+  - Riemannian geodesic reference tracking
+- **Persistence Round-Trip:** The declared `x_kind` and observed `embed_dim` persist in profile metadata (`export_profile()` / `save()`). Restoring via `from_profile()` verifies width and protects against mismatched re-fits.
+
 ## Ladder levels under one API
 
 **Shipped Personalizer path** (same trunk, no architecture change):

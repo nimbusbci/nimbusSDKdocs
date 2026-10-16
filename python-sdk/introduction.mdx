@@ -7,7 +7,7 @@ icon: "braces"
 
 The **nimbus-bci** Python library is a Bayesian personalization head for frozen neural EEG embeddings — and sklearn-compatible classifiers for classical feature pipelines. Wrap any trunk that emits `encode(X) → Z`, adapt online with `Personalizer`, and ship apps on `BrainState`.
 
-Optional extras: `[softmax]` (JAX), `[riemann]` (pyRiemann + `for_riemann` / `for_p300`), `[train]` (torch PEFT / BaLoRA), `[mne]`, `[viz]`, or `[all]`.
+Optional extras: `[lsl]` (Lab Streaming Layer), `[softmax]` (JAX), `[riemann]` (pyRiemann + `for_riemann` / `for_p300`), `[train]` (torch PEFT / BaLoRA), `[mne]`, `[viz]`, or `[all]`.
 
 ## Start here
 
@@ -32,7 +32,7 @@ pip install nimbus-bci
 ```
 
 <Note>
-**Product wedge:** `wrap` → `Personalizer` → `BrainState`. Also: `CalibrationSession` for active learning, and `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)` for pyRiemann + Nimbus heads. See [Personalizer & Middleware](/personalizer/overview) and [Active Learning](/python-sdk/active-learning).
+**Product wedge:** `wrap` → `Personalizer` → `BrainState`. Also: `SafetyConfig` / `LabelBudget` for online governance, `CalibrationSession` for active learning, and `nimbus_bci.riemann.make_riemann_nimbus_pipeline(...)` for pyRiemann + Nimbus heads. See [Personalizer & Middleware](/personalizer/overview), [Online Safety Layer](/personalizer/safety), and [Active Learning](/python-sdk/active-learning).
 </Note>
 
 ## Key features
@@ -40,6 +40,9 @@ pip install nimbus-bci
 <Columns cols={2}>
   <Card title="Personalizer Middleware" icon="layers" href="/personalizer/overview">
     Plug any frozen trunk; personalize online; ship `BrainState` to apps.
+  </Card>
+  <Card title="Online Safety & Governance" icon="shield-check" href="/personalizer/safety">
+    Label budgets, adaptation governors, drift surveillance, and rollback.
   </Card>
   <Card title="sklearn Compatible Heads" icon="code">
     Bayesian heads work as drop-in sklearn classifiers in pipelines and CV.

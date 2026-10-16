@@ -239,6 +239,18 @@ println("Quality score: $(round(report.quality_score * 100, digits=1))%")
 
 For Python trial-level quality checks, see the [Python SDK API Reference](/python-sdk/api-reference#metrics) and [BrainState](/personalizer/brain-state) gates.
 
+## Repository showcase scripts (0.8)
+
+The `examples/` directory in the `nimbus-bci` repository provides runnable end-to-end demonstrations:
+
+| Script | Command | Key Concept |
+| --- | --- | --- |
+| **Trust Dashboard** | `python examples/trust_dashboard.py` | Real-time safety stream: verified accuracy, regret CUSUM alarms, drift stats, rollback, and budget limits (`[viz]` extra) |
+| **Tap-to-Roam Profile** | `python examples/wallet_profile_roundtrip.py` | Packs a fitted profile into a `<30 KB` portable pass bundle (`neural_profile.pass/`) with SHA-256 manifest |
+| **LSL Live Loop** | `python examples/lsl_live_loop.py --simulate` | Live Lab Streaming Layer ingest with ring buffer and event-locked epoching (`[lsl]` extra) |
+| **Deployment Calibration** | `python examples/deployment_fit_calibrated.py` | Pins realized accept rate on held-out validation slices with `fit_calibrated` |
+| **Embeddings Contract** | `python examples/embeddings_contract.py` | Precomputed embeddings workflow with `Personalizer(x_kind="embeddings")` |
+
 ## Choosing a starting point
 
 | Path | Use first when | Notes |

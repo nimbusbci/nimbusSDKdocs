@@ -1,0 +1,204 @@
+---
+title: "Migration to 0.8"
+description: "Upgrade guide for nimbus-bci 0.8: online safety layer, precomputed embeddings contract, joint gate calibration, and hardened pseudo-adaptation."
+sidebarTitle: "Migration to 0.8"
+icon: "arrow-right"
+keywords:
+  - "migration"
+  - "0.8"
+  - "0.7"
+  - "upgrade"
+  - "nimbus-bci"
+  - "breaking changes"
+  - "safety"
+  - "embeddings"
+---
+
+This guide covers upgrading from **nimbus-bci 0.6.x or 0.7.x to 0.8.x**.
+
+```bash
+pip install --upgrade nimbus-bci
+```
+
+Verify your installed version:
+
+```python
+import nimbus_bci
+assert nimbus_bci.__version__.startswith("0.8")
+print(f"nimbus-bci version: {nimbus_bci.__version__}")
+```
+
+---
+
+## One-Hop Upgrade Summary
+
+Nothing in 0.7 or 0.8 breaks existing saved profiles or bundles from 0.6. Profile artifacts and session bundles continue to load. The upgrade introduces new guardrails, deployment contracts, and an opt-in safety layer:
+
+| Change | Version | Impact | Action Required |
+| --- | --- | --- | --- |
+| **`adapt_pseudo` hardened** | 0.8.0 | **Unconditional** behavioral change | Heads without MC sampling now fail closed; epistemic threshold defaults to 0.45; cap at 200 updates |
+| **Online Safety Layer** | 0.8.0 | Opt-in | Wrap adaptation loops with `SafetyConfig` and `LabelBudget` |
+| **Head Snapshot & Rollback** | 0.8.0 | New capability | Use `snapshot_head()` and `restore_head()` to revert degraded adaptations |
+| **Precomputed Embeddings** | 0.7.0 | New contract | Pass `x_kind="embeddings"` when serving pre-extracted feature vectors |
+| **Joint Gate Calibration** | 0.7.2 | Calibration fix | `fit_calibrated` now pins realized accept rates accurately for multiclass ($K > 2$) |
+| **Balanced Accuracy** | 0.7.3 | Metric addition | Available on `EvaluationResult` and `nimbus_bci.metrics.balanced_accuracy` |
+| **Format-2 Session Bundles** | 0.7.1 | Integrity check | Bundles verify SHA-256 digests; post-save metadata edits are refused by design |
+| **Constructor Preset Syntax** | 0.8.2 | Cleanup | Pass `decision=DecisionConfig(preset="strict")` instead of deprecated `preset=` kwarg |
+
+---
+
+## 1. Unconditional Change: Hardened `adapt_pseudo`
+
+In 0.6, `adapt_pseudo` had its entropy and epistemic uncertainty gates disabled by default (`None`). In 0.8.0+, defaults are hardened:
+
+- **Entropy gate:** Defaults to $0.60 \cdot \log_2(K)$ bits (class-count-aware).
+- **Epistemic gate:** Defaults to $0.45$ (normalized scale).
+- **Cumulative update cap:** `max_pseudo_updates=200` cumulative updates per session.
+- **Fail-closed posture:** If your model lacks Monte Carlo sampling (no epistemic score), `adapt_pseudo` now **refuses** with `AdaptationRefusedError` rather than self-training unguided.
+
+```python
+# If you rely on adapt_pseudo with a non-MC model:
+# Option A (Recommended): Enable MC sampling on your Personalizer
+from nimbus_bci import MCSamplingConfig
+p = Personalizer(enc, classes, mc=MCSamplingConfig.head_only(32))
+
+# Option B: Explicitly disable the epistemic gate if you accept unguided self-training
+p.adapt_pseudo(X_unlabeled, epistemic=1.0)
+```
+
+<Note>
+  For multiclass problems ($K \ge 4$), the default epistemic threshold of $0.45$ may need re-tuning for your specific uncertainty scale.
+</Note>
+
+---
+
+## 2. Opt-in Online Safety Layer (`nimbus_bci.safety`)
+
+To govern adaptation pacing, label spend, and rollback, supply `safety=SafetyConfig(...)` to `Personalizer`:
+
+```python
+from nimbus_bci import DecisionConfig, Personalizer
+from nimbus_bci.safety import AdaptationRefusedError, LabelBudget, SafetyConfig
+
+p = Personalizer(
+    encoder=enc,
+    classes=["left", "right"],
+    decision=DecisionConfig(preset="strict"),
+    safety=SafetyConfig(
+        burn_in=50,
+        cooldown_trials=10,
+        max_adaptations=200,
+        budget=LabelBudget(per_session_cap=500, hard_cap=2_000),
+    ),
+)
+```
+
+- When configured, `partial_fit`, `adapt_pseudo`, `adapt_trunk`, and `adapt_async` consult the governor first and raise `AdaptationRefusedError` when a limit binds.
+- Enforcement is session-scoped: `save()` and `load()` do not persist safety counters. Attach a fresh `SafetyConfig` when loading a profile.
+- Details: [Online Safety Layer](/personalizer/safety).
+
+---
+
+## 3. Head Snapshot and Rollback
+
+Capture byte-exact frozen snapshots of the head to undo problematic online updates:
+
+```python
+# Before adapting:
+snapshot = p.snapshot_head()
+
+# Adapt:
+p.partial_fit(X_stream, y_stream)
+
+# Rollback if verification checks fail:
+if monitor.should_revert:
+    p.restore_head(snapshot)
+```
+
+---
+
+## 4. Precomputed Embeddings (`x_kind="embeddings"`)
+
+If your pipeline serves precomputed embeddings (e.g. from an inference server or feature store):
+
+```python
+# Declare x_kind="embeddings"
+p = Personalizer(
+    x_kind="embeddings",
+    classes=["left", "right"],
+    decision=DecisionConfig(preset="strict"),
+)
+p.fit(Z_cal, y_cal)  # Z is already the encoder output
+```
+
+- `encoder.encode()` is never called.
+- Trunk adaptation (`adapt_trunk`, `adapt_async`, `fit_tent`) and Riemannian reference tracking cannot operate on precomputed embeddings and raise `PersonalizerInputError`.
+- Contract roundtrips through profile metadata (`export_profile()` / `from_profile()`).
+
+---
+
+## 5. Joint Gate Calibration (`fit_calibrated`)
+
+In 0.6, `fit_calibrated` calibrated confidence thresholds in isolation. When $K > 2$, the independent entropy ceiling ($0.75 \cdot \log_2 K$) silently lowered the realized accept rate below the target (e.g., target 70% realized only 57–64%).
+
+In 0.8:
+- Thresholds are computed within the validation subset passing the entropy ceiling.
+- `gate_calibration_.achieved_accept` reports the true realized joint rate.
+- If fewer trials pass the entropy ceiling than requested, a `UserWarning` reports the maximum achievable accept rate honestly.
+
+---
+
+## 6. Balanced Accuracy for Rare Targets
+
+For rare-target paradigms (such as P300 spellers or RSVP), raw accuracy is distorted by class imbalance. 0.8 includes macro-averaged recall by default:
+
+```python
+from nimbus_bci.metrics import balanced_accuracy
+
+# Direct metric:
+bacc = balanced_accuracy(y_true, y_pred)
+
+# Included on evaluation results:
+result = p.evaluate(X_val, y_val)
+print(f"Accuracy: {result.accuracy:.2%}")
+print(f"Balanced Accuracy: {result.balanced_accuracy:.2%}")
+```
+
+---
+
+## 7. Direct Construction Syntax
+
+Direct construction should pass `decision=DecisionConfig(preset=...)` rather than passing `preset=` directly to `Personalizer`:
+
+```python
+# Before (0.6 / early)
+p = Personalizer(enc, classes, preset="strict")
+
+# Clean 0.8 syntax
+from nimbus_bci import DecisionConfig, Personalizer
+
+p = Personalizer(
+    encoder=enc,
+    classes=classes,
+    decision=DecisionConfig(preset="strict"),
+)
+```
+
+---
+
+## Next Read
+
+<Columns cols={2}>
+  <Card title="Online Safety Layer" icon="shield-check" href="/personalizer/safety">
+    Full guide to budgets, governors, monitors, and rollback
+  </Card>
+  <Card title="Changelog 0.8" icon="scroll" href="/python-sdk/changelog-0.8">
+    Detailed release notes for 0.7 and 0.8
+  </Card>
+  <Card title="Encoder Contract" icon="plug" href="/personalizer/encoder-contract">
+    Updated encoder and precomputed embeddings rules
+  </Card>
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
+    Complete API signatures
+  </Card>
+</Columns>

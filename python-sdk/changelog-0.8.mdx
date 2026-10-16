@@ -1,0 +1,109 @@
+---
+title: "Changelog 0.8"
+description: "Release notes for nimbus-bci 0.8.x and 0.7.x — safety layer, rollback, embeddings contract, joint gate calibration, and LSL ingest."
+sidebarTitle: "Changelog 0.8"
+icon: "scroll"
+keywords:
+  - "changelog"
+  - "0.8"
+  - "0.7"
+  - "release notes"
+  - "nimbus-bci"
+---
+
+Release notes for **nimbus-bci 0.8.x** and **0.7.x**. The full historical log is shipped in the PyPI source distribution (`CHANGELOG.md`).
+
+Upgrading from 0.6 or 0.7? See [Migration to 0.8](/python-sdk/migration-0.8).
+
+---
+
+## [0.8.2] — 2026-10-16
+
+### Added
+- **Live Safety Dashboard (`examples/trust_dashboard.py`):** One-command streaming dashboard visualizing verified rolling accuracy, regret CUSUM, mean/cov drift statistics, accept rates, governor commits, and budget exhaustion. Supports terminal and graphical render (`[viz]` extra).
+- **Wallet Profile Demo (`examples/wallet_profile_roundtrip.py`):** Tap-to-Roam demo packing fitted user profiles into `<30 KB` pass-shaped bundles (`neural_profile.pass/`) with SHA-256 manifests.
+- **Lab Streaming Layer Ingest (`examples/lsl_live_loop.py` + `[lsl]` extra):** Real-time EEG and marker inlet ingest with timestamped ring buffer and event-locked epoching. Includes `--simulate` flag to test without physical hardware.
+- **Preregistered Leaderboard Generator:** Generated headline leaderboard script (`scripts/generate_leaderboard.py`) pulling directly from diff-protected golden fixtures.
+
+### Fixed
+- README and quickstart direct construction examples aligned with `DecisionConfig(preset=...)` signature.
+
+---
+
+## [0.8.1] — 2026-10-16
+
+### Fixed
+- **`adapt_pseudo` mid-batch cap refusal accounting:** Commits accepted trials to the label budget and writes `pseudo_report_` before raising `AdaptationRefusedError`.
+- **Ordered format checking in `Personalizer.load`:** Older format versions load with a `UserWarning` rather than hard-failing with misleading "written by newer SDK" messages.
+- **`restore_head` trunk-generation warning:** Emits a warning when restoring a head snapshot that predates the current live trunk geometry.
+
+---
+
+## [0.8.0] — 2026-10-14
+
+### Added
+- **Public Safety Module (`nimbus_bci.safety`):**
+  - `LabelBudget`: Session and lifetime label spend ledger with monitoring floor exemptions.
+  - `AdaptationGovernor`: Burn-in, cooldown, and adaptation count state machine with pure `check()` and atomic `commit()`.
+  - `DriftMonitor`: Persistent run-length mean and covariance shift surveillance.
+  - `SafetyMonitor`: Single-arm regret CUSUM watchdog with Monte-Carlo calibrated thresholds.
+  - `AdaptationRefusedError`: Raised with refusing control name, current state, and actionable remedy.
+- **Opt-in Safety Enforcement:** `Personalizer(..., safety=SafetyConfig(...))` gates all online adaptation sites (`partial_fit`, `adapt_pseudo`, `adapt_trunk`, `adapt_async`, `adapt`).
+- **Head Snapshot & Exact Rollback:** `Personalizer.snapshot_head() -> HeadSnapshot` and `Personalizer.restore_head(snapshot)`.
+- **Epochs Ingest Contract:** Detailed ingest documentation for event-locking, `from_mne_epochs`, sampling rate discipline, and baseline correction.
+
+### Changed
+- **`adapt_pseudo` hardened defaults:** Entropy ceiling ($0.60 \cdot \log_2 K$) and epistemic uncertainty ($0.45$) enabled by default; `max_pseudo_updates=200` cumulative cap; fails closed on heads without MC uncertainty.
+
+---
+
+## [0.7.3] — 2026-10-14
+
+### Added
+- **Balanced Accuracy Metric:** Added `nimbus_bci.metrics.balanced_accuracy` and populated `EvaluationResult.balanced_accuracy` / `CrossValResult.balanced_accuracy` by default for rare-target paradigms (P300 / RSVP).
+- **Deployment Examples:** Added `deployment_fit_calibrated.py` and `embeddings_contract.py`.
+
+---
+
+## [0.7.2] — 2026-10-14
+
+### Fixed
+- **Honest Joint-Gate Calibration:** `calibrate_decision_gate` and `fit_calibrated` now calibrate against the joint gate (confidence + entropy ceiling), eliminating undershoot at $K > 2$.
+- **De-biased Geometry Recommendation:** `recommend_geometry` uses repeated stratified shuffle-split CV (`n_repeats=24`) to eliminate winner's curse holdout inflation.
+- **Active Learning Hardening:** `CalibrationSession` copies pools at construction, checks for pool contamination, and ensures idempotent stopping histories.
+
+---
+
+## [0.7.1] — 2026-10-14
+
+### Fixed
+- **Digest-Bound Session Bundles:** `MISessionBundle` and `P300SessionBundle` bind artifacts with format-2 SHA-256 digests (`profile_sha256`, `sidecar_sha256`) to prevent tampering and cross-bundle contamination.
+- `fit_population` and `adapt_trunk` track embedding width across adaptation cycles and resets.
+
+---
+
+## [0.7.0] — 2026-10-12
+
+### Added
+- **Precomputed Embeddings Input Contract (`x_kind="embeddings"`):** Allows `Personalizer` to consume embeddings directly without calling `encoder.encode`.
+- **`PersonalizerInputError`:** Clear exception raised when attempting trunk-level operations on precomputed embeddings.
+- Full contract round-trip persisted in profile metadata.
+
+---
+
+## Next Read
+
+<Columns cols={2}>
+  <Card title="Online Safety Layer" icon="shield-check" href="/personalizer/safety">
+    Guide to budgets, governors, and rollback
+  </Card>
+  <Card title="Migration to 0.8" icon="arrow-right" href="/python-sdk/migration-0.8">
+    Upgrade path from 0.6 to 0.8
+  </Card>
+  <Card title="Installation" icon="download" href="/python-sdk/installation">
+    Install instructions and optional extras
+  </Card>
+  <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
+    Full symbol reference
+  </Card>
+</Columns>

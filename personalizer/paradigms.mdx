@@ -123,26 +123,30 @@ p.fit(X_cal, y_cal)
 
 ## Gate calibration
 
-Default decision gates accept **7–78%** of trials across trunks. Pin the accept rate:
+Default decision gates accept **7–78%** of trials across trunks. Pin the realized accept rate with joint gate calibration:
 
 ```python
 p = Personalizer.for_deployment(enc, ["left", "right"])
 p.fit_calibrated(X_cal, y_cal, X_val, y_val, target_accept=0.7)
 ```
 
+<Note>
+  `fit_calibrated` calibrates the confidence threshold within trials that pass the entropy ceiling. At $K > 2$, the joint gate guarantees the realized accept rate matches `target_accept` on validation data, rather than being eroded by independent entropy rejection.
+</Note>
+
 ## Next read
 
 <Columns cols={2}>
+  <Card title="Online Safety Layer" icon="shield-check" href="/personalizer/safety">
+    Govern online adaptation with budgets, monitors, and rollback
+  </Card>
   <Card title="Encoder contract" icon="plug" href="/personalizer/encoder-contract">
-    wrap, sfreq, save/load, profiles
+    wrap, sfreq, save/load, profiles, and precomputed embeddings
   </Card>
   <Card title="BrainState" icon="brain" href="/personalizer/brain-state">
     strict / permissive gates
   </Card>
-  <Card title="Migration to 0.6" icon="arrow-right" href="/python-sdk/migration-0.6">
-    Breaking changes from 0.5
-  </Card>
-  <Card title="Basic examples" icon="play" href="/examples/basic-examples">
-    Compact MI / P300 recipes
+  <Card title="Migration to 0.8" icon="arrow-right" href="/python-sdk/migration-0.8">
+    Upgrading to 0.8
   </Card>
 </Columns>

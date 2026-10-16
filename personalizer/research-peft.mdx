@@ -65,27 +65,29 @@ Trainer arms accept hyperparameter overrides. Prefer measuring cost on your hard
 
 ## Other research-only mechanisms
 
-| API | Role |
-| --- | --- |
-| `adapt_pseudo` | Gated self-training on an unlabeled stream |
-| `fit_tent` | Entropy minimization over trunk norm affine params |
-| `T3APrototypeChannel` | Optimization-free recalibration on verified labels |
-| `adapt_errp` | Soft-negative conjugate update from an external ErrP probability |
-| `fit_population` | Warm-start from pooled LOSO posteriors + prior-predictive gate |
+| API | Role | Notes |
+| --- | --- | --- |
+| `adapt_pseudo` | Gated self-training on an unlabeled stream | Hardened in 0.8: entropy ceiling ($0.60 \log_2 K$), epistemic ($0.45$), `max_pseudo_updates=200` cap |
+| `fit_tent` | Entropy minimization over trunk norm affine params | Unsupervised normalization adaptation |
+| `T3APrototypeChannel` | Optimization-free recalibration on verified labels | Prototype recalibration |
+| `adapt_errp` | Soft-negative conjugate update from external ErrP probability | Soft-label error updates |
+| `fit_population` | Warm-start from pooled LOSO posteriors + prior-predictive gate | Population initialization |
 
-These ship for experimentation — confirmation-drift and protocol risks apply.
+<Warning>
+  **Hardened `adapt_pseudo` Defaults (0.8):** `adapt_pseudo` now enforces an entropy ceiling ($0.60 \cdot \log_2 K$ bits) and normalized epistemic uncertainty floor ($0.45$), plus a cumulative session cap of 200 accepted updates. Models without Monte Carlo sampling lack epistemic scores and **fail closed** by raising `AdaptationRefusedError`. Enable `mc=MCSamplingConfig.head_only(...)` or pass `epistemic=1.0` if running unguarded experiments.
+</Warning>
 
 ## Next read
 
 <Columns cols={2}>
-  <Card title="Evidence" icon="chart-line" href="/personalizer/evidence">
-    When head-only beats FT on cost
+  <Card title="Online Safety Layer" icon="shield-check" href="/personalizer/safety">
+    Govern online adaptation with budgets and monitors
   </Card>
   <Card title="Transforms" icon="sliders-horizontal" href="/personalizer/transforms">
     Embedding-space alignment
   </Card>
-  <Card title="Migration to 0.6" icon="arrow-right" href="/python-sdk/migration-0.6">
-    Breaking changes and adoption map
+  <Card title="Migration to 0.8" icon="arrow-right" href="/python-sdk/migration-0.8">
+    Upgrading to 0.8
   </Card>
   <Card title="API Reference" icon="book" href="/python-sdk/api-reference">
     Personalizer methods and configs

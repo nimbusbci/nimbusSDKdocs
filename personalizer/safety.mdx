@@ -1,0 +1,226 @@
+---
+title: "Online Safety Layer"
+description: "Govern online adaptation with label budgets, adaptation governors, drift surveillance, regret CUSUM monitoring, and head rollback via nimbus_bci.safety."
+sidebarTitle: "Safety & Governance"
+icon: "shield-check"
+keywords:
+  - "safety"
+  - "LabelBudget"
+  - "AdaptationGovernor"
+  - "DriftMonitor"
+  - "SafetyMonitor"
+  - "SafetyConfig"
+  - "AdaptationRefusedError"
+  - "snapshot_head"
+  - "restore_head"
+  - "HeadSnapshot"
+  - "online adaptation"
+---
+
+The **nimbus-bci 0.8 safety layer** (`nimbus_bci.safety`) provides dependency-light state machines that gate online adaptation. 
+
+While trial rejection (`BrainState.rejected`) gates individual *predictions*, the safety module gates *adaptation* — preventing runaway updates, label budget exhaustion, adaptation during drift storms, and silent model degradation.
+
+<Tip>
+  **Safety posture:** `safety=None` (the default) keeps all adaptation paths byte-identical to previous releases. Opting in with `SafetyConfig` turns silent adaptation drops into explicit, actionable refusals (`AdaptationRefusedError`).
+</Tip>
+
+## Core Architecture
+
+```text
+Incoming Trial (X, y)
+        │
+        ▼
+┌──────────────────────────────────────────────────────────┐
+│ AdaptationGovernor.check()                               │
+│  ├── Burn-in satisfied? (min trials before adaptation)   │
+│  ├── Cooldown satisfied? (min trials between updates)    │
+│  ├── Adaptation cap respected? (max adaptations allowed) │
+│  └── LabelBudget available? (session & lifetime limits)  │
+└──────────────────────────────────────────────────────────┘
+        │
+   [All Pass] ──(Commit spend)──► Apply Update (partial_fit / adapt)
+        │                                  │
+     [Refuse]                              ▼
+        │                    ┌────────────────────────────┐
+        ▼                    │ SafetyMonitor (Regret CUSUM)│
+ raises AdaptationRefusedError│ Detects performance drop   │
+ (named control + remedy)    └─────────────┬──────────────┘
+                                           │
+                                     [should_revert]
+                                           ▼
+                                Personalizer.restore_head()
+                                (Byte-exact rollback)
+```
+
+## Quick Start: Governed Adaptation
+
+To enforce safety controls, supply a `SafetyConfig` at `Personalizer` construction:
+
+```python
+from nimbus_bci import DecisionConfig, Personalizer, wrap
+from nimbus_bci.safety import LabelBudget, SafetyConfig
+
+enc = wrap(model.encode, model_id="partner-encoder", embedding_dim=64)
+
+# Configure governed personalizer
+p = Personalizer(
+    encoder=enc,
+    classes=["left", "right"],
+    decision=DecisionConfig(preset="strict"),
+    safety=SafetyConfig(
+        burn_in=50,                  # Wait 50 trials before allowing adaptation
+        cooldown_trials=10,          # Enforce 10 trials between consecutive updates
+        max_adaptations=200,         # Maximum 200 head adaptations per session
+        budget=LabelBudget(
+            per_session_cap=500,     # Maximum 500 labeled trials this session
+            hard_cap=2_000,          # Lifetime limit across resets
+            floor_exempt=10,         # 10 labels exempt for baseline monitoring
+        ),
+    ),
+)
+
+p.fit(X_cal, y_cal)
+
+# Capture initial fitted state before streaming
+baseline_snapshot = p.snapshot_head()
+```
+
+When `safety=` is configured, every adaptation call (`partial_fit`, `adapt_pseudo`, `adapt_trunk`, `adapt_async`, and unsupervised `adapt`) consults the governor **before** modifying head state:
+
+```python
+try:
+    p.partial_fit(X_new, y_new)
+except AdaptationRefusedError as err:
+    print(f"Adaptation blocked by: {err.control}")
+    print(f"Current state: {err.state}")
+    print(f"Recommended remedy: {err.remedy}")
+```
+
+---
+
+## Safety Components
+
+### 1. LabelBudget
+
+[`LabelBudget`](/python-sdk/api-reference#labelbudget) tracks and enforces label expenditure across sessions:
+
+- **All-or-nothing spend:** If a batch requires 10 labels but only 8 remain in the budget, the entire spend refuses without partial side effects.
+- **Lifetime `hard_cap`:** `budget.reset()` clears session spend but **never** restores a lifetime hard cap.
+- **Monitoring floor exemption (`floor_exempt`):** A reserved quota of label queries that pass uncharged, ensuring diagnostic monitoring never starves even when the operational budget is spent.
+
+```python
+from nimbus_bci.safety import LabelBudget
+
+budget = LabelBudget(per_session_cap=100, hard_cap=500, floor_exempt=5)
+budget.spend(20)
+print(budget.remaining_session)  # 80
+```
+
+### 2. AdaptationGovernor
+
+[`AdaptationGovernor`](/python-sdk/api-reference#adaptationgovernor) manages adaptation timing and pacing through a pure `check()` and atomic `commit()` pattern:
+
+- **Burn-in (`burn_in`):** Requires observing a minimum number of stream trials before permitting any parameter updates.
+- **Cooldown (`cooldown_trials`):** Mandates a spacing interval between updates so the system can evaluate transient effects.
+- **Max adaptations (`max_adaptations`):** Caps total adaptation count per session.
+- **Multi-control visibility:** When multiple controls bind simultaneously, `check()` returns a `GovernorDecision` naming **all** violated controls, not just the first.
+
+### 3. DriftMonitor
+
+[`DriftMonitor`](/python-sdk/api-reference#driftmonitor) runs persistent run-length surveillance over embedding mean-shift and covariance statistics:
+
+- Tracks independent consecutive-exceedance runs across mean and covariance metrics against user-defined thresholds (`tau_mean`, `tau_cov`).
+- Non-latching alarms notify you when embedding geometry enters an unstable drift state.
+
+```python
+from nimbus_bci.safety import DriftMonitor
+
+drift = DriftMonitor(tau_mean=0.35, tau_cov=1.20)
+status = drift.step(z_mean_stat=0.42, z_cov_stat=0.95)
+if status.alarm_mean:
+    print(f"Mean drift run: {status.run_mean} consecutive exceedances")
+```
+
+### 4. SafetyMonitor (Regret CUSUM)
+
+[`SafetyMonitor`](/python-sdk/api-reference#safetymonitor) is a sequential change-point watchdog over verified prediction outcomes:
+
+- Uses a Bernoulli log-likelihood ratio (LLR) CUSUM statistic on a sliding window.
+- Calibrated with Monte Carlo simulation (`fa=0.05`, `miss=0.20`, `min_window=10`, `max_window=40`) achieving a measured 0.0510 false-alarm rate.
+- Emits a `SafetyVerdict` with `should_revert=True` when cumulative regret indicates that recent adaptation harmed classification accuracy.
+
+<Warning>
+  **Monitoring Best Practice:** Always keep the monitor's baseline **fixed** mid-session. Blending the baseline toward a collapsing stream disarms the alarm that must catch the collapse. In addition, reset the monitor at each adaptation cycle to preserve the nominal false alarm rate.
+</Warning>
+
+---
+
+## Head Snapshot & Exact Rollback
+
+When `SafetyMonitor` flags degradation (`verdict.should_revert`), restore the head to a known healthy state:
+
+```python
+# 1. Capture snapshot before risky adaptation
+snapshot = p.snapshot_head()  # Returns an immutable HeadSnapshot
+
+# 2. Perform online adaptation
+p.partial_fit(X_stream, y_stream)
+
+# 3. Step monitor on verified outcomes
+verdict = monitor.step(is_correct=False)
+if verdict.should_revert:
+    # 4. Roll back head parameters
+    p.restore_head(snapshot)
+    print("Head rolled back to pre-adaptation parameters")
+```
+
+### Guarantees of `restore_head`
+- **Byte-exact:** Post-restore `predict_proba` and `predict` outputs are identical (`np.array_equal`) to pre-snapshot outputs.
+- **Repeatable:** Restoring deep-copies the snapshot payload; the `HeadSnapshot` instance remains pristine and reusable.
+- **Protected:** Fails fast with loud exceptions if attempted while an `adapt_async` job is in flight, or if head family or embedding dimensions have changed.
+- **Trunk generation warning:** Restoring a head snapshot across an encoder swap or trunk adaptation emits a `UserWarning`, alerting you that the restored head was fitted on a different geometry manifold.
+
+---
+
+## Ungoverned Surfaces by Design
+
+The following surfaces do **not** consult the governor:
+- `update_from_prediction()`: Verified single-trial labels represent the high-priority remediation channel that safety controls protect.
+- `adapt_errp()` and `fit_tent()`: Label-free self-supervision operates outside the label ledger. If desired, wrap these calls in your own `LabelBudget.spend()` invocations.
+- `save()` / `load()`: `SafetyConfig` and pacing counters are session-scoped and **not** persisted. A loaded profile starts ungoverned; attach a fresh `SafetyConfig` at load time.
+
+---
+
+## Live Safety Dashboard
+
+Nimbus provides a complete runnable example demonstrating all safety signals in action:
+
+```bash
+# Run the live trust dashboard (requires [viz] extra for animation)
+python examples/trust_dashboard.py
+
+# Headless / static render
+python examples/trust_dashboard.py --static
+```
+
+The script streams a synthetic session featuring a mislabeled batch, CUSUM threshold crossing, automated `restore_head` rollback, full accuracy recovery, and eventual budget exhaustion.
+
+---
+
+## Next Read
+
+<Columns cols={2}>
+  <Card title="Personalizer Overview" icon="layers" href="/personalizer/overview">
+    The Personalizer product wedge and integration patterns
+  </Card>
+  <Card title="API Reference: Safety" icon="book" href="/python-sdk/api-reference#safety">
+    Signatures and parameter defaults for all safety classes
+  </Card>
+  <Card title="Migration to 0.8" icon="arrow-right" href="/python-sdk/migration-0.8">
+    Adopting the 0.8 safety layer in existing pipelines
+  </Card>
+  <Card title="BrainState & Decision Presets" icon="brain" href="/personalizer/brain-state">
+    Per-trial rejection and confidence gating
+  </Card>
+</Columns>
